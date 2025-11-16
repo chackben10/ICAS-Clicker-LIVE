@@ -79,6 +79,22 @@
       min-height: 1.2em;
     }
 
+    .slide-status {
+      text-align: left;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+      color: var(--status-grey);
+    }
+    
+    .slide-status .current {
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    .slide-status .total {
+      color: var(--status-grey);
+    }
+
     .slides-list {
       display: flex;
       flex-direction: column;
@@ -146,8 +162,10 @@
       <a href="index.html" class="back-link">Clicker</a>
     </div>
 
-    <div id="statusText" class="status">
-      Loading slides...
+    <div id="statusText" class="slide-status">
+      Slide <span id="slideCurrent" class="current">0</span>
+      of
+      <span id="slideTotal" class="total">0</span>
     </div>
 
     <div id="slidesContainer" class="slides-list"></div>
@@ -204,9 +222,8 @@
           slideIndex = idxData.presentation_index.index;
         }
 
-        statusEl.textContent = totalSlides > 0
-          ? `Slide ${slideIndex + 1} of ${totalSlides}`
-          : 'No slides';
+        document.getElementById("slideCurrent").textContent = slideIndex + 1;
+        document.getElementById("slideTotal").textContent = totalSlides;
 
         // Render slide buttons
         container.innerHTML = '';
@@ -264,14 +281,12 @@
       } catch (err) {
         console.error(err);
         nameEl.textContent = 'No active presentation';
-        statusEl.textContent = 'Failed to load slides';
         container.innerHTML = '';
       }
     }
 
     async function focusSlide(index) {
       const statusEl = document.getElementById('statusText');
-      statusEl.textContent = `Going to slide ${index + 1}...`;
 
       try {
         const res = await fetch(`${BASE_URL}/focus?index=${index}`, {
@@ -282,10 +297,8 @@
         if (!res.ok) throw new Error('Bad response: ' + res.status);
 
         await fetchStatus();
-        statusEl.textContent = `Now on slide ${index + 1}`;
       } catch (err) {
         console.error(err);
-        statusEl.textContent = 'Error changing slide';
       }
 
       setTimeout(() => {
