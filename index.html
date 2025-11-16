@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Slide Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #000000;
+      --btn-prev-bg: #ffffff;
+      --btn-prev-text: #000000;
+      --btn-next-bg: #00c853;
+      --btn-next-text: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 480px;
+      padding: 16px;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 16px 12px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.07s ease, filter 0.07s ease;
+      width: 100%;
+    }
+
+    button:active {
+      transform: scale(0.97);
+      filter: brightness(0.9);
+    }
+
+    .btn-prev {
+      background: var(--btn-prev-bg);
+      color: var(--btn-prev-text);
+    }
+
+    .btn-next {
+      background: var(--btn-next-bg);
+      color: var(--btn-next-text);
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="buttons">
+      <button class="btn-prev" onclick="sendCommand('previous')">
+        Previous
+      </button>
+      <button class="btn-next" onclick="sendCommand('next')">
+        Next
+      </button>
+    </div>
+    <div class="status" id="statusText">
+      Ready
+    </div>
+  </div>
+
+  <script>
+    // 🔴 CHANGE THIS AFTER YOU SET UP CLOUDFLARE TUNNEL
+    // Example: 'https://your-tunnel-subdomain.trycloudflare.com'
+    const BASE_URL = 'https://YOUR_TUNNEL_URL_HERE';
+
+    async function sendCommand(action) {
+      const statusEl = document.getElementById('statusText');
+      const isNext = action === 'next';
+      statusEl.textContent = isNext ? 'Sending: Next…' : 'Sending: Previous…';
+
+      try {
+        const path = action === 'next' ? '/next' : '/previous';
+        const res = await fetch(`${BASE_URL}${path}`, {
+          method: 'GET',
+          cache: 'no-cache',
+        });
+
+        if (!res.ok) throw new Error('Bad response: ' + res.status);
+
+        statusEl.textContent = 'Command sent ✔';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Error sending command';
+      }
+
+      setTimeout(() => {
+        statusEl.textContent = 'Ready';
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
