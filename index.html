@@ -265,11 +265,20 @@
             currentSlideText = slide.text;
           }
         }
-
-        slideTextEl.textContent = currentSlideText;
+        
+        // ✅ Preserve line breaks from ProPresenter (handles \r\n, \r, \n)
+        const htmlText = (currentSlideText || '')
+          .replace(/\r\n/g, '\n')   // Windows-style -> \n
+          .replace(/\r/g, '\n')     // Lone \r -> \n
+          .split('\n')
+          .map(line => line.trimEnd())
+          .join('<br>');
+        
+        slideTextEl.innerHTML = htmlText;
+        
         slideCurrentEl.textContent = totalSlides > 0 ? (slideIndex + 1) : 0;
         slideTotalEl.textContent = totalSlides;
-
+        
         // Resize text to fit box
         fitSlideText();
 
