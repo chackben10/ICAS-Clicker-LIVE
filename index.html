@@ -267,7 +267,14 @@
           }
         }
 
-        slideTextEl.textContent = currentSlideText;
+        // Preserve line breaks from ProPresenter
+        const htmlText = (currentSlideText || '')
+          .replace(/\r\n/g, '\n')       // normalize Windows newlines
+          .split('\n')
+          .map(line => line.trimEnd())  // keep spacing but clean trailing spaces
+          .join('<br>');
+        
+        slideTextEl.innerHTML = htmlText;
         slideCurrentEl.textContent = totalSlides > 0 ? (slideIndex + 1) : 0;
         slideTotalEl.textContent = totalSlides;
 
