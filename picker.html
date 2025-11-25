@@ -178,7 +178,18 @@
   <script>
     const BASE_URL = "https://slides.icas-clicker.work";
 
+    // Cache so thumbnails are only fetched once per slide per presentation
+    const thumbCache = {};
+    let lastSlidesKey = null;
+    let lastUuid = null;
+    let lastIndex = null;
+
     async function loadThumbnail(uuid, index) {
+      const cacheKey = `${uuid}_${index}`;
+      if (thumbCache[cacheKey]) {
+        return thumbCache[cacheKey];
+      }
+
       try {
         const res = await fetch(
           `${BASE_URL}/thumbnail?uuid=${uuid}&index=${index}`,
@@ -188,16 +199,45 @@
         if (!res.ok) throw new Error("Bad thumbnail response");
 
         const blob = await res.blob();
-        return URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
+        thumbCache[cacheKey] = url;
+        return url;
       } catch (err) {
         console.error("Thumbnail error:", err);
         return null;
       }
     }
 
+    function buildSlidesKey(slides) {
+      // only consider groupName + text so ordering/content changes are detectable
+      const compact = slides.map(s => ({
+        g: s.groupName || "",
+        t: s.text || ""
+      }));
+      return JSON.stringify(compact);
+    }
+
+    function updateCurrentHighlight(currentIndex) {
+      const container = document.getElementById("slidesContainer");
+      const children = container.children;
+      for (let i = 0; i < children.length; i++) {
+        const el = children[i];
+        el.classList.remove("current");
+        el.disabled = false;
+        // keep "selected" if user just tapped it; it will clear next full rebuild
+      }
+      if (children[currentIndex]) {
+        children[currentIndex].classList.add("current");
+        children[currentIndex].disabled = true;
+        children[currentIndex].classList.remove("selected"); // remove outline once it becomes current
+      }
+    }
+
     async function fetchStatus() {
       const nameEl = document.getElementById("presentationName");
       const container = document.getElementById("slidesContainer");
+      const slideCurrentEl = document.getElementById("slideCurrent");
+      const slideTotalEl = document.getElementById("slideTotal");
 
       try {
         const [presRes, indexRes] = await Promise.all([
@@ -225,33 +265,53 @@
 
         // Presentation name
         nameEl.textContent =
-          presData.presentation?.id?.name || "No active presentation";
+          (presData.presentation && presData.presentation.id && presData.presentation.id.name) ||
+          "No active presentation";
 
         // Build flattened slides
         let slides = [];
-        presData.presentation?.groups?.forEach((group) => {
-          const groupName = group.name || "";
-          group.slides?.forEach((slide) => {
-            slides.push({
-              groupName,
-              text: slide.text || "",
-            });
+        if (presData.presentation && Array.isArray(presData.presentation.groups)) {
+          presData.presentation.groups.forEach((group) => {
+            const groupName = group.name || "";
+            if (Array.isArray(group.slides)) {
+              group.slides.forEach((slide) => {
+                slides.push({
+                  groupName,
+                  text: (slide && slide.text) || "",
+                });
+              });
+            }
           });
-        });
+        }
 
         const totalSlides = slides.length;
         const currentIndex =
-          idxData.presentation_index?.index || 0;
+          (idxData.presentation_index && typeof idxData.presentation_index.index === "number")
+            ? idxData.presentation_index.index
+            : 0;
 
-        document.getElementById("slideCurrent").textContent =
-          currentIndex + 1;
-        document.getElementById("slideTotal").textContent =
-          totalSlides;
+        slideCurrentEl.textContent = totalSlides > 0 ? currentIndex + 1 : 0;
+        slideTotalEl.textContent = totalSlides;
+
+        const slidesKey = buildSlidesKey(slides);
+
+        // If same presentation + same slide contents, just update current highlight
+        if (uuid === lastUuid && slidesKey === lastSlidesKey) {
+          if (currentIndex !== lastIndex) {
+            updateCurrentHighlight(currentIndex);
+            lastIndex = currentIndex;
+          }
+          return; // Do not rebuild DOM; avoid flicker & reloading thumbnails
+        }
+
+        // Presentation or slide list changed → rebuild DOM
+        lastUuid = uuid;
+        lastSlidesKey = slidesKey;
+        lastIndex = currentIndex;
 
         container.innerHTML = "";
 
-        // Render slides
-        slides.forEach(async (slide, i) => {
+        slides.forEach((slide, i) => {
           const item = document.createElement("button");
           item.type = "button";
           item.className = "slide-item";
@@ -290,20 +350,25 @@
 
             item.appendChild(textDiv);
           } else if (uuid) {
-            // Thumbnail for slides with no text
-            const imgURL = await loadThumbnail(uuid, i);
-
-            if (imgURL) {
+            // Thumbnail for slides with no text (loaded once from cache/fetch)
+            loadThumbnail(uuid, i).then((imgURL) => {
+              if (!imgURL) {
+                const fallback = document.createElement("div");
+                fallback.className = "slide-text";
+                fallback.textContent = "(No text / No thumbnail)";
+                item.appendChild(fallback);
+                return;
+              }
               const img = document.createElement("img");
               img.src = imgURL;
               img.className = "slide-thumb";
               item.appendChild(img);
-            } else {
-              const fallback = document.createElement("div");
-              fallback.className = "slide-text";
-              fallback.textContent = "(No text / No thumbnail)";
-              item.appendChild(fallback);
-            }
+            });
+          } else {
+            const fallback = document.createElement("div");
+            fallback.className = "slide-text";
+            fallback.textContent = "(No text)";
+            item.appendChild(fallback);
           }
 
           // click → focus slide
@@ -325,12 +390,15 @@
     }
 
     async function focusSlide(index) {
-      await fetch(`${BASE_URL}/focus?index=${index}`, {
-        method: "GET",
-        cache: "no-cache",
-      });
-
-      // allow outline to remain for a moment
+      try {
+        await fetch(`${BASE_URL}/focus?index=${index}`, {
+          method: "GET",
+          cache: "no-cache",
+        });
+      } catch (err) {
+        console.error("Error focusing slide:", err);
+      }
+      // allow outline to remain for a moment; next fetchStatus handles current highlight
       setTimeout(fetchStatus, 400);
     }
 
