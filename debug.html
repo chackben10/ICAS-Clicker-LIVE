@@ -11,6 +11,8 @@
       --status-grey: #888888;
       --card-bg: #181818;
       --border: #333333;
+      --ok: #00e676;
+      --bad: #ff5252;
     }
 
     * {
@@ -67,11 +69,6 @@
       white-space: nowrap;
     }
 
-    .back-link:hover {
-      opacity: 1;
-      background: #222;
-    }
-
     .status-bar {
       margin-top: 8px;
       margin-bottom: 12px;
@@ -80,12 +77,12 @@
     }
 
     .status-ok {
-      color: #00e676;
+      color: var(--ok);
       font-weight: 600;
     }
 
     .status-bad {
-      color: #ff5252;
+      color: var(--bad);
       font-weight: 600;
     }
 
@@ -93,21 +90,20 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      margin-top: 8px;
+      margin-top: 12px;
     }
 
     .card {
       background: var(--card-bg);
-      border-radius: 10px;
       border: 1px solid var(--border);
-      padding: 10px 12px;
+      border-radius: 10px;
+      padding: 12px;
     }
 
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 4px;
     }
 
     .card-title {
@@ -122,12 +118,19 @@
 
     pre {
       margin-top: 6px;
-      font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+      font-family: Menlo, Monaco, Consolas, monospace;
       font-size: 0.8rem;
-      line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
       color: #e0e0e0;
+    }
+
+    .thumb-img {
+      display: block;
+      margin-top: 10px;
+      max-width: 300px;
+      border: 1px solid #444;
+      border-radius: 6px;
     }
   </style>
 </head>
@@ -137,17 +140,16 @@
       <div>
         <div class="title">Slide Debug View</div>
         <div class="subtitle">
-          Inspect raw JSON from Hammerspoon / ProPresenter endpoints.
+          Inspect raw JSON + thumbnail responses from your Hammerspoon server.
         </div>
       </div>
-      <a href="index.html" class="back-link">Back to Controller</a>
+      <a href="index.html" class="back-link">Back</a>
     </div>
 
-    <div id="globalStatus" class="status-bar">
-      Loading…
-    </div>
+    <div id="globalStatus" class="status-bar">Loading…</div>
 
     <div class="cards">
+      <!-- HEALTH -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">/health</div>
@@ -156,6 +158,7 @@
         <pre id="healthBody">(waiting)</pre>
       </div>
 
+      <!-- ACTIVE PRESENTATION -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">/active-presentation</div>
@@ -164,6 +167,7 @@
         <pre id="activeBody">(waiting)</pre>
       </div>
 
+      <!-- SLIDE INDEX -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">/slide-index</div>
@@ -171,93 +175,140 @@
         </div>
         <pre id="indexBody">(waiting)</pre>
       </div>
+
+      <!-- THUMBNAIL DEBUG -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">/thumbnail</div>
+          <div id="thumbMeta" class="card-meta">Pending…</div>
+        </div>
+        <pre id="thumbBody">(waiting)</pre>
+        <img id="thumbImage" class="thumb-img" style="display:none" />
+      </div>
     </div>
   </div>
 
   <script>
-    // ⚠️ IMPORTANT:
-    // Use the SAME BASE_URL as in index.html and picker.html
-    const BASE_URL = 'https://slides.icas-clicker.work'; // or whatever you're using
+    const BASE_URL = "https://slides.icas-clicker.work";
 
     function pretty(obj) {
       try {
-        if (typeof obj === 'string') {
-          // try to parse if it looks like JSON
+        if (typeof obj === "string") {
           return JSON.stringify(JSON.parse(obj), null, 2);
         }
         return JSON.stringify(obj, null, 2);
-      } catch (e) {
+      } catch {
         return String(obj);
       }
     }
 
     function nowString() {
-      const d = new Date();
-      return d.toLocaleTimeString();
+      return new Date().toLocaleTimeString();
     }
 
     async function fetchEndpoint(path, metaEl, bodyEl, expectJson = true) {
       try {
         const res = await fetch(`${BASE_URL}${path}`, {
-          method: 'GET',
-          cache: 'no-cache',
+          method: "GET",
+          cache: "no-cache",
         });
 
         metaEl.textContent = `Status ${res.status} at ${nowString()}`;
 
         if (!res.ok) {
           bodyEl.textContent = `Error: HTTP ${res.status}`;
-          return res.ok;
+          return [false, null];
         }
 
         if (expectJson) {
           const data = await res.json();
           bodyEl.textContent = pretty(data);
+          return [true, data];
         } else {
           const text = await res.text();
           bodyEl.textContent = text;
+          return [true, text];
         }
-
-        return true;
       } catch (err) {
-        console.error(`Error fetching ${path}`, err);
         metaEl.textContent = `Error at ${nowString()}`;
         bodyEl.textContent = String(err);
-        return false;
+        return [false, null];
       }
     }
 
     async function refreshDebug() {
-      const globalStatus = document.getElementById('globalStatus');
-      const healthMeta = document.getElementById('healthMeta');
-      const healthBody = document.getElementById('healthBody');
-      const activeMeta = document.getElementById('activeMeta');
-      const activeBody = document.getElementById('activeBody');
-      const indexMeta = document.getElementById('indexMeta');
-      const indexBody = document.getElementById('indexBody');
+      const globalStatus = document.getElementById("globalStatus");
 
-      globalStatus.textContent = 'Refreshing…';
+      const healthMeta = document.getElementById("healthMeta");
+      const healthBody = document.getElementById("healthBody");
 
-      const [okHealth, okActive, okIndex] = await Promise.all([
-        fetchEndpoint('/health', healthMeta, healthBody, false),
-        fetchEndpoint('/active-presentation', activeMeta, activeBody, true),
-        fetchEndpoint('/slide-index', indexMeta, indexBody, true),
-      ]);
+      const activeMeta = document.getElementById("activeMeta");
+      const activeBody = document.getElementById("activeBody");
+
+      const indexMeta = document.getElementById("indexMeta");
+      const indexBody = document.getElementById("indexBody");
+
+      const thumbMeta = document.getElementById("thumbMeta");
+      const thumbBody = document.getElementById("thumbBody");
+      const thumbImage = document.getElementById("thumbImage");
+
+      globalStatus.textContent = "Refreshing…";
+
+      const [okHealth] = await fetchEndpoint("/health", healthMeta, healthBody, false);
+      const [okActive, activeData] = await fetchEndpoint("/active-presentation", activeMeta, activeBody, true);
+      const [okIndex, indexData] = await fetchEndpoint("/slide-index", indexMeta, indexBody, true);
+
+      let uuid = null;
+      let slideIndex = null;
+
+      if (activeData?.presentation?.id?.uuid) {
+        uuid = activeData.presentation.id.uuid;
+      }
+
+      if (indexData?.presentation_index?.index !== undefined) {
+        slideIndex = indexData.presentation_index.index;
+      }
+
+      if (uuid && slideIndex !== null) {
+        // Build thumbnail URL exactly as index/picker uses
+        const thumbUrl = `${BASE_URL}/thumbnail?uuid=${uuid}&index=${slideIndex}`;
+
+        try {
+          const res = await fetch(thumbUrl, { method: "GET", cache: "no-cache" });
+          thumbMeta.textContent = `Status ${res.status} at ${nowString()} — ${thumbUrl}`;
+
+          if (!res.ok) {
+            thumbBody.textContent = `Error: HTTP ${res.status}`;
+            thumbImage.style.display = "none";
+          } else {
+            const blob = await res.blob();
+            thumbBody.textContent = `Received ${blob.size} bytes`;
+
+            const localURL = URL.createObjectURL(blob);
+            thumbImage.src = localURL;
+            thumbImage.style.display = "block";
+          }
+        } catch (err) {
+          thumbMeta.textContent = `Error at ${nowString()}`;
+          thumbBody.textContent = String(err);
+          thumbImage.style.display = "none";
+        }
+
+      } else {
+        thumbMeta.textContent = "UUID or slide index missing";
+        thumbBody.textContent = "(Cannot request thumbnail)";
+        thumbImage.style.display = "none";
+      }
 
       if (okHealth && okActive && okIndex) {
-        globalStatus.innerHTML =
-          '<span class="status-ok">All endpoints OK</span> — ' +
-          nowString();
+        globalStatus.innerHTML = `<span class="status-ok">All endpoints OK</span> — ${nowString()}`;
       } else {
-        globalStatus.innerHTML =
-          '<span class="status-bad">One or more endpoints failed</span> — ' +
-          nowString();
+        globalStatus.innerHTML = `<span class="status-bad">One or more endpoints failed</span> — ${nowString()}`;
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener("DOMContentLoaded", () => {
       refreshDebug();
-      // Auto-refresh every 5 seconds so you can watch things change
       setInterval(refreshDebug, 5000);
     });
   </script>
