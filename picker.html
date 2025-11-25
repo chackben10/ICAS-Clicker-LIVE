@@ -13,6 +13,7 @@
       --slide-bg-current: #ffffff;
       --slide-text: #f0f0f0;
       --slide-text-current: #000000;
+      --selected-outline: 3px solid white;
     }
 
     * {
@@ -71,26 +72,18 @@
       background: #222;
     }
 
-    .status {
-      text-align: left;
-      margin-bottom: 8px;
-      font-size: 0.9rem;
-      color: var(--status-grey);
-      min-height: 1.2em;
-    }
-
     .slide-status {
       text-align: left;
       margin-bottom: 12px;
       font-size: 0.95rem;
       color: var(--status-grey);
     }
-    
+
     .slide-status .current {
       color: #ffffff;
       font-weight: 600;
     }
-    
+
     .slide-status .total {
       color: var(--status-grey);
     }
@@ -125,6 +118,12 @@
       cursor: default;
     }
 
+    /* White outline for selection feedback */
+    .slide-item.selected {
+      outline: var(--selected-outline);
+      outline-offset: 3px;
+    }
+
     .slide-item-header {
       display: flex;
       align-items: baseline;
@@ -148,8 +147,13 @@
       word-break: break-word;
     }
 
-    .slide-text br {
-      line-height: 1.2;
+    /* Thumbnail image inside slide item */
+    .slide-thumb {
+      margin-top: 6px;
+      width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      border-radius: 6px;
     }
   </style>
 </head>
@@ -172,103 +176,141 @@
   </div>
 
   <script>
-    // Use the SAME hostname as index.html
-    const BASE_URL = 'https://slides.icas-clicker.work';
+    const BASE_URL = "https://slides.icas-clicker.work";
+
+    async function loadThumbnail(uuid, index) {
+      try {
+        const res = await fetch(
+          `${BASE_URL}/thumbnail?uuid=${uuid}&index=${index}`,
+          { method: "GET", cache: "no-cache" }
+        );
+
+        if (!res.ok) throw new Error("Bad thumbnail response");
+
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      } catch (err) {
+        console.error("Thumbnail error:", err);
+        return null;
+      }
+    }
 
     async function fetchStatus() {
-      const statusEl = document.getElementById('statusText');
-      const nameEl = document.getElementById('presentationName');
-      const container = document.getElementById('slidesContainer');
+      const nameEl = document.getElementById("presentationName");
+      const container = document.getElementById("slidesContainer");
 
       try {
         const [presRes, indexRes] = await Promise.all([
-          fetch(`${BASE_URL}/active-presentation`, { method: 'GET', cache: 'no-cache' }),
-          fetch(`${BASE_URL}/slide-index`, { method: 'GET', cache: 'no-cache' })
+          fetch(`${BASE_URL}/active-presentation`, {
+            method: "GET",
+            cache: "no-cache",
+          }),
+          fetch(`${BASE_URL}/slide-index`, {
+            method: "GET",
+            cache: "no-cache",
+          }),
         ]);
 
         if (!presRes.ok || !indexRes.ok) {
-          throw new Error('Bad response from one of the endpoints');
+          throw new Error("Bad response from endpoints");
         }
 
         const presData = await presRes.json();
         const idxData = await indexRes.json();
 
-        // Presentation name
-        let name = 'No active presentation';
-        if (presData && presData.presentation && presData.presentation.id && presData.presentation.id.name) {
-          name = presData.presentation.id.name;
-        }
-        nameEl.textContent = name;
+        const uuid =
+          presData.presentation && presData.presentation.id
+            ? presData.presentation.id.uuid
+            : null;
 
-        // Build flattened slides with group names
+        // Presentation name
+        nameEl.textContent =
+          presData.presentation?.id?.name || "No active presentation";
+
+        // Build flattened slides
         let slides = [];
-        if (presData && presData.presentation && Array.isArray(presData.presentation.groups)) {
-          presData.presentation.groups.forEach(group => {
-            const groupName = group && group.name ? group.name : '';
-            if (group && Array.isArray(group.slides)) {
-              group.slides.forEach(slide => {
-                slides.push({
-                  groupName,
-                  text: slide && slide.text ? slide.text : ''
-                });
-              });
-            }
+        presData.presentation?.groups?.forEach((group) => {
+          const groupName = group.name || "";
+          group.slides?.forEach((slide) => {
+            slides.push({
+              groupName,
+              text: slide.text || "",
+            });
           });
-        }
+        });
 
         const totalSlides = slides.length;
-        let slideIndex = 0;
-        if (idxData && idxData.presentation_index && typeof idxData.presentation_index.index === 'number') {
-          slideIndex = idxData.presentation_index.index;
-        }
+        const currentIndex =
+          idxData.presentation_index?.index || 0;
 
-        document.getElementById("slideCurrent").textContent = slideIndex + 1;
-        document.getElementById("slideTotal").textContent = totalSlides;
+        document.getElementById("slideCurrent").textContent =
+          currentIndex + 1;
+        document.getElementById("slideTotal").textContent =
+          totalSlides;
 
-        // Render slide buttons
-        container.innerHTML = '';
-        slides.forEach((slide, i) => {
-          const item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'slide-item';
-          if (i === slideIndex) {
-            item.classList.add('current');
-          }
+        container.innerHTML = "";
 
-          const header = document.createElement('div');
-          header.className = 'slide-item-header';
+        // Render slides
+        slides.forEach(async (slide, i) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "slide-item";
+          if (i === currentIndex) item.classList.add("current");
 
-          const numSpan = document.createElement('span');
-          numSpan.className = 'slide-number';
-          numSpan.textContent = (i + 1).toString();
+          // Header: slide number + group name
+          const header = document.createElement("div");
+          header.className = "slide-item-header";
+
+          const numSpan = document.createElement("span");
+          numSpan.className = "slide-number";
+          numSpan.textContent = i + 1;
 
           header.appendChild(numSpan);
 
           if (slide.groupName) {
-            const groupSpan = document.createElement('span');
-            groupSpan.className = 'slide-group';
+            const groupSpan = document.createElement("span");
+            groupSpan.className = "slide-group";
             groupSpan.textContent = slide.groupName;
             header.appendChild(groupSpan);
           }
 
-          const textDiv = document.createElement('div');
-          textDiv.className = 'slide-text';
-
-          // Preserve line breaks like on the clicker page
-          const htmlText = (slide.text || '')
-            .replace(/\r\n/g, '\n')
-            .replace(/\r/g, '\n')
-            .split('\n')
-            .map(line => line.trimEnd())
-            .join('<br>');
-
-          textDiv.innerHTML = htmlText;
-
           item.appendChild(header);
-          item.appendChild(textDiv);
 
-          if (i !== slideIndex) {
-            item.addEventListener('click', () => {
+          // Slide text or thumbnail
+          if (slide.text && slide.text.trim() !== "") {
+            const textDiv = document.createElement("div");
+            textDiv.className = "slide-text";
+
+            textDiv.innerHTML = slide.text
+              .replace(/\r\n/g, "\n")
+              .replace(/\r/g, "\n")
+              .split("\n")
+              .map((l) => l.trimEnd())
+              .join("<br>");
+
+            item.appendChild(textDiv);
+          } else if (uuid) {
+            // Thumbnail for slides with no text
+            const imgURL = await loadThumbnail(uuid, i);
+
+            if (imgURL) {
+              const img = document.createElement("img");
+              img.src = imgURL;
+              img.className = "slide-thumb";
+              item.appendChild(img);
+            } else {
+              const fallback = document.createElement("div");
+              fallback.className = "slide-text";
+              fallback.textContent = "(No text / No thumbnail)";
+              item.appendChild(fallback);
+            }
+          }
+
+          // click → focus slide
+          if (i !== currentIndex) {
+            item.addEventListener("click", () => {
+              // visual feedback BEFORE ProPresenter switches
+              item.classList.add("selected");
               focusSlide(i);
             });
           } else {
@@ -277,36 +319,22 @@
 
           container.appendChild(item);
         });
-
       } catch (err) {
         console.error(err);
-        nameEl.textContent = 'No active presentation';
-        container.innerHTML = '';
       }
     }
 
     async function focusSlide(index) {
-      const statusEl = document.getElementById('statusText');
+      await fetch(`${BASE_URL}/focus?index=${index}`, {
+        method: "GET",
+        cache: "no-cache",
+      });
 
-      try {
-        const res = await fetch(`${BASE_URL}/focus?index=${index}`, {
-          method: 'GET',
-          cache: 'no-cache'
-        });
-
-        if (!res.ok) throw new Error('Bad response: ' + res.status);
-
-        await fetchStatus();
-      } catch (err) {
-        console.error(err);
-      }
-
-      setTimeout(() => {
-        fetchStatus();
-      }, 800);
+      // allow outline to remain for a moment
+      setTimeout(fetchStatus, 400);
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener("DOMContentLoaded", () => {
       fetchStatus();
       setInterval(fetchStatus, 1000);
     });
