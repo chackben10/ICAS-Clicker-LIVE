@@ -15,17 +15,12 @@
       --status-grey: #888888;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: var(--bg);
       color: #ffffff;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -49,7 +44,7 @@
     .presentation-name {
       text-align: left;
       color: var(--title-color);
-      font-size: 1.4rem; /* ~25% larger */
+      font-size: 1.4rem;
       font-weight: 700;
       min-height: 1.4em;
       margin-right: 8px;
@@ -82,9 +77,9 @@
       justify-content: center;
       overflow: hidden;
 
-      /* 16:9 and limited to at most 1/3 of viewport height on larger screens */
       aspect-ratio: 16 / 9;
       width: min(100%, calc(100vh / 3 * 16 / 9));
+      position: relative;
     }
 
     .slide-text {
@@ -102,14 +97,8 @@
       color: var(--status-grey);
     }
 
-    .slide-status .current {
-      color: #ffffff;
-      font-weight: 600;
-    }
-
-    .slide-status .total {
-      color: var(--status-grey);
-    }
+    .slide-status .current { color: #ffffff; font-weight: 600; }
+    .slide-status .total   { color: var(--status-grey); }
 
     .buttons {
       display: grid;
@@ -128,20 +117,9 @@
       width: 100%;
     }
 
-    button:active {
-      transform: scale(0.97);
-      filter: brightness(0.9);
-    }
-
-    .btn-prev {
-      background: var(--btn-prev-bg);
-      color: var(--btn-prev-text);
-    }
-
-    .btn-next {
-      background: var(--btn-next-bg);
-      color: var(--btn-next-text);
-    }
+    button:active { transform: scale(0.97); filter: brightness(0.9); }
+    .btn-prev { background: var(--btn-prev-bg); color: var(--btn-prev-text); }
+    .btn-next { background: var(--btn-next-bg); color: var(--btn-next-text); }
 
     .status {
       text-align: center;
@@ -154,72 +132,48 @@
 </head>
 <body>
   <div class="wrapper">
-    <!-- Top bar: presentation name + Picker button -->
+
     <div class="top-row">
-      <div id="presentationName" class="presentation-name">
-        Loading presentation...
-      </div>
+      <div id="presentationName" class="presentation-name">Loading presentation...</div>
       <a href="picker.html" class="nav-link">Picker</a>
     </div>
 
-    <!-- 16:9 box with slide text -->
     <div id="slideBox" class="slide-box">
       <p id="slideText" class="slide-text"></p>
       <img id="slideImage" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
     </div>
 
-    <!-- Slide X of Y -->
     <div class="slide-status">
-      Slide <span id="slideCurrent" class="current">0</span>
-      of
+      Slide <span id="slideCurrent" class="current">0</span> of
       <span id="slideTotal" class="total">0</span>
     </div>
 
-    <!-- Buttons -->
     <div class="buttons">
-      <button class="btn-prev" onclick="sendCommand('previous')">
-        Previous
-      </button>
-      <button class="btn-next" onclick="sendCommand('next')">
-        Next
-      </button>
+      <button class="btn-prev" onclick="sendCommand('previous')">Previous</button>
+      <button class="btn-next" onclick="sendCommand('next')">Next</button>
     </div>
 
-    <div class="status" id="statusText">
-      Ready
-    </div>
+    <div class="status" id="statusText">Ready</div>
   </div>
 
   <script>
-    // Your tunnel hostname
     const BASE_URL = 'https://slides.icas-clicker.work';
 
     async function sendCommand(action) {
       const statusEl = document.getElementById('statusText');
-      const isNext = action === 'next';
-      statusEl.textContent = isNext ? 'Sending: Next…' : 'Sending: Previous…';
+      statusEl.textContent = action === 'next' ? 'Sending: Next…' : 'Sending: Previous…';
 
       try {
-        const path = action === 'next' ? '/next' : '/previous';
-        const res = await fetch(`${BASE_URL}${path}`, {
-          method: 'GET',
-          cache: 'no-cache',
-        });
-
-        if (!res.ok) throw new Error('Bad response: ' + res.status);
-
-        statusEl.textContent = 'Command sent ✔';
-
-        // Refresh immediately after command
+        const endpoint = action === 'next' ? '/next' : '/previous';
+        const res = await fetch(`${BASE_URL}${endpoint}`, { method: 'GET', cache: 'no-cache' });
+        if (!res.ok) throw new Error("Bad response");
+        statusEl.textContent = "Command sent ✔";
         refreshStatus();
       } catch (err) {
-        console.error(err);
-        statusEl.textContent = 'Error sending command';
+        statusEl.textContent = "Error sending command";
       }
 
-      setTimeout(() => {
-        statusEl.textContent = 'Ready';
-      }, 1000);
+      setTimeout(() => { statusEl.textContent = "Ready"; }, 1000);
     }
 
     function fitSlideText() {
@@ -227,35 +181,30 @@
       const textEl = document.getElementById('slideText');
       if (!box || !textEl) return;
 
-      const maxFont = 40; // px
-      const minFont = 14; // px
-
-      let fontSize = maxFont;
-      textEl.style.fontSize = fontSize + 'px';
+      let fontSize = 40;
+      textEl.style.fontSize = fontSize + "px";
 
       const boxHeight = box.clientHeight - 16;
       const boxWidth = box.clientWidth - 16;
 
-      while (
-        fontSize > minFont &&
-        (textEl.scrollHeight > boxHeight || textEl.scrollWidth > boxWidth)
-      ) {
+      while (fontSize > 14 && (textEl.scrollHeight > boxHeight || textEl.scrollWidth > boxWidth)) {
         fontSize -= 1;
-        textEl.style.fontSize = fontSize + 'px';
+        textEl.style.fontSize = fontSize + "px";
       }
     }
 
     async function loadThumbnail(uuid, index) {
       try {
-        const res = await fetch(`${BASE_URL}/thumbnail?uuid=${uuid}&index=${index}`, {
-          method: 'GET',
-          cache: 'no-cache'
-        });
-    
-        if (!res.ok) throw new Error('Bad thumbnail response');
-    
+        const res = await fetch(
+          `${BASE_URL}/thumbnail?uuid=${uuid}&index=${index}&t=${Date.now()}`,
+          { method: "GET", cache: "no-cache" }
+        );
+
+        if (!res.ok) throw new Error("Bad thumbnail response");
+
         const blob = await res.blob();
         return URL.createObjectURL(blob);
+
       } catch (err) {
         console.error("Thumbnail error", err);
         return null;
@@ -265,106 +214,83 @@
     async function refreshStatus() {
       const nameEl = document.getElementById('presentationName');
       const slideTextEl = document.getElementById('slideText');
+      const slideImageEl = document.getElementById('slideImage');
       const slideCurrentEl = document.getElementById('slideCurrent');
       const slideTotalEl = document.getElementById('slideTotal');
 
       try {
         const [presRes, indexRes] = await Promise.all([
-          fetch(`${BASE_URL}/active-presentation`, { method: 'GET', cache: 'no-cache' }),
-          fetch(`${BASE_URL}/slide-index`, { method: 'GET', cache: 'no-cache' })
+          fetch(`${BASE_URL}/active-presentation`, { cache: "no-cache" }),
+          fetch(`${BASE_URL}/slide-index`, { cache: "no-cache" })
         ]);
-
-        if (!presRes.ok || !indexRes.ok) {
-          throw new Error('Bad response from one of the endpoints');
-        }
 
         const presData = await presRes.json();
         const idxData = await indexRes.json();
 
         // Presentation name
-        let name = 'No active presentation';
-        if (presData && presData.presentation && presData.presentation.id && presData.presentation.id.name) {
-          name = presData.presentation.id.name;
-        }
-        nameEl.textContent = name;
+        nameEl.textContent = presData?.presentation?.id?.name || "No active presentation";
 
-        // Flatten all slides from groups to find total + current slide text
+        // Slides
         let slides = [];
-        if (presData && presData.presentation && Array.isArray(presData.presentation.groups)) {
-          presData.presentation.groups.forEach(group => {
-            if (group && Array.isArray(group.slides)) {
-              slides = slides.concat(group.slides);
-            }
-          });
-        }
+        presData.presentation?.groups?.forEach(group => {
+          if (Array.isArray(group.slides)) slides = slides.concat(group.slides);
+        });
 
         const totalSlides = slides.length;
-        let slideIndex = 0;
-        if (idxData && idxData.presentation_index && typeof idxData.presentation_index.index === 'number') {
-          slideIndex = idxData.presentation_index.index;
-        }
+        const slideIndex = idxData?.presentation_index?.index ?? 0;
 
-        let currentSlide = null;
-        let currentSlideText = "";
-        
-        if (totalSlides > 0 && slideIndex >= 0 && slideIndex < totalSlides) {
-          currentSlide = slides[slideIndex];
-          if (currentSlide && currentSlide.text) {
-            currentSlideText = currentSlide.text.trim();
-          }
-        }
+        const currentSlide = slides[slideIndex];
+        const currentText = (currentSlide?.text || "").trim();
 
-        // Preserve line breaks from ProPresenter (\r\n, \r, \n)
-        const htmlText = (currentSlideText || '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .split('\n')
-          .map(line => line.trimEnd())
-          .join('<br>');
-
-        const slideImageEl = document.getElementById('slideImage');
-
-        // CASE 1 — Slide HAS text
-        if (htmlText && htmlText.trim() !== "") {
+        // Case 1: Slide has text
+        if (currentText !== "") {
           slideImageEl.style.display = "none";
           slideTextEl.style.display = "block";
+
+          const htmlText = currentText
+            .replace(/\r\n/g, '\n')
+            .replace(/\r/g, '\n')
+            .split('\n')
+            .map(l => l.trimEnd())
+            .join('<br>');
+
           slideTextEl.innerHTML = htmlText;
           fitSlideText();
         }
-        
-        // CASE 2 — Slide HAS NO text — show thumbnail
-        else if (currentSlide && presData.presentation && presData.presentation.id) {
-          const uuid = presData.presentation.id.uuid;
-        
-          slideTextEl.style.display = "none";
-          slideImageEl.style.display = "block";
-        
-          const imgURL = await loadThumbnail(uuid, slideIndex);
-          if (imgURL) {
-            slideImageEl.src = imgURL;
-          } else {
-            slideImageEl.style.display = "none";
-            slideTextEl.style.display = "block";
-            slideTextEl.textContent = "(No Text / No Thumbnail)";
+        // Case 2: Slide has NO text → load PNG thumbnail
+        else {
+          const uuid = presData?.presentation?.id?.uuid;
+          if (uuid) {
+            const imgURL = await loadThumbnail(uuid, slideIndex);
+
+            if (imgURL) {
+              slideTextEl.style.display = "none";
+              slideImageEl.style.display = "block";
+              slideImageEl.src = imgURL;
+            } else {
+              slideImageEl.style.display = "none";
+              slideTextEl.style.display = "block";
+              slideTextEl.textContent = "(No Text / No Thumbnail)";
+            }
           }
         }
-        
-        // Update X of Y
-        slideCurrentEl.textContent = totalSlides > 0 ? (slideIndex + 1) : 0;
+
+        slideCurrentEl.textContent = totalSlides > 0 ? slideIndex + 1 : 0;
         slideTotalEl.textContent = totalSlides;
+
       } catch (err) {
         console.error(err);
-        nameEl.textContent = 'No active presentation';
-        slideTextEl.textContent = '';
-        slideCurrentEl.textContent = '0';
-        slideTotalEl.textContent = '0';
+        nameEl.textContent = "No active presentation";
+        slideTextEl.textContent = "";
+        slideCurrentEl.textContent = "0";
+        slideTotalEl.textContent = "0";
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener("DOMContentLoaded", () => {
       refreshStatus();
       setInterval(refreshStatus, 1000);
-      window.addEventListener('resize', fitSlideText);
+      window.addEventListener("resize", fitSlideText);
     });
   </script>
 </body>
