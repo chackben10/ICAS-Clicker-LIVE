@@ -1,0 +1,1 @@
+2025-11-24 21:36:47: HTTP handler error:	...ammerspoon.app/Contents/Resources/extensions/hs/http.lua:95: ERROR: incorrect type 'nil' for argument 5 (expected function)
