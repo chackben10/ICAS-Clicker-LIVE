@@ -192,14 +192,10 @@
       min-width: 260px;
       max-width: 340px;
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
-      display: block;
+      position: relative;      /* ⬅️ anchor for the X button */
     }
 
     .settings-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
       margin-bottom: 12px;
     }
 
@@ -209,6 +205,9 @@
     }
 
     .settings-close {
+      position: absolute;      /* ⬅️ always in the card’s top-right */
+      top: 10px;
+      right: 12px;
       border: none;
       background: none;
       color: #ffffff;
@@ -308,16 +307,19 @@
 
   <div id="settingsOverlay" class="settings-overlay">
     <div class="settings-card">
+      <!-- X is absolutely positioned relative to settings-card -->
+      <button
+        type="button"
+        class="settings-close"
+        id="settingsCloseButton"
+      >
+        ×
+      </button>
+
       <div class="settings-header">
         <div class="settings-title">Settings</div>
-        <button
-          type="button"
-          class="settings-close"
-          id="settingsCloseButton"
-        >
-          ×
-        </button>
       </div>
+
       <div class="settings-row">
         <div class="settings-label">Thumbnails only</div>
         <label class="switch">
