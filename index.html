@@ -12,6 +12,7 @@
       --btn-next-bg: #00c853;
       --btn-next-text: #ffffff;
       --title-color: #ff5252;
+      --page-title-color: #bbbbbb;
       --status-grey: #888888;
       --overlay-bg: rgba(0, 0, 0, 0.7);
       --card-bg: #111111;
@@ -38,20 +39,18 @@
       padding: 16px;
     }
 
+    /* Top bar: page title + actions */
     .top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
-    .presentation-name {
-      text-align: left;
-      color: var(--title-color);
-      font-size: 1.4rem;
-      font-weight: 700;
-      min-height: 1.4em;
-      margin-right: 8px;
+    .page-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--page-title-color);
     }
 
     .top-actions {
@@ -71,11 +70,25 @@
       white-space: nowrap;
       background: transparent;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      appearance: none;
     }
 
     .nav-link:hover {
       opacity: 1;
       background: #222;
+    }
+
+    /* Presentation title now under buttons */
+    .presentation-name {
+      text-align: left;
+      color: var(--title-color);
+      font-size: 1.4rem;
+      font-weight: 700;
+      min-height: 1.4em;
+      margin: 4px 0 10px 0;
     }
 
     .slide-box {
@@ -156,15 +169,17 @@
       background: var(--card-bg);
       border-radius: 12px;
       border: 1px solid var(--card-border);
-      padding: 16px 18px;
+      padding: 16px 18px 12px 18px;
       width: min(90%, 360px);
+      position: relative;
     }
 
     .settings-header {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
       align-items: center;
       margin-bottom: 10px;
+      padding-right: 24px; /* space so title doesn't run under the X */
     }
 
     .settings-title {
@@ -173,12 +188,16 @@
     }
 
     .settings-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
       background: transparent;
       border: none;
       color: #ffffff;
       font-size: 1.2rem;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 4px 6px;
+      line-height: 1;
     }
 
     .settings-row {
@@ -191,13 +210,6 @@
 
     .settings-label {
       margin-right: 12px;
-    }
-
-    .settings-footer {
-      margin-top: 10px;
-      text-align: right;
-      font-size: 0.8rem;
-      color: var(--status-grey);
     }
 
     .settings-toggle {
@@ -240,13 +252,17 @@
 <body>
   <div class="wrapper">
 
+    <!-- Top bar: page title + actions -->
     <div class="top-row">
-      <div id="presentationName" class="presentation-name">Loading presentation...</div>
+      <div class="page-title">Clicker</div>
       <div class="top-actions">
         <a href="picker.html" class="nav-link">Picker</a>
         <button type="button" class="nav-link" onclick="openSettings()">Settings</button>
       </div>
     </div>
+
+    <!-- Presentation title under buttons -->
+    <div id="presentationName" class="presentation-name">Loading presentation...</div>
 
     <div id="slideBox" class="slide-box">
       <p id="slideText" class="slide-text"></p>
@@ -274,8 +290,8 @@
     <div class="settings-card">
       <div class="settings-header">
         <div class="settings-title">Settings</div>
-        <button class="settings-close" onclick="closeSettings()">×</button>
       </div>
+      <button class="settings-close" onclick="closeSettings()">×</button>
 
       <div class="settings-row">
         <div class="settings-label">Thumbnails only</div>
@@ -290,10 +306,6 @@
             <div class="settings-toggle-knob"></div>
           </div>
         </label>
-      </div>
-
-      <div class="settings-footer">
-        This setting is saved on this device and shared across pages.
       </div>
     </div>
   </div>
@@ -318,7 +330,7 @@
     }
 
     function openSettings() {
-      loadSettings(); // ensure UI matches current state
+      loadSettings(); // sync UI with current state
       const overlay = document.getElementById('settingsOverlay');
       if (overlay) overlay.style.display = 'flex';
     }
@@ -331,7 +343,6 @@
     function onThumbsToggleChange(checked) {
       thumbnailsOnly = !!checked;
       saveSettings();
-      // Immediately refresh display so the user sees the mode change
       refreshStatus();
     }
 
@@ -417,7 +428,6 @@
         const currentText = currentTextRaw.trim();
         const uuid = presData?.presentation?.id?.uuid || null;
 
-        // Helper: render text
         function showText(text) {
           const htmlText = (text || "")
             .replace(/\r\n/g, '\n')
@@ -432,7 +442,6 @@
           fitSlideText();
         }
 
-        // Helper: show "no data" message
         function showFallbackMessage() {
           slideImageEl.style.display = "none";
           slideTextEl.style.display = "block";
@@ -443,7 +452,6 @@
           showFallbackMessage();
         } else {
           if (thumbnailsOnly && uuid) {
-            // Thumbnails only mode: prefer image; fallback to text if image fails
             const imgURL = await loadThumbnail(uuid, slideIndex);
             if (imgURL) {
               slideTextEl.style.display = "none";
@@ -455,7 +463,6 @@
               showFallbackMessage();
             }
           } else {
-            // Normal mode: show text if present; otherwise thumbnail
             if (currentText !== "") {
               showText(currentTextRaw);
             } else if (uuid) {
