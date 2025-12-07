@@ -138,6 +138,7 @@
       background: var(--slide-bg-current);
       color: var(--slide-text-current);
       border-color: #888;
+      cursor: default;
     }
 
     .slide-item.selected {
@@ -391,10 +392,12 @@
       for (let i = 0; i < children.length; i++) {
         const el = children[i];
         el.classList.remove("current");
-        el.classList.remove("selected");
+        el.disabled = false;
       }
       if (children[currentIndex]) {
         children[currentIndex].classList.add("current");
+        children[currentIndex].disabled = true;
+        children[currentIndex].classList.remove("selected");
       }
     }
 
@@ -543,11 +546,16 @@
             item.appendChild(fallback);
           }
 
-          // Always allow clicking any slide (including the current one)
+          // ALWAYS attach click handler; ignore clicks while disabled
           item.addEventListener("click", () => {
+            if (item.disabled) return; // current slide; do nothing
             item.classList.add("selected");
             focusSlide(i);
           });
+
+          if (i === currentIndex) {
+            item.disabled = true;
+          }
 
           container.appendChild(item);
         });
