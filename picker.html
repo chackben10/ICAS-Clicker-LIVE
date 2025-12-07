@@ -183,7 +183,7 @@
       }
     }
 
-    /* Settings modal (same as index.html) */
+    /* Settings modal */
 
     .settings-overlay {
       position: fixed;
@@ -224,6 +224,33 @@
       font-size: 0.95rem;
     }
 
+    /* Text-size row: stack label + slider nicely */
+
+    .settings-row-column {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .settings-textsize {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .settings-textsize input[type="range"] {
+      flex: 1;
+    }
+
+    .settings-textsize-value {
+      font-size: 0.85rem;
+      color: var(--status-grey);
+      min-width: 48px;
+      text-align: right;
+    }
+
     .settings-footer {
       margin-top: 14px;
     }
@@ -244,6 +271,8 @@
     .settings-close-btn:hover {
       background: #222;
     }
+
+    /* Toggle switch */
 
     .switch {
       position: relative;
@@ -321,12 +350,28 @@
         <div class="settings-title">Settings</div>
       </div>
 
+      <!-- Thumbnails only -->
       <div class="settings-row">
         <div class="settings-label">Thumbnails only</div>
         <label class="switch">
           <input type="checkbox" id="thumbsOnlyToggle" />
           <span class="slider"></span>
         </label>
+      </div>
+
+      <!-- Text size -->
+      <div class="settings-row settings-row-column">
+        <div class="settings-label">Text size</div>
+        <div class="settings-textsize">
+          <input
+            type="range"
+            id="textSizeSlider"
+            min="50"
+            max="300"
+            step="10"
+          />
+          <span id="textSizeValue" class="settings-textsize-value">100%</span>
+        </div>
       </div>
 
       <div class="settings-footer">
@@ -340,6 +385,7 @@
   <script>
     const BASE_URL = "https://slides.icas-clicker.work";
     const SETTINGS_KEY = "icas-thumbnails-only";
+    const TEXT_SCALE_KEY = "icas-picker-text-scale";
 
     const thumbCache = {};
     let lastSlidesKey = null;
@@ -354,6 +400,22 @@
       localStorage.setItem(SETTINGS_KEY, value ? "true" : "false");
     }
 
+    function getTextScale() {
+      const raw = parseInt(localStorage.getItem(TEXT_SCALE_KEY), 10);
+      if (Number.isNaN(raw)) return 100;
+      return Math.min(300, Math.max(50, raw));
+    }
+
+    function setTextScale(value) {
+      const clamped = Math.min(300, Math.max(50, value));
+      localStorage.setItem(TEXT_SCALE_KEY, String(clamped));
+    }
+
+    function applyTextScale(el, scalePercent) {
+      const baseRem = 0.95;
+      el.style.fontSize = baseRem * (scalePercent / 100) + "rem";
+    }
+
     async function loadThumbnail(uuid, index) {
       const cacheKey = `${uuid}_${index}`;
       if (thumbCache[cacheKey]) {
@@ -365,7 +427,6 @@
           `${BASE_URL}/thumbnail?uuid=${uuid}&index=${index}`,
           { method: "GET", cache: "no-cache" }
         );
-
         if (!res.ok) throw new Error("Bad thumbnail response");
 
         const blob = await res.blob();
@@ -378,12 +439,18 @@
       }
     }
 
-    function buildSlidesKey(slides, thumbnailsOnly) {
+    function buildSlidesKey(slides, thumbnailsOnly, textScale) {
       const compact = slides.map((s) => ({
         g: s.groupName || "",
-        t: s.text || "",
+        t: s.text || ""
       }));
-      return JSON.stringify(compact) + "|thumbs=" + (thumbnailsOnly ? "1" : "0");
+      return (
+        JSON.stringify(compact) +
+        "|thumbs=" +
+        (thumbnailsOnly ? "1" : "0") +
+        "|scale=" +
+        textScale
+      );
     }
 
     function updateCurrentHighlight(currentIndex) {
@@ -408,6 +475,7 @@
       const slideTotalEl = document.getElementById("slideTotal");
 
       const thumbnailsOnly = getThumbnailsOnly();
+      const textScale = getTextScale();
 
       try {
         const [presRes, indexRes] = await Promise.all([
@@ -464,7 +532,7 @@
         slideCurrentEl.textContent = totalSlides > 0 ? currentIndex + 1 : 0;
         slideTotalEl.textContent = totalSlides;
 
-        const slidesKey = buildSlidesKey(slides, thumbnailsOnly);
+        const slidesKey = buildSlidesKey(slides, thumbnailsOnly, textScale);
 
         if (uuid === lastUuid && slidesKey === lastSlidesKey) {
           if (currentIndex !== lastIndex) {
@@ -514,6 +582,7 @@
               .split("\n")
               .map((l) => l.trimEnd())
               .join("<br>");
+            applyTextScale(textDiv, textScale);
             item.appendChild(textDiv);
           } else if (uuid) {
             loadThumbnail(uuid, i).then((imgURL) => {
@@ -531,11 +600,13 @@
                   .split("\n")
                   .map((l) => l.trimEnd())
                   .join("<br>");
+                applyTextScale(textDiv, textScale);
                 item.appendChild(textDiv);
               } else {
                 const fallback = document.createElement("div");
                 fallback.className = "slide-text";
                 fallback.textContent = "(No text / No thumbnail)";
+                applyTextScale(fallback, textScale);
                 item.appendChild(fallback);
               }
             });
@@ -543,12 +614,13 @@
             const fallback = document.createElement("div");
             fallback.className = "slide-text";
             fallback.textContent = hasText ? slide.text : "(No text)";
+            applyTextScale(fallback, textScale);
             item.appendChild(fallback);
           }
 
-          // ALWAYS attach click handler; ignore clicks while disabled
+          // ALWAYS register a click handler; we just disable the current one.
           item.addEventListener("click", () => {
-            if (item.disabled) return; // current slide; do nothing
+            if (item.disabled) return; // ignore clicks while it's the active slide
             item.classList.add("selected");
             focusSlide(i);
           });
@@ -578,8 +650,16 @@
 
     function openSettings() {
       const overlay = document.getElementById("settingsOverlay");
-      const toggle = document.getElementById("thumbsOnlyToggle");
-      toggle.checked = getThumbnailsOnly();
+      const thumbsToggle = document.getElementById("thumbsOnlyToggle");
+      const textSlider = document.getElementById("textSizeSlider");
+      const textValue = document.getElementById("textSizeValue");
+
+      thumbsToggle.checked = getThumbnailsOnly();
+
+      const scale = getTextScale();
+      textSlider.value = scale;
+      textValue.textContent = `${scale}%`;
+
       overlay.style.display = "flex";
     }
 
@@ -601,9 +681,21 @@
           if (e.target.id === "settingsOverlay") closeSettings();
         });
 
-      const toggle = document.getElementById("thumbsOnlyToggle");
-      toggle.addEventListener("change", () => {
-        setThumbnailsOnly(toggle.checked);
+      const thumbsToggle = document.getElementById("thumbsOnlyToggle");
+      thumbsToggle.addEventListener("change", () => {
+        setThumbnailsOnly(thumbsToggle.checked);
+        fetchStatus();
+      });
+
+      const textSlider = document.getElementById("textSizeSlider");
+      const textValue = document.getElementById("textSizeValue");
+      textSlider.addEventListener("input", () => {
+        const v = parseInt(textSlider.value, 10);
+        textValue.textContent = `${v}%`;
+      });
+      textSlider.addEventListener("change", () => {
+        const v = parseInt(textSlider.value, 10);
+        setTextScale(v);
         fetchStatus();
       });
 
