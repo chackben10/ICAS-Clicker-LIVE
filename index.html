@@ -543,8 +543,31 @@
       setInterval(fetchStatus, 1000);
       fetchStatus();
 
-      document.getElementById("settingsButton").onclick = () =>
+      // Initialize UI settings on initial load
+      (function initSettingsUI() {
+        const scale = getTextScale();
+        const slider = document.getElementById("textSizeSlider");
+        const textVal = document.getElementById("textSizeValue");
+      
+        slider.value = scale;
+        textVal.textContent = `${scale}%`;
+      
+        document.getElementById("thumbsOnlyToggle").checked = getThumbnailsOnly();
+      })();
+
+      document.getElementById("settingsButton").onclick = () => {
+        const scale = getTextScale();
+        const slider = document.getElementById("textSizeSlider");
+        const textVal = document.getElementById("textSizeValue");
+      
+        slider.value = scale;
+        textVal.textContent = `${scale}%`;
+      
+        const thumbsToggle = document.getElementById("thumbsOnlyToggle");
+        thumbsToggle.checked = getThumbnailsOnly();
+      
         document.getElementById("settingsOverlay").style.display = "flex";
+      };
 
       document.getElementById("settingsCloseButton").onclick = () =>
         document.getElementById("settingsOverlay").style.display = "none";
