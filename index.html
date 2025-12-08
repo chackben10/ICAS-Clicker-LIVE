@@ -388,16 +388,27 @@
 
       const thumbnailsOnly = getThumbnailsOnly();
       const textScale = getTextScale();
-      const slidesKey = JSON.stringify(slides) + thumbnailsOnly + textScale;
+      const slidesKey = JSON.stringify(slides) +
+                  "|thumbs=" + thumbnailsOnly +
+                  "|scale=" + textScale +
+                  "|focused=" + focusedMode;
 
-      const needsFull = uuid !== lastUuid || slidesKey !== lastSlidesKey;
+      // Detect mode transition BEFORE updating lastIndex
       const leavingFocusedMode = (lastIndex === null && currentIndex !== null);
       
+      // Detect if settings changed OR slides changed
+      const needsFull =
+        uuid !== lastUuid ||
+        slidesKey !== lastSlidesKey ||
+        leavingFocusedMode;
+      
+      // NOW update last-known state
       lastUuid = uuid;
       lastSlidesKey = slidesKey;
       lastIndex = currentIndex;
       
-      if (!needsFull && !leavingFocusedMode) {
+      // Skip rebuild only if absolutely safe
+      if (!needsFull) {
         updateCurrentHighlight(currentIndex);
         return;
       }
