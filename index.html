@@ -343,6 +343,7 @@
       if (currentIndex === null) return;
       if (children[currentIndex]) {
         children[currentIndex].classList.add("current");
+        children[currentIndex].classList.remove("selected"); // REMOVE OUTLINE
         children[currentIndex].disabled = true;
       }
     }
@@ -390,11 +391,13 @@
       const slidesKey = JSON.stringify(slides) + thumbnailsOnly + textScale;
 
       const needsFull = uuid !== lastUuid || slidesKey !== lastSlidesKey;
+      const leavingFocusedMode = (lastIndex === null && currentIndex !== null);
+      
       lastUuid = uuid;
       lastSlidesKey = slidesKey;
       lastIndex = currentIndex;
-
-      if (!needsFull) {
+      
+      if (!needsFull && !leavingFocusedMode) {
         updateCurrentHighlight(currentIndex);
         return;
       }
