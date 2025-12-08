@@ -45,8 +45,7 @@
     body {
       background: var(--bg);
       color: var(--slide-text);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -164,12 +163,13 @@
       word-break: break-word;
     }
 
+    /* Slightly rounded thumbnails */
     .slide-thumb {
       margin-top: 6px;
       width: 100%;
       max-height: 200px;
       object-fit: contain;
-      border-radius: 6px;
+      border-radius: 10px; /* <--- ADDED */
     }
 
     /* Settings modal */
@@ -207,17 +207,12 @@
       margin-top: 6px;
     }
 
-    /* Toggle switch */
     .switch {
       position: relative;
       width: 46px;
       height: 26px;
     }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
+    .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
       position: absolute;
       inset: 0;
@@ -243,7 +238,6 @@
       transform: translateX(20px);
     }
 
-    /* Text size slider */
     .settings-row-column {
       display: flex;
       flex-direction: column;
@@ -252,7 +246,6 @@
       gap: 6px;
     }
 
-    /* Segmented control */
     .segment {
       display: flex;
       width: 100%;
@@ -323,6 +316,15 @@
 
       <div class="settings-title">Settings</div>
 
+      <!-- NEW Viewer Mode -->
+      <div class="settings-row">
+        <span>Viewer Mode</span>
+        <label class="switch">
+          <input type="checkbox" id="viewerModeToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
       <div class="settings-row">
         <span>Slide Previews Only</span>
         <label class="switch">
@@ -339,7 +341,6 @@
         </div>
       </div>
 
-      <!-- Theme segmented control -->
       <div class="segment" id="themeSegment">
         <button data-mode="light">Light</button>
         <button data-mode="dark">Dark</button>
@@ -355,41 +356,45 @@
     const SETTINGS_KEY = "icas-thumbnails-only";
     const TEXT_SCALE_KEY = "icas-picker-text-scale";
     const THEME_KEY = "icas-theme-mode";
+    const VIEWER_MODE_KEY = "icas-viewer-mode"; // <--- NEW
 
     let pendingSelectedIndex = null;
 
+    /* Theme Handling */
     function applyTheme(mode) {
-      if (mode === "light") {
-        document.body.classList.remove("dark");
-      } else if (mode === "dark") {
-        document.body.classList.add("dark");
-      } else {
-        // system
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      if (mode === "light") document.body.classList.remove("dark");
+      else if (mode === "dark") document.body.classList.add("dark");
+      else {
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches)
           document.body.classList.add("dark");
-        } else {
-          document.body.classList.remove("dark");
-        }
+        else document.body.classList.remove("dark");
       }
       updateSegmentUI(mode);
     }
 
     function updateSegmentUI(mode) {
-      document.querySelectorAll("#themeSegment button").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.mode === mode);
-      });
+      document.querySelectorAll("#themeSegment button").forEach(btn =>
+        btn.classList.toggle("active", btn.dataset.mode === mode)
+      );
     }
 
     function loadTheme() {
-      const stored = localStorage.getItem(THEME_KEY);
-      const mode = stored || "system";
-      applyTheme(mode);
+      const stored = localStorage.getItem(THEME_KEY) || "system";
+      applyTheme(stored);
     }
 
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
       const stored = localStorage.getItem(THEME_KEY);
       if (stored === "system") applyTheme("system");
     });
+
+    /* Settings getters/setters */
+    function getViewerMode() {
+      return localStorage.getItem(VIEWER_MODE_KEY) === "true";
+    }
+    function setViewerMode(v) {
+      localStorage.setItem(VIEWER_MODE_KEY, v ? "true" : "false");
+    }
 
     function getThumbnailsOnly() {
       return localStorage.getItem(SETTINGS_KEY) === "true";
@@ -449,10 +454,12 @@
         let slides = [];
         if (Array.isArray(pres.presentation?.groups)) {
           pres.presentation.groups.forEach(g =>
-            g.slides?.forEach(s => slides.push({
-              groupName: g.name || "",
-              text: s.text || ""
-            }))
+            g.slides?.forEach(s =>
+              slides.push({
+                groupName: g.name || "",
+                text: s.text || ""
+              })
+            )
           );
         }
 
@@ -476,16 +483,25 @@
 
         const thumbnailsOnly = getThumbnailsOnly();
         const textScale = getTextScale();
+        const viewerMode = getViewerMode();
 
         slides.forEach((slide, i) => {
           const item = document.createElement("button");
           item.className = "slide-item";
 
-          if (!focused && i === indexValue) {
+          const isCurrent = !focused && i === indexValue;
+
+          if (isCurrent) {
             item.classList.add("current");
             item.disabled = true;
           } else if (pendingSelectedIndex === i) {
             item.classList.add("selected");
+          }
+
+          // Disable click action visually in viewer mode
+          if (viewerMode) {
+            item.style.opacity = "0.6";
+            item.style.cursor = "default";
           }
 
           const header = document.createElement("div");
@@ -525,6 +541,7 @@
           }
 
           item.addEventListener("click", () => {
+            if (viewerMode) return; // <--- BLOCK INTERACTION
             if (!item.disabled) focusSlide(i);
           });
 
@@ -537,35 +554,29 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-
       loadTheme();
 
       setInterval(fetchStatus, 1000);
       fetchStatus();
 
-      // Initialize UI settings on initial load
+      // Initialize UI
       (function initSettingsUI() {
         const scale = getTextScale();
-        const slider = document.getElementById("textSizeSlider");
-        const textVal = document.getElementById("textSizeValue");
-      
-        slider.value = scale;
-        textVal.textContent = `${scale}%`;
-      
+        document.getElementById("textSizeSlider").value = scale;
+        document.getElementById("textSizeValue").textContent = `${scale}%`;
+
         document.getElementById("thumbsOnlyToggle").checked = getThumbnailsOnly();
+        document.getElementById("viewerModeToggle").checked = getViewerMode();
       })();
 
       document.getElementById("settingsButton").onclick = () => {
         const scale = getTextScale();
-        const slider = document.getElementById("textSizeSlider");
-        const textVal = document.getElementById("textSizeValue");
-      
-        slider.value = scale;
-        textVal.textContent = `${scale}%`;
-      
-        const thumbsToggle = document.getElementById("thumbsOnlyToggle");
-        thumbsToggle.checked = getThumbnailsOnly();
-      
+        document.getElementById("textSizeSlider").value = scale;
+        document.getElementById("textSizeValue").textContent = `${scale}%`;
+
+        document.getElementById("thumbsOnlyToggle").checked = getThumbnailsOnly();
+        document.getElementById("viewerModeToggle").checked = getViewerMode();
+
         document.getElementById("settingsOverlay").style.display = "flex";
       };
 
@@ -574,6 +585,11 @@
 
       document.getElementById("thumbsOnlyToggle").addEventListener("change", e => {
         setThumbnailsOnly(e.target.checked);
+        fetchStatus();
+      });
+
+      document.getElementById("viewerModeToggle").addEventListener("change", e => {
+        setViewerMode(e.target.checked);
         fetchStatus();
       });
 
@@ -587,7 +603,6 @@
         fetchStatus();
       });
 
-      // theme buttons
       document.querySelectorAll("#themeSegment button").forEach(btn => {
         btn.addEventListener("click", () => {
           const mode = btn.dataset.mode;
