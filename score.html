@@ -3,12 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <title>ICAS Score</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
     :root {
       --bg: #000000;
-      --btn-prev-bg: #ffffff;
-      --btn-prev-text: #000000;
       --btn-next-bg: #00c853;
       --btn-next-text: #ffffff;
       --title-color: #ff5252;
@@ -16,14 +14,15 @@
 
       --card-bg: #ffffff;
       --card-text: #000000;
-      --muted: #666;
       --border: #e6e6e6;
       --pill-border: #cfcfcf;
+
       --danger: #ff5252;
       --danger-bg: rgba(255, 82, 82, 0.10);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
 
     body {
       background: var(--bg);
@@ -34,6 +33,7 @@
       justify-content: center;
       align-items: flex-start;
       padding-top: 12px;
+      touch-action: manipulation;
     }
 
     .wrapper {
@@ -74,6 +74,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .top-btn:hover { opacity: 1; background: #222; }
@@ -100,6 +101,7 @@
       max-height: calc(100vh - 270px);
       overflow-y: auto;
       border: 1px solid var(--border);
+      -webkit-overflow-scrolling: touch;
     }
 
     .empty-state {
@@ -108,7 +110,7 @@
       font-size: 0.95rem;
     }
 
-    /* Row card (Option B) */
+    /* Row card */
     .row-card {
       background: #f7f7f7;
       border: 1px solid #e9e9e9;
@@ -126,30 +128,30 @@
       align-items: center;
     }
 
+    /* iOS zoom prevention: inputs >= 16px */
     .name-input {
       width: 100%;
       border-radius: 999px;
       border: 1px solid var(--pill-border);
-      padding: 8px 10px;
-      font-size: 0.95rem;
+      padding: 10px 12px;
+      font-size: 16px;
       outline: none;
       background: #fff;
+      -webkit-appearance: none;
     }
 
-    .score-pill {
+    /* Score display (non-editable look) */
+    .score-display {
       min-width: 64px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #ffffff;
-      border: 1px solid var(--pill-border);
-      font-variant-numeric: tabular-nums;
-      font-size: 1.05rem;
-      font-weight: 700;
       text-align: right;
-      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #111;
+      padding: 0 2px;
+      user-select: none;
     }
 
-    /* Bottom segmented controls row */
     .row-bottom {
       display: grid;
       grid-template-columns: 1fr;
@@ -167,12 +169,14 @@
       border-radius: 999px;
       border: 1px solid #bbbbbb;
       background: #ffffff;
-      font-size: 0.85rem;
-      padding: 8px 10px;
+      font-size: 0.9rem;
+      padding: 10px 10px;
       cursor: pointer;
       text-align: center;
       user-select: none;
       transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .seg-btn:active {
@@ -186,10 +190,11 @@
       width: 100%;
       border-radius: 999px;
       border: 1px solid #cccccc;
-      padding: 8px 10px;
-      font-size: 0.85rem;
+      padding: 10px 12px;
+      font-size: 16px; /* iOS zoom prevention */
       outline: none;
       background: #fff;
+      -webkit-appearance: none;
     }
 
     .seg-danger {
@@ -198,9 +203,7 @@
       background: var(--danger-bg);
     }
 
-    .seg-danger:hover {
-      background: rgba(255, 82, 82, 0.16);
-    }
+    .seg-danger:hover { background: rgba(255, 82, 82, 0.16); }
 
     /* Add row button */
     .buttons-single { margin-top: 10px; }
@@ -216,6 +219,8 @@
       font-weight: 600;
       cursor: pointer;
       transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     button.btn-add:active {
@@ -244,8 +249,9 @@
 
     .queue-value {
       font-variant-numeric: tabular-nums;
-      font-weight: 800;
+      font-weight: 900;
       color: #fff;
+      font-size: 1.1rem;
     }
 
     .queue-controls {
@@ -260,11 +266,13 @@
       background: transparent;
       color: #fff;
       border-radius: 999px;
-      padding: 10px 12px;
-      font-weight: 600;
+      padding: 12px 12px;
+      font-weight: 700;
       cursor: pointer;
       opacity: 0.9;
       transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .queue-btn:hover { opacity: 1; background: #222; }
@@ -274,11 +282,12 @@
       grid-column: 1 / -1;
       border-radius: 999px;
       border: 1px solid #444;
-      padding: 10px 12px;
-      font-size: 0.95rem;
+      padding: 12px 12px;
+      font-size: 16px; /* iOS zoom prevention */
       outline: none;
       background: #0b0b0b;
       color: #fff;
+      -webkit-appearance: none;
     }
 
     .queue-actions {
@@ -293,10 +302,13 @@
       border: none;
       border-radius: 999px;
       padding: 12px 12px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
+
     .queue-apply:active { transform: scale(0.98); filter: brightness(0.92); }
     .queue-apply:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -306,86 +318,41 @@
       color: #fff;
       border-radius: 999px;
       padding: 12px 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       opacity: 0.9;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
+
     .queue-clear:hover { opacity: 1; background: #222; }
 
-    /* Status */
+    /* Inline Apply (no extra click) */
+    .apply-row {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .apply-select {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid #444;
+      background: #0b0b0b;
+      color: #fff;
+      padding: 12px 12px;
+      font-size: 16px; /* iOS zoom prevention */
+      outline: none;
+      -webkit-appearance: none;
+    }
+
     .status {
       text-align: center;
       margin-top: 8px;
       opacity: 0.8;
       min-height: 1.1em;
-    }
-
-    /* Modal (match index.html style) */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-    }
-
-    .modal-card {
-      background: #111;
-      border-radius: 12px;
-      padding: 16px;
-      width: min(92vw, 360px);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.6);
-      border: 1px solid #2a2a2a;
-    }
-
-    .modal-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-      color: #fff;
-    }
-
-    .modal-sub {
-      font-size: 0.92rem;
-      color: var(--status-grey);
-      margin-bottom: 12px;
-    }
-
-    .modal-select {
-      width: 100%;
-      border-radius: 10px;
-      border: 1px solid #444;
-      background: #0b0b0b;
-      color: #fff;
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      outline: none;
-    }
-
-    .modal-footer {
-      margin-top: 14px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-
-    .modal-btn {
-      border: 1px solid #444;
-      background: transparent;
-      color: #fff;
-      border-radius: 999px;
-      padding: 8px 12px;
-      cursor: pointer;
-    }
-    .modal-btn:hover { background: #222; }
-
-    .modal-primary {
-      border: none;
-      background: var(--btn-next-bg);
-      color: var(--btn-next-text);
-      font-weight: 700;
     }
   </style>
 </head>
@@ -429,48 +396,35 @@
 
       <div class="queue-actions">
         <button type="button" class="queue-clear" id="queueClear">Clear</button>
-        <button type="button" class="queue-apply" id="queueApply">Apply to…</button>
+        <button type="button" class="queue-apply" id="queueApply">Apply</button>
+      </div>
+
+      <!-- One-click target selection (no modal) -->
+      <div class="apply-row">
+        <select id="applySelect" class="apply-select"></select>
+        <div style="color: var(--status-grey); font-weight:700; font-variant-numeric: tabular-nums;">
+          <span id="applyAmountLabel">+0</span>
+        </div>
       </div>
     </div>
 
     <div id="statusText" class="status">Ready</div>
   </div>
 
-  <!-- Apply Modal -->
-  <div id="applyOverlay" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-title">Apply queue</div>
-      <div class="modal-sub">Choose who should receive <span id="applyAmountLabel"></span> points.</div>
-
-      <select id="applySelect" class="modal-select"></select>
-
-      <div class="modal-footer">
-        <button type="button" class="modal-btn" id="applyCancel">Cancel</button>
-        <button type="button" class="modal-btn modal-primary" id="applyConfirm">Apply</button>
-      </div>
-    </div>
-  </div>
-
 <script>
 (function () {
-  // ====== BACKEND (Cloudflare tunnel) ======
   const API_BASE = "https://score.icas-clicker.work";
   const SCORE_GET  = `${API_BASE}/score`;
   const SCORE_POST = `${API_BASE}/score`;
 
-  // ====== SHARED STATE ======
   let state = { rows: [], history: [] };
 
-  // Sync helpers
   let lastRemoteJson = "";
   let pendingRemote = null;
   let isPosting = false;
-  let pollTimer = null;
 
-  // Local-only queue
   let queue = 0;
 
-  // Elements
   const scoreRowsEl = document.getElementById("scoreRows");
   const emptyStateEl = document.getElementById("emptyState");
   const undoBtn = document.getElementById("undoBtn");
@@ -485,10 +439,7 @@
   const queueClearBtn = document.getElementById("queueClear");
   const queueApplyBtn = document.getElementById("queueApply");
 
-  const applyOverlay = document.getElementById("applyOverlay");
   const applySelect = document.getElementById("applySelect");
-  const applyCancel = document.getElementById("applyCancel");
-  const applyConfirm = document.getElementById("applyConfirm");
   const applyAmountLabel = document.getElementById("applyAmountLabel");
 
   function setStatus(msg, timeoutMs = 900) {
@@ -520,12 +471,42 @@
     if (!el) return false;
     return el.classList?.contains("name-input") ||
            el.classList?.contains("seg-input") ||
-           el.classList?.contains("queue-input");
+           el.classList?.contains("queue-input") ||
+           el.classList?.contains("apply-select");
   }
 
   function updateQueueUI() {
     queueValueEl.textContent = String(queue);
-    queueApplyBtn.disabled = (queue === 0) || (state.rows.length === 0);
+    applyAmountLabel.textContent = `${queue > 0 ? "+" : ""}${queue}`;
+    queueApplyBtn.disabled = (queue === 0) || (state.rows.length === 0) || !applySelect.value;
+  }
+
+  function updateApplySelect() {
+    const prev = applySelect.value;
+    applySelect.innerHTML = "";
+
+    if (!state.rows.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No teams yet";
+      applySelect.appendChild(opt);
+      applySelect.value = "";
+      return;
+    }
+
+    state.rows.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.id;
+      opt.textContent = r.name ? r.name : "(Unnamed)";
+      applySelect.appendChild(opt);
+    });
+
+    // keep previous selection if still exists
+    if (prev && state.rows.some(r => r.id === prev)) {
+      applySelect.value = prev;
+    } else {
+      applySelect.value = state.rows[0].id;
+    }
   }
 
   function pushHistory() {
@@ -589,6 +570,7 @@
     lastRemoteJson = JSON.stringify(state);
     pendingRemote = null;
     render();
+    updateApplySelect();
     updateQueueUI();
   }
 
@@ -596,7 +578,6 @@
     if (pendingRemote && !isUserEditing()) applyRemote(pendingRemote);
   }
 
-  // ====== MUTATIONS ======
   function undo() {
     if (!state.history || !state.history.length) return;
     state.rows = state.history.pop() || [];
@@ -604,17 +585,18 @@
     render();
     postState();
     setStatus("Undo");
+    updateApplySelect();
     updateQueueUI();
   }
 
   function clearAll() {
     if (!state.rows.length) return;
-    if (!confirm("Clear all rows?")) return;
     pushHistory();
     state.rows = [];
     render();
     postState();
     setStatus("Cleared");
+    updateApplySelect();
     updateQueueUI();
   }
 
@@ -628,6 +610,7 @@
     render();
     postState();
     setStatus("Added row");
+    updateApplySelect();
     updateQueueUI();
 
     requestAnimationFrame(() => {
@@ -648,6 +631,8 @@
     render();
     postState();
     setStatus("Name updated");
+    updateApplySelect();
+    updateQueueUI();
   }
 
   function updateScore(id, delta) {
@@ -686,14 +671,13 @@
   function deleteRow(id) {
     const row = state.rows.find(r => r.id === id);
     if (!row) return;
-    const label = row.name ? `"${row.name}"` : "this row";
-    if (!confirm(`Delete ${label}?`)) return;
 
     pushHistory();
     state.rows = state.rows.filter(r => r.id !== id);
     render();
     postState();
     setStatus("Row deleted");
+    updateApplySelect();
     updateQueueUI();
   }
 
@@ -713,53 +697,26 @@
     queueAdd(val);
   }
 
-  function openApplyModal() {
-    if (queue === 0 || state.rows.length === 0) return;
-
-    applySelect.innerHTML = "";
-    state.rows.forEach(r => {
-      const opt = document.createElement("option");
-      opt.value = r.id;
-      opt.textContent = r.name ? r.name : "(Unnamed)";
-      applySelect.appendChild(opt);
-    });
-
-    applyAmountLabel.textContent = `${queue > 0 ? "+" : ""}${queue}`;
-    applyOverlay.style.display = "flex";
-  }
-
-  function closeApplyModal() {
-    applyOverlay.style.display = "none";
-  }
-
-  function confirmApplyModal() {
+  function applyQueue() {
     const id = applySelect.value;
-    if (!id) return;
-
-    // Apply to server-held state, then clear local queue
+    if (!id || queue === 0) return;
     updateScore(id, queue);
     queue = 0;
     updateQueueUI();
-    closeApplyModal();
     setStatus("Applied");
   }
 
-  // ====== RENDER ======
   function render() {
     scoreRowsEl.innerHTML = "";
 
-    if (!state.rows.length) {
-      emptyStateEl.style.display = "block";
-    } else {
-      emptyStateEl.style.display = "none";
-    }
+    if (!state.rows.length) emptyStateEl.style.display = "block";
+    else emptyStateEl.style.display = "none";
 
     state.rows.forEach(row => {
       const card = document.createElement("div");
       card.className = "row-card";
       card.dataset.id = row.id;
 
-      // Top row: Name + Score
       const top = document.createElement("div");
       top.className = "row-top";
 
@@ -777,14 +734,13 @@
         applyPendingRemoteIfAny();
       });
 
-      const scorePill = document.createElement("div");
-      scorePill.className = "score-pill";
-      scorePill.textContent = String(row.score ?? 0);
+      const scoreDisplay = document.createElement("div");
+      scoreDisplay.className = "score-display";
+      scoreDisplay.textContent = String(row.score ?? 0);
 
       top.appendChild(nameInput);
-      top.appendChild(scorePill);
+      top.appendChild(scoreDisplay);
 
-      // Bottom segmented controls
       const bottom = document.createElement("div");
       bottom.className = "row-bottom";
 
@@ -817,23 +773,23 @@
         applyPendingRemoteIfAny();
       });
 
-      const clearBtn = document.createElement("button");
-      clearBtn.type = "button";
-      clearBtn.className = "seg-btn";
-      clearBtn.textContent = "Clear";
-      clearBtn.onclick = () => clearRow(row.id);
+      const clr = document.createElement("button");
+      clr.type = "button";
+      clr.className = "seg-btn";
+      clr.textContent = "Clear";
+      clr.onclick = () => clearRow(row.id);
 
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "seg-btn seg-danger";
-      delBtn.textContent = "Delete";
-      delBtn.onclick = () => deleteRow(row.id);
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "seg-btn seg-danger";
+      del.textContent = "Delete";
+      del.onclick = () => deleteRow(row.id);
 
       seg.appendChild(minusBtn);
       seg.appendChild(plusBtn);
       seg.appendChild(custom);
-      seg.appendChild(clearBtn);
-      seg.appendChild(delBtn);
+      seg.appendChild(clr);
+      seg.appendChild(del);
 
       bottom.appendChild(seg);
 
@@ -845,7 +801,6 @@
     updateUndoButton();
   }
 
-  // ====== INIT ======
   async function init() {
     undoBtn.onclick = undo;
     clearBtn.onclick = clearAll;
@@ -860,13 +815,8 @@
     });
     queueCustomEl.addEventListener("blur", () => queueApplyCustom());
 
-    queueApplyBtn.onclick = openApplyModal;
-
-    applyCancel.onclick = closeApplyModal;
-    applyConfirm.onclick = confirmApplyModal;
-    applyOverlay.addEventListener("click", (e) => {
-      if (e.target === applyOverlay) closeApplyModal();
-    });
+    applySelect.addEventListener("change", updateQueueUI);
+    queueApplyBtn.onclick = applyQueue;
 
     undoBtn.disabled = true;
     undoBtn.style.opacity = 0.5;
@@ -881,12 +831,13 @@
       state = { rows: [], history: [] };
       lastRemoteJson = JSON.stringify(state);
       render();
+      updateApplySelect();
+      updateQueueUI();
       setStatus("Backend offline", 1200);
     }
 
-    updateQueueUI();
-
-    pollTimer = setInterval(pollLoop, 800);
+    // sync poll
+    setInterval(pollLoop, 800);
 
     document.addEventListener("focusout", () => {
       setTimeout(applyPendingRemoteIfAny, 0);
