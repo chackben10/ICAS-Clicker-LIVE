@@ -36,11 +36,7 @@
       touch-action: manipulation;
     }
 
-    .wrapper {
-      width: 100%;
-      max-width: 480px;
-      padding: 16px;
-    }
+    .wrapper { width: 100%; max-width: 480px; padding: 16px; }
 
     /* Top bar */
     .top-row {
@@ -56,10 +52,7 @@
       color: var(--status-grey);
     }
 
-    .top-buttons {
-      display: flex;
-      gap: 8px;
-    }
+    .top-buttons { display: flex; gap: 8px; }
 
     .top-btn {
       font-size: 0.9rem;
@@ -76,7 +69,6 @@
       justify-content: center;
       -webkit-tap-highlight-color: transparent;
     }
-
     .top-btn:hover { opacity: 1; background: #222; }
     .top-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -98,17 +90,13 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-height: calc(100vh - 300px);
+      max-height: calc(100vh - 340px);
       overflow-y: auto;
       border: 1px solid var(--border);
       -webkit-overflow-scrolling: touch;
     }
 
-    .empty-state {
-      color: #777;
-      padding: 6px 4px 10px;
-      font-size: 0.95rem;
-    }
+    .empty-state { color: #777; padding: 6px 4px 10px; font-size: 0.95rem; }
 
     /* Row card */
     .row-card {
@@ -128,7 +116,6 @@
       align-items: center;
     }
 
-    /* iOS zoom prevention: inputs >= 16px */
     .name-input {
       width: 100%;
       border-radius: 999px;
@@ -140,7 +127,6 @@
       -webkit-appearance: none;
     }
 
-    /* Score display (non-editable look) */
     .score-display {
       min-width: 64px;
       text-align: right;
@@ -174,7 +160,6 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-
     .seg-btn:active { transform: scale(0.97); filter: brightness(0.92); }
     .seg-btn:hover { background: #eeeeee; }
 
@@ -183,7 +168,7 @@
       border-radius: 999px;
       border: 1px solid #cccccc;
       padding: 10px 12px;
-      font-size: 16px; /* iOS zoom prevention */
+      font-size: 16px;
       outline: none;
       background: #fff;
       -webkit-appearance: none;
@@ -242,7 +227,6 @@
       letter-spacing: 0.2px;
     }
 
-    /* Queue row 1: +1, -1, Clear */
     .queue-row1 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -250,7 +234,6 @@
       margin-bottom: 10px;
     }
 
-    /* Queue row 2: ±N input + select (with caret) */
     .queue-row2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -279,17 +262,14 @@
       border-radius: 999px;
       border: 1px solid #444;
       padding: 12px 12px;
-      font-size: 16px; /* iOS zoom prevention */
+      font-size: 16px;
       outline: none;
       background: #0b0b0b;
       color: #fff;
       -webkit-appearance: none;
     }
 
-    .select-wrap {
-      position: relative;
-      width: 100%;
-    }
+    .select-wrap { position: relative; width: 100%; }
 
     .apply-select {
       width: 100%;
@@ -297,8 +277,8 @@
       border: 1px solid #666;
       background: #0b0b0b;
       color: #fff;
-      padding: 12px 40px 12px 14px; /* leave room for caret */
-      font-size: 16px; /* iOS zoom prevention */
+      padding: 12px 40px 12px 14px;
+      font-size: 16px;
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -319,7 +299,6 @@
       font-weight: 900;
     }
 
-    /* Apply button (full width) */
     .queue-apply {
       width: 100%;
       background: var(--btn-next-bg);
@@ -336,6 +315,79 @@
     }
     .queue-apply:active { transform: scale(0.98); filter: brightness(0.92); }
     .queue-apply:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* History */
+    .history-toggle {
+      margin-top: 12px;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #2a2a2a;
+      background: transparent;
+      color: #fff;
+      padding: 12px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      opacity: 0.92;
+      font-weight: 800;
+    }
+    .history-toggle:hover { background: #222; opacity: 1; }
+
+    .caret {
+      display: inline-block;
+      transition: transform 0.12s ease;
+      font-weight: 900;
+      opacity: 0.9;
+    }
+    .caret.open { transform: rotate(180deg); }
+
+    .history-panel {
+      margin-top: 8px;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      display: none; /* default hidden */
+    }
+
+    .history-list {
+      max-height: 180px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: #0b0b0b;
+    }
+
+    .hist-item {
+      padding: 10px 12px;
+      border-top: 1px solid #1f1f1f;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .hist-item:first-child { border-top: none; }
+
+    .hist-main {
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .hist-sub {
+      color: var(--status-grey);
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hist-empty {
+      padding: 12px;
+      color: var(--status-grey);
+      font-size: 0.9rem;
+      background: #0b0b0b;
+    }
 
     .status {
       text-align: center;
@@ -382,14 +434,12 @@
         <div class="queue-total" id="queueTotal">+ 0</div>
       </div>
 
-      <!-- Row 1: +1, -1, Clear -->
       <div class="queue-row1">
         <button type="button" class="queue-btn" id="queuePlus">+1</button>
         <button type="button" class="queue-btn" id="queueMinus">-1</button>
         <button type="button" class="queue-btn" id="queueClear">Clear</button>
       </div>
 
-      <!-- Row 2: ±N input + selector -->
       <div class="queue-row2">
         <input type="number" class="queue-input" id="queueCustom" placeholder="±N (adds to queue)" step="1" />
         <div class="select-wrap">
@@ -397,8 +447,18 @@
         </div>
       </div>
 
-      <!-- Apply -->
       <button type="button" class="queue-apply" id="queueApply">Apply</button>
+
+      <!-- History -->
+      <button type="button" class="history-toggle" id="historyToggle">
+        <span>History</span>
+        <span class="caret" id="historyCaret">▾</span>
+      </button>
+
+      <div class="history-panel" id="historyPanel">
+        <div class="history-list" id="historyList"></div>
+        <div class="hist-empty" id="historyEmpty">No history yet.</div>
+      </div>
     </div>
 
     <div id="statusText" class="status">Ready</div>
@@ -416,8 +476,10 @@
   let pendingRemote = null;
   let isPosting = false;
 
-  // Local-only queue
+  // Local-only queue + local-only action history
   let queue = 0;
+  let actionHistory = [];     // [{ts:number, text:string}]
+  const HISTORY_CAP = 60;     // keep last 60 actions (feels right on mobile)
 
   const scoreRowsEl = document.getElementById("scoreRows");
   const emptyStateEl = document.getElementById("emptyState");
@@ -433,6 +495,12 @@
   const queueClearBtn = document.getElementById("queueClear");
   const queueApplyBtn = document.getElementById("queueApply");
   const applySelect = document.getElementById("applySelect");
+
+  const historyToggle = document.getElementById("historyToggle");
+  const historyPanel  = document.getElementById("historyPanel");
+  const historyCaret  = document.getElementById("historyCaret");
+  const historyList   = document.getElementById("historyList");
+  const historyEmpty  = document.getElementById("historyEmpty");
 
   function setStatus(msg, timeoutMs = 900) {
     statusText.textContent = msg;
@@ -470,6 +538,61 @@
   function formatQueue(q) {
     const sign = q >= 0 ? "+" : "-";
     return `${sign} ${Math.abs(q)}`;
+  }
+
+  function formatTime(ts) {
+    // local time, compact
+    return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function rowLabelById(id) {
+    const r = state.rows.find(x => x.id === id);
+    return r ? (r.name ? r.name : "(Unnamed)") : "(Unknown)";
+  }
+
+  function addHistory(text) {
+    actionHistory.push({ ts: Date.now(), text: String(text || "") });
+    if (actionHistory.length > HISTORY_CAP) actionHistory = actionHistory.slice(-HISTORY_CAP);
+    renderHistory();
+  }
+
+  function clearHistory() {
+    actionHistory = [];
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = "";
+    if (!actionHistory.length) {
+      historyEmpty.style.display = "block";
+      return;
+    }
+    historyEmpty.style.display = "none";
+
+    // newest first
+    const items = [...actionHistory].reverse();
+    items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "hist-item";
+
+      const main = document.createElement("div");
+      main.className = "hist-main";
+      main.textContent = it.text;
+
+      const sub = document.createElement("div");
+      sub.className = "hist-sub";
+      sub.textContent = formatTime(it.ts);
+
+      div.appendChild(main);
+      div.appendChild(sub);
+      historyList.appendChild(div);
+    });
+  }
+
+  function toggleHistory() {
+    const open = historyPanel.style.display === "block";
+    historyPanel.style.display = open ? "none" : "block";
+    historyCaret.classList.toggle("open", !open);
   }
 
   function updateQueueUI() {
@@ -577,6 +700,12 @@
   // ====== MUTATIONS ======
   function undo() {
     if (!state.history || !state.history.length) return;
+
+    // Requirement: if an undo happens, DON'T show "undo" in history,
+    // just remove the most recent history item we added (best-effort).
+    if (actionHistory.length) actionHistory.pop();
+    renderHistory();
+
     state.rows = state.history.pop() || [];
     updateUndoButton();
     render();
@@ -595,6 +724,10 @@
     setStatus("Cleared");
     updateApplySelect();
     updateQueueUI();
+
+    // New "session" of history at clear all
+    clearHistory();
+    addHistory("Cleared all rows");
   }
 
   function addRow() {
@@ -610,6 +743,8 @@
     updateApplySelect();
     updateQueueUI();
 
+    addHistory("Added row");
+
     requestAnimationFrame(() => {
       const last = state.rows[state.rows.length - 1];
       const input = scoreRowsEl.querySelector(`.row-card[data-id="${last.id}"] .name-input`);
@@ -624,15 +759,19 @@
     if (row.name === cleaned) return;
 
     pushHistory();
+    const prevLabel = row.name ? row.name : "(Unnamed)";
     row.name = cleaned;
     render();
     postState();
     setStatus("Name updated");
     updateApplySelect();
     updateQueueUI();
+
+    const nextLabel = cleaned ? cleaned : "(Unnamed)";
+    addHistory(`Renamed: ${prevLabel} → ${nextLabel}`);
   }
 
-  function updateScore(id, delta) {
+  function updateScore(id, delta, metaText) {
     const row = state.rows.find(r => r.id === id);
     if (!row) return;
 
@@ -644,12 +783,15 @@
     render();
     postState();
     setStatus(d > 0 ? `+${d}` : `${d}`);
+
+    if (metaText) addHistory(metaText);
   }
 
   function applyCustom(id, inputEl) {
     const val = Number(inputEl.value);
     if (!Number.isFinite(val) || val === 0) { inputEl.value = ""; return; }
-    updateScore(id, val);
+    const label = rowLabelById(id);
+    updateScore(id, val, `Set ${label}: ${val > 0 ? "+" : ""}${val}`);
     inputEl.value = "";
   }
 
@@ -663,9 +805,12 @@
     render();
     postState();
     setStatus("Row cleared");
+
+    addHistory(`Cleared ${rowLabelById(id)}`);
   }
 
   function deleteRow(id) {
+    const label = rowLabelById(id);
     const row = state.rows.find(r => r.id === id);
     if (!row) return;
 
@@ -676,6 +821,8 @@
     setStatus("Row deleted");
     updateApplySelect();
     updateQueueUI();
+
+    addHistory(`Deleted ${label}`);
   }
 
   // ====== QUEUE (LOCAL ONLY) ======
@@ -685,6 +832,7 @@
     queue += d;
     updateQueueUI();
     setStatus(d > 0 ? `Queue +${d}` : `Queue ${d}`);
+    addHistory(`Queue ${d > 0 ? "+" : ""}${d}`);
   }
 
   function queueApplyCustom() {
@@ -697,7 +845,9 @@
   function applyQueue() {
     const id = applySelect.value;
     if (!id || queue === 0) return;
-    updateScore(id, queue);
+    const label = rowLabelById(id);
+    const amt = queue;
+    updateScore(id, amt, `Applied ${amt > 0 ? "+" : ""}${amt} → ${label}`);
     queue = 0;
     updateQueueUI();
     setStatus("Applied");
@@ -749,13 +899,13 @@
       minusBtn.type = "button";
       minusBtn.className = "seg-btn";
       minusBtn.textContent = "-1";
-      minusBtn.onclick = () => updateScore(row.id, -1);
+      minusBtn.onclick = () => updateScore(row.id, -1, `-1 → ${rowLabelById(row.id)}`);
 
       const plusBtn = document.createElement("button");
       plusBtn.type = "button";
       plusBtn.className = "seg-btn";
       plusBtn.textContent = "+1";
-      plusBtn.onclick = () => updateScore(row.id, 1);
+      plusBtn.onclick = () => updateScore(row.id, 1, `+1 → ${rowLabelById(row.id)}`);
 
       const custom = document.createElement("input");
       custom.type = "number";
@@ -807,7 +957,13 @@
 
     queuePlusBtn.onclick = () => queueAdd(1);
     queueMinusBtn.onclick = () => queueAdd(-1);
-    queueClearBtn.onclick = () => { queue = 0; updateQueueUI(); setStatus("Queue cleared"); };
+    queueClearBtn.onclick = () => {
+      if (queue === 0) return;
+      queue = 0;
+      updateQueueUI();
+      setStatus("Queue cleared");
+      addHistory("Queue cleared");
+    };
 
     queueCustomEl.addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); queueCustomEl.blur(); }
@@ -816,6 +972,8 @@
 
     applySelect.addEventListener("change", updateQueueUI);
     queueApplyBtn.onclick = applyQueue;
+
+    historyToggle.onclick = toggleHistory;
 
     undoBtn.disabled = true;
     undoBtn.style.opacity = 0.5;
@@ -834,6 +992,9 @@
       updateQueueUI();
       setStatus("Backend offline", 1200);
     }
+
+    // Default: history hidden
+    renderHistory();
 
     // Sync poll
     setInterval(pollLoop, 800);
