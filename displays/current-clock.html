@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Centered Clock – 12 Hour</title>
+
+  <!-- Antonio -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700;800&display=swap" rel="stylesheet">
+
+  <!-- Norwester -->
+  <style>
+    @font-face {
+      font-family: 'Norwester';
+      src: url("https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/Norwester/Norwester-Regular.otf")
+           format("opentype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root{
+      --bg: #000;
+      --fg: #fff;
+      --muted: rgba(255,255,255,0.7);
+      --panel: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.18);
+
+      --radius: 14px;
+      --pad: 20px;
+
+      /* Fixed sizing = zero jitter */
+      --time-w: clamp(320px, 50vw, 520px);
+      --sec-w: clamp(80px, 12vw, 120px);
+      --time-h: clamp(110px, 18vw, 180px);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body{
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      display: grid;
+      place-items: center;
+    }
+
+    .wrap{
+      display: grid;
+      gap: 22px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .date{
+      font-family: "Antonio", system-ui, sans-serif;
+      font-weight: 700;
+      font-size: clamp(26px, 4vw, 44px);
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .timeRow{
+      display: grid;
+      grid-auto-flow: column;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .panel{
+      height: var(--time-h);
+      border-radius: var(--radius);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      padding: var(--pad);
+      backdrop-filter: blur(6px);
+    }
+
+    .mainTime{
+      width: var(--time-w);
+      font-family: "Norwester", "Antonio", system-ui, sans-serif;
+      font-size: clamp(64px, 10vw, 120px);
+      letter-spacing: 0.04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "lnum" 1;
+    }
+
+    .seconds{
+      width: var(--sec-w);
+      font-family: "Norwester", "Antonio", system-ui, sans-serif;
+      font-size: clamp(40px, 6vw, 72px);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ampm{
+      font-family: "Antonio", system-ui, sans-serif;
+      font-weight: 800;
+      font-size: clamp(18px, 3vw, 28px);
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div id="date" class="date">—</div>
+
+    <div class="timeRow">
+      <div class="panel mainTime" id="hm">--:--</div>
+      <div class="panel seconds" id="ss">--</div>
+    </div>
+
+    <div id="ampm" class="ampm">—</div>
+  </div>
+
+  <script>
+    const dateEl = document.getElementById("date");
+    const hmEl   = document.getElementById("hm");
+    const ssEl   = document.getElementById("ss");
+    const ampmEl = document.getElementById("ampm");
+
+    const fmtDate = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "2-digit"
+    });
+
+    function pad2(n){ return String(n).padStart(2, "0"); }
+
+    function tick(){
+      const d = new Date();
+
+      // Date
+      dateEl.textContent = fmtDate.format(d).toUpperCase();
+
+      // 12-hour time
+      let h = d.getHours();
+      const ampm = h >= 12 ? "PM" : "AM";
+      h = h % 12;
+      if (h === 0) h = 12;
+
+      hmEl.textContent = `${pad2(h)}:${pad2(d.getMinutes())}`;
+      ssEl.textContent = pad2(d.getSeconds());
+      ampmEl.textContent = ampm;
+    }
+
+    tick();
+
+    // Sync to exact second boundary
+    setTimeout(() => {
+      tick();
+      setInterval(tick, 1000);
+    }, 1000 - new Date().getMilliseconds());
+  </script>
+</body>
+</html>
