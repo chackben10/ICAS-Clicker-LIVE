@@ -27,10 +27,10 @@
 
       /* All text white; use opacity for hierarchy */
       --fg: #fff;
-      --top-opacity: 0.65;
+      --top-opacity: 0.90;
 
       /* Boxes: white @ 5% opacity, no outline */
-      --panel: rgba(255,255,255,0.05);
+      --panel: rgba(255,255,255,0.15);
 
       --radius: 16px;
       --pad: 20px;
@@ -176,7 +176,7 @@
       const day     = get("day");   // already 2-digit per options
       const year    = get("year");
 
-      toplineEl.textContent = `${weekday} \u2022 ${month} ${day} \u2022 ${year}`;
+      toplineEl.textContent = `${weekday} \u2022 ${month} ${day} ${year}`;
 
       // 12-hour time
       let h = d.getHours();
