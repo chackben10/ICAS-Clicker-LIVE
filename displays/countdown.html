@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Countdown</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background-color: rgba(0, 0, 0, 0.0);
+      font-family: 'Norwester';
+      font-weight: bold;
+      display: flex;
+      justify-content: flex-end; /* Right align */
+      align-items: center;
+      color: white;
+    }
+
+    #countdown {
+      font-size: 3rem;
+      text-transform: uppercase;
+      text-align: right;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .blink {
+      animation: blink 1s step-start 0s infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="countdown">SOON</div>
+
+  <script>
+    // -----------------------------
+    // URL Params (all optional)
+    // -----------------------------
+    // Examples:
+    //   countdown.html?time=11:00&after=soon&afterHours=1
+    //   countdown.html?time=18:30&after=break&afterHours=0.5
+    //
+    // Defaults:
+    //   time       = 11:00 (local time)
+    //   after      = "SOON"
+    //   afterHours = 1
+    // -----------------------------
+    const params = new URLSearchParams(window.location.search);
+
+    const afterTextRaw = params.get("after");
+    const AFTER_TEXT = (afterTextRaw && afterTextRaw.trim() !== "")
+      ? afterTextRaw
+      : "SOON";
+
+    const afterHoursRaw = params.get("afterHours");
+    let AFTER_HOURS = Number(afterHoursRaw);
+    if (!Number.isFinite(AFTER_HOURS) || AFTER_HOURS <= 0) AFTER_HOURS = 1;
+
+    const timeRaw = params.get("time") || "11:00";
+
+    function parseTimeHHMM(str) {
+      // Accept "H:MM" or "HH:MM"
+      const m = String(str).trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return { hh, mm };
+    }
+
+    const parsed = parseTimeHHMM(timeRaw) || { hh: 11, mm: 0 };
+
+    function updateCountdown() {
+      const countdownEl = document.getElementById("countdown");
+      const now = new Date(); // user's local timezone
+
+      // Target time TODAY (local)
+      const target = new Date(now);
+      target.setHours(parsed.hh, parsed.mm, 0, 0);
+
+      const afterEnd = new Date(target.getTime() + AFTER_HOURS * 60 * 60 * 1000);
+
+      // If we're in the "after text" window: show AFTER_TEXT
+      if (now >= target && now < afterEnd) {
+        countdownEl.textContent = String(AFTER_TEXT).toUpperCase();
+        countdownEl.classList.remove("blink");
+        return;
+      }
+
+      // Otherwise, we are counting down to the NEXT occurrence of target.
+      // If we've already passed today's target+after window, count down to tomorrow's target.
+      let nextTarget = target;
+      if (now >= afterEnd) {
+        nextTarget = new Date(target);
+        nextTarget.setDate(target.getDate() + 1);
+      } else if (now > target && now < afterEnd) {
+        // already returned above, but keep safe
+        nextTarget = new Date(target);
+        nextTarget.setDate(target.getDate() + 1);
+      }
+
+      const diff = nextTarget - now;
+      const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+
+      if (totalSeconds < 60) {
+        countdownEl.textContent = totalSeconds.toString();
+        countdownEl.classList.toggle("blink", totalSeconds < 10);
+      } else {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        countdownEl.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+        countdownEl.classList.remove("blink");
+      }
+    }
+
+    updateCountdown();
+
+    // Align interval to the next second boundary (less drift)
+    setTimeout(() => {
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+    }, 1000 - new Date().getMilliseconds());
+  </script>
+</body>
+</html>
