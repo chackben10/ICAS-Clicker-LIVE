@@ -22,19 +22,24 @@
     }
 
     :root{
-      --bg: #000;
-      --fg: #fff;
-      --muted: rgba(255,255,255,0.7);
-      --panel: rgba(255,255,255,0.10);
-      --border: rgba(255,255,255,0.18);
+      /* Transparent background for overlay use */
+      --bg: transparent;
 
-      --radius: 14px;
+      /* All text white; use opacity for hierarchy */
+      --fg: #fff;
+      --top-opacity: 0.65;
+
+      /* Boxes: white @ 5% opacity, no outline */
+      --panel: rgba(255,255,255,0.05);
+
+      --radius: 16px;
       --pad: 20px;
 
       /* Fixed sizing = zero jitter */
-      --time-w: clamp(320px, 50vw, 520px);
-      --sec-w: clamp(80px, 12vw, 120px);
-      --time-h: clamp(110px, 18vw, 180px);
+      --time-w: clamp(320px, 50vw, 560px);
+      --sec-w:  clamp(84px, 12vw, 130px);
+      --time-h: clamp(110px, 18vw, 190px);
+      --gap: 16px;
     }
 
     * { box-sizing: border-box; }
@@ -50,36 +55,38 @@
 
     .wrap{
       display: grid;
-      gap: 22px;
+      gap: 18px;
       justify-items: center;
       text-align: center;
     }
 
-    .date{
+    /* Top line: opacity-based "grey" effect */
+    .topline{
       font-family: "Antonio", system-ui, sans-serif;
       font-weight: 700;
-      font-size: clamp(26px, 4vw, 44px);
-      letter-spacing: 0.1em;
-      color: var(--muted);
+      font-size: clamp(24px, 3.6vw, 44px);
+      letter-spacing: 0.10em;
       text-transform: uppercase;
+      color: rgba(255,255,255,var(--top-opacity));
+      line-height: 1.1;
+      white-space: nowrap;
     }
 
     .timeRow{
       display: grid;
       grid-auto-flow: column;
-      gap: 16px;
+      gap: var(--gap);
       align-items: center;
+      justify-content: center;
     }
 
     .panel{
       height: var(--time-h);
       border-radius: var(--radius);
       background: var(--panel);
-      border: 1px solid var(--border);
       display: grid;
       place-items: center;
       padding: var(--pad);
-      backdrop-filter: blur(6px);
     }
 
     .mainTime{
@@ -88,8 +95,11 @@
       font-size: clamp(64px, 10vw, 120px);
       letter-spacing: 0.04em;
       line-height: 1;
+      color: var(--fg);
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1, "lnum" 1;
+      white-space: nowrap;
+      position: relative;
     }
 
     .seconds{
@@ -97,42 +107,59 @@
       font-family: "Norwester", "Antonio", system-ui, sans-serif;
       font-size: clamp(40px, 6vw, 72px);
       line-height: 1;
+      color: var(--fg);
       font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "lnum" 1;
+      white-space: nowrap;
     }
 
-    .ampm{
+    /* AM/PM: attach it visually to the big time (top-right inside the HH:MM panel) */
+    .ampmBadge{
+      position: absolute;
+      top: 12px;
+      right: 14px;
       font-family: "Antonio", system-ui, sans-serif;
       font-weight: 800;
-      font-size: clamp(18px, 3vw, 28px);
-      letter-spacing: 0.25em;
-      color: var(--muted);
+      font-size: clamp(16px, 2.2vw, 22px);
+      letter-spacing: 0.20em;
       text-transform: uppercase;
+      color: rgba(255,255,255,0.85);
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    @media (max-width: 420px){
+      :root{ --gap: 12px; --pad: 16px; --radius: 14px; }
+      .ampmBadge{ top: 10px; right: 12px; letter-spacing: 0.16em; }
     }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <div id="date" class="date">—</div>
+  <div class="wrap" aria-label="Centered clock using local time">
+    <div id="topline" class="topline">—</div>
 
     <div class="timeRow">
-      <div class="panel mainTime" id="hm">--:--</div>
+      <div class="panel mainTime" id="hmWrap">
+        <span id="hm">--:--</span>
+        <span id="ampm" class="ampmBadge">—</span>
+      </div>
+
       <div class="panel seconds" id="ss">--</div>
     </div>
-
-    <div id="ampm" class="ampm">—</div>
   </div>
 
   <script>
-    const dateEl = document.getElementById("date");
-    const hmEl   = document.getElementById("hm");
-    const ssEl   = document.getElementById("ss");
-    const ampmEl = document.getElementById("ampm");
+    const toplineEl = document.getElementById("topline");
+    const hmEl      = document.getElementById("hm");
+    const ssEl      = document.getElementById("ss");
+    const ampmEl    = document.getElementById("ampm");
 
-    const fmtDate = new Intl.DateTimeFormat(undefined, {
+    const fmtParts = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
       month: "short",
-      day: "2-digit"
+      day: "2-digit",
+      year: "numeric"
     });
 
     function pad2(n){ return String(n).padStart(2, "0"); }
@@ -140,8 +167,16 @@
     function tick(){
       const d = new Date();
 
-      // Date
-      dateEl.textContent = fmtDate.format(d).toUpperCase();
+      // Build "SATURDAY • DEC 20 • 2025"
+      const parts = fmtParts.formatToParts(d);
+      const get = (type) => (parts.find(p => p.type === type)?.value || "").toUpperCase();
+
+      const weekday = get("weekday");
+      const month   = get("month");
+      const day     = get("day");   // already 2-digit per options
+      const year    = get("year");
+
+      toplineEl.textContent = `${weekday} \u2022 ${month} ${day} \u2022 ${year}`;
 
       // 12-hour time
       let h = d.getHours();
