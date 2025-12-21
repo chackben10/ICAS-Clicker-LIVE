@@ -22,20 +22,17 @@
     }
 
     :root{
-      /* Transparent background for overlay use */
-      --bg: transparent;
+      /* ===== SCALE CONTROL ===== */
+      --scale: 1.75; /* 1.5 – 2.0 sweet spot */
 
-      /* All text white; use opacity for hierarchy */
+      --bg: transparent;
       --fg: #fff;
       --top-opacity: 0.90;
-
-      /* Boxes: white @ 5% opacity, no outline */
       --panel: rgba(255,255,255,0.15);
 
       --radius: 16px;
       --pad: 20px;
 
-      /* Fixed sizing = zero jitter */
       --time-w: clamp(320px, 50vw, 560px);
       --sec-w:  clamp(84px, 12vw, 130px);
       --time-h: clamp(110px, 18vw, 190px);
@@ -51,6 +48,7 @@
       color: var(--fg);
       display: grid;
       place-items: center;
+      overflow: hidden;
     }
 
     .wrap{
@@ -58,9 +56,12 @@
       gap: 18px;
       justify-items: center;
       text-align: center;
+
+      /* 🔑 SCALE EVERYTHING */
+      transform: scale(var(--scale));
+      transform-origin: center;
     }
 
-    /* Top line: opacity-based "grey" effect */
     .topline{
       font-family: "Antonio", system-ui, sans-serif;
       font-weight: 700;
@@ -95,7 +96,6 @@
       font-size: clamp(64px, 10vw, 120px);
       letter-spacing: 0.04em;
       line-height: 1;
-      color: var(--fg);
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1, "lnum" 1;
       white-space: nowrap;
@@ -107,13 +107,11 @@
       font-family: "Norwester", "Antonio", system-ui, sans-serif;
       font-size: clamp(40px, 6vw, 72px);
       line-height: 1;
-      color: var(--fg);
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1, "lnum" 1;
       white-space: nowrap;
     }
 
-    /* AM/PM: attach it visually to the big time (top-right inside the HH:MM panel) */
     .ampmBadge{
       position: absolute;
       top: 12px;
@@ -127,24 +125,18 @@
       line-height: 1;
       pointer-events: none;
     }
-
-    @media (max-width: 420px){
-      :root{ --gap: 12px; --pad: 16px; --radius: 14px; }
-      .ampmBadge{ top: 10px; right: 12px; letter-spacing: 0.16em; }
-    }
   </style>
 </head>
 
 <body>
-  <div class="wrap" aria-label="Centered clock using local time">
+  <div class="wrap">
     <div id="topline" class="topline">—</div>
 
     <div class="timeRow">
-      <div class="panel mainTime" id="hmWrap">
+      <div class="panel mainTime">
         <span id="hm">--:--</span>
         <span id="ampm" class="ampmBadge">—</span>
       </div>
-
       <div class="panel seconds" id="ss">--</div>
     </div>
   </div>
@@ -166,32 +158,21 @@
 
     function tick(){
       const d = new Date();
-
-      // Build "SATURDAY • DEC 20 • 2025"
       const parts = fmtParts.formatToParts(d);
-      const get = (type) => (parts.find(p => p.type === type)?.value || "").toUpperCase();
+      const get = t => (parts.find(p => p.type === t)?.value || "").toUpperCase();
 
-      const weekday = get("weekday");
-      const month   = get("month");
-      const day     = get("day");   // already 2-digit per options
-      const year    = get("year");
+      toplineEl.textContent =
+        `${get("weekday")} \u2022 ${get("month")} ${get("day")} ${get("year")}`;
 
-      toplineEl.textContent = `${weekday} \u2022 ${month} ${day} ${year}`;
-
-      // 12-hour time
       let h = d.getHours();
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12;
-      if (h === 0) h = 12;
+      ampmEl.textContent = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
 
       hmEl.textContent = `${pad2(h)}:${pad2(d.getMinutes())}`;
       ssEl.textContent = pad2(d.getSeconds());
-      ampmEl.textContent = ampm;
     }
 
     tick();
-
-    // Sync to exact second boundary
     setTimeout(() => {
       tick();
       setInterval(tick, 1000);
