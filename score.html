@@ -31,12 +31,19 @@
       background: var(--bg);
       color: #ffffff;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+      /* allow page to grow with content */
       min-height: 100vh;
+      height: auto;
+
       display: flex;
       justify-content: center;
       align-items: flex-start;
       padding-top: 12px;
+
       touch-action: manipulation;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .wrapper { width: 100%; max-width: 480px; padding: 16px; }
@@ -84,7 +91,7 @@
       margin: 4px 0 10px;
     }
 
-    /* Score box */
+    /* Score box (NOW AUTO-HEIGHT: no max-height / no internal scrolling) */
     .score-box {
       background: var(--card-bg);
       color: var(--card-text);
@@ -93,10 +100,12 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-height: calc(100vh - 420px);
-      overflow-y: auto;
+
+      /* changed */
+      max-height: none;
+      overflow: visible;
+
       border: 1px solid var(--border);
-      -webkit-overflow-scrolling: touch;
     }
 
     .empty-state { color: #777; padding: 6px 4px 10px; font-size: 0.95rem; }
