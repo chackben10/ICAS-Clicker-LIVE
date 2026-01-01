@@ -33,6 +33,7 @@
       --radius: 16px;
       --pad: 20px;
 
+      /* Make sure content fits */
       --time-w: clamp(420px, 60vw, 740px);
       --time-h: clamp(110px, 18vw, 190px);
     }
@@ -58,6 +59,7 @@
       /* 🔑 SCALE EVERYTHING */
       transform: scale(var(--scale));
       transform-origin: center;
+      max-width: 92vw; /* safety */
     }
 
     .topline{
@@ -74,21 +76,34 @@
     .panel{
       height: var(--time-h);
       width: var(--time-w);
+      max-width: 92vw; /* safety */
       border-radius: var(--radius);
       background: var(--panel);
       display: grid;
       place-items: center;
       padding: var(--pad);
+      overflow: hidden; /* keep text inside */
     }
 
     .countdown{
       font-family: "Norwester", "Antonio", system-ui, sans-serif;
-      font-size: clamp(64px, 10vw, 120px);
+
+      /* Fit inside the box: fluid size + no overflow */
+      font-size: clamp(44px, 8.5vw, 120px);
       letter-spacing: 0.04em;
       line-height: 1;
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1, "lnum" 1;
       white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+
+    /* Slightly smaller when showing the message to guarantee fit */
+    .countdown.message{
+      font-size: clamp(34px, 6.2vw, 92px);
+      letter-spacing: 0.03em;
     }
 
     .blink {
@@ -103,7 +118,7 @@
 
 <body>
   <div class="wrap">
-    <div id="topline" class="topline">COUNTDOWN</div>
+    <div id="topline" class="topline">—</div>
 
     <div class="panel">
       <div id="countdown" class="countdown">--:--:--</div>
@@ -113,75 +128,104 @@
   <script>
     // Intended URL:
     //   https://icas-clicker.work/displays/full-screen-countdown
-    // Optional:
-    //   ?time=12:00  (noon)
-    // Default (no param):
-    //   00:00 (midnight)
+    // Optional params:
+    //   ?time=12:00        (noon)   // default is 00:00 (midnight)
+    //   ?afterHours=1      (show "HAPPY NEW YEAR!" for 1 hour after target)
+    //
+    // Example:
+    //   /displays/full-screen-countdown?time=00:00&afterHours=1
 
     const toplineEl   = document.getElementById("topline");
     const countdownEl = document.getElementById("countdown");
 
+    const fmtParts = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "2-digit",
+      year: "numeric"
+    });
+
     function pad2(n){ return String(n).padStart(2, "0"); }
+
+    function setBlink(on) {
+      countdownEl.classList.toggle("blink", !!on);
+    }
+
+    function setMessageMode(on){
+      countdownEl.classList.toggle("message", !!on);
+    }
 
     function parseTimeParam() {
       const sp = new URLSearchParams(location.search);
       const t = (sp.get("time") || "00:00").trim();
 
-      // Accept H:MM or HH:MM
       const m = t.match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) return { hours: 0, minutes: 0, label: "12:00 AM" };
+      if (!m) return { hours: 0, minutes: 0 };
 
       let hh = Number(m[1]);
       let mm = Number(m[2]);
-      if (!Number.isFinite(hh) || !Number.isFinite(mm)) return { hours: 0, minutes: 0, label: "12:00 AM" };
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) return { hours: 0, minutes: 0 };
+
       hh = Math.min(Math.max(hh, 0), 23);
       mm = Math.min(Math.max(mm, 0), 59);
+      return { hours: hh, minutes: mm };
+    }
 
-      // Build a nice label (12-hour)
-      const ampm = hh >= 12 ? "PM" : "AM";
-      const h12 = (hh % 12) || 12;
-      const label = `${h12}:${pad2(mm)} ${ampm}`;
-
-      return { hours: hh, minutes: mm, label };
+    function parseAfterHours() {
+      const sp = new URLSearchParams(location.search);
+      const raw = (sp.get("afterHours") || "1").trim();
+      let n = Number(raw);
+      if (!Number.isFinite(n)) n = 1;
+      n = Math.min(Math.max(n, 0), 24); // clamp 0..24
+      return n;
     }
 
     const target = parseTimeParam();
+    const afterHours = parseAfterHours();
+    const afterMs = afterHours * 60 * 60 * 1000;
 
     function getNextTargetDate(now) {
       const d = new Date(now);
       d.setHours(target.hours, target.minutes, 0, 0);
 
       // If we've already passed it today, count down to tomorrow's target time.
-      if (now.getTime() >= d.getTime()) {
-        d.setDate(d.getDate() + 1);
-      }
+      if (now.getTime() >= d.getTime()) d.setDate(d.getDate() + 1);
       return d;
     }
 
     let nextTarget = getNextTargetDate(new Date());
-    toplineEl.textContent = `COUNTDOWN TO ${target.label}`.toUpperCase();
 
-    function setBlink(on) {
-      countdownEl.classList.toggle("blink", !!on);
+    function updateToplineDate(now){
+      const parts = fmtParts.formatToParts(now);
+      const get = t => (parts.find(p => p.type === t)?.value || "").toUpperCase();
+      toplineEl.textContent = `${get("weekday")} \u2022 ${get("month")} ${get("day")} ${get("year")}`;
     }
 
     function tick(){
       const now = new Date();
-      // Recompute target if day rolled over / time passed (keeps it robust)
-      if (now.getTime() >= nextTarget.getTime() + 1500) {
-        nextTarget = getNextTargetDate(now);
-      }
+      updateToplineDate(now);
 
-      let diffMs = nextTarget.getTime() - now.getTime();
+      // If we are within the after-window *after* the target moment, show message
+      const diffMs = nextTarget.getTime() - now.getTime();
+      const elapsedSinceTarget = now.getTime() - nextTarget.getTime();
 
-      if (diffMs <= 0) {
+      if (diffMs <= 0 && elapsedSinceTarget <= afterMs) {
         setBlink(false);
-        toplineEl.textContent = "—";
+        setMessageMode(true);
         countdownEl.textContent = "HAPPY NEW YEAR!";
         return;
       }
 
-      const diffSec = Math.ceil(diffMs / 1000);
+      // If we're past the after-window, roll forward to the next occurrence.
+      if (diffMs <= 0 && elapsedSinceTarget > afterMs) {
+        nextTarget = getNextTargetDate(now);
+        // fall through to show countdown
+      }
+
+      const newDiffMs = nextTarget.getTime() - now.getTime();
+      const diffSec = Math.ceil(newDiffMs / 1000);
+
+      setMessageMode(false);
 
       // Flash in the last 10 seconds
       setBlink(diffSec <= 10);
