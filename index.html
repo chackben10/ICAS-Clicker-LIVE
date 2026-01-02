@@ -162,27 +162,23 @@
       word-break: break-word;
     }
 
-    /* NEW: slide notes styling (distinct from text) */
-    .slide-notes {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px dashed rgba(128,128,128,0.45);
-      font-size: 0.85rem;
-      opacity: 0.9;
-      font-style: italic;
-      white-space: normal;
-      word-break: break-word;
-    }
-    body.dark .slide-notes {
-      border-top-color: rgba(255,255,255,0.22);
-    }
-
     .slide-thumb {
       margin-top: 6px;
       width: 100%;
       max-height: 200px;
       object-fit: contain;
       border-radius: 10px;
+    }
+
+    /* NEW: Notes styling (distinct from normal text) */
+    .slide-notes {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(128,128,128,0.55);
+      font-style: italic;
+      opacity: 0.85;
+      white-space: normal;
+      word-break: break-word;
     }
 
     /* Settings modal */
@@ -372,8 +368,8 @@
         </div>
       </div>
 
-      <!-- NEW: Show Slide Notes toggle (default off) -->
-      <div class="settings-row" style="margin-top: 10px;">
+      <!-- NEW: Show Slide Notes toggle (default OFF) -->
+      <div class="settings-row" style="margin-top: 12px;">
         <span>Show Slide Notes</span>
         <label class="switch">
           <input type="checkbox" id="showNotesToggle">
@@ -381,7 +377,7 @@
         </label>
       </div>
       <div class="settings-subtitle">
-        Displays slide notes below slide text (if available)
+        Shows notes under each slide preview
       </div>
 
       <div class="settings-row-column">
@@ -418,7 +414,7 @@
     // Auto-scroll
     const AUTO_SCROLL_KEY = "icas-auto-scroll";
 
-    // NEW: Show notes
+    // NEW: Show notes toggle
     const SHOW_NOTES_KEY = "icas-show-slide-notes";
 
     let pendingSelectedIndex = null;
@@ -470,14 +466,6 @@
       localStorage.setItem(AUTO_SCROLL_KEY, v ? "true" : "false");
     }
 
-    // NEW: Show notes helpers (default OFF)
-    function getShowNotes() {
-      return localStorage.getItem(SHOW_NOTES_KEY) === "true";
-    }
-    function setShowNotes(v) {
-      localStorage.setItem(SHOW_NOTES_KEY, v ? "true" : "false");
-    }
-
     function getTextScale() {
       const raw = parseInt(localStorage.getItem(TEXT_SCALE_KEY), 10);
       return Number.isNaN(raw) ? 100 : Math.min(300, Math.max(50, raw));
@@ -488,11 +476,6 @@
 
     function applyTextScale(el, scale) {
       el.style.fontSize = (0.95 * (scale / 100)) + "rem";
-    }
-
-    // Notes should follow slider too (slightly smaller base than slide-text)
-    function applyNotesScale(el, scale) {
-      el.style.fontSize = (0.85 * (scale / 100)) + "rem";
     }
 
     // Preview preference helpers
@@ -507,6 +490,14 @@
       document.querySelectorAll("#previewPreferenceSegment button").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.pref === pref);
       });
+    }
+
+    // NEW: Show notes helpers (default OFF)
+    function getShowNotes() {
+      return localStorage.getItem(SHOW_NOTES_KEY) === "true";
+    }
+    function setShowNotes(v) {
+      localStorage.setItem(SHOW_NOTES_KEY, v ? "true" : "false");
     }
 
     const thumbCache = {};
@@ -612,16 +603,16 @@
 
           item.appendChild(header);
 
-          const hasText = slide.text.trim() !== "";
+          const hasText = (slide.text || "").trim() !== "";
           const hasNotes = (slide.notes || "").trim() !== "";
 
-          // helper to append notes (if enabled and exists)
-          const maybeAppendNotes = () => {
+          // Helper to append notes (under text OR under image), scaled with slider
+          const appendNotesIfNeeded = () => {
             if (!showNotes || !hasNotes) return;
             const notesEl = document.createElement("div");
             notesEl.className = "slide-notes";
             notesEl.innerHTML = slide.notes.replace(/\n/g, "<br>");
-            applyNotesScale(notesEl, textScale);
+            applyTextScale(notesEl, textScale);
             item.appendChild(notesEl);
           };
 
@@ -633,8 +624,8 @@
               applyTextScale(t, textScale);
               item.appendChild(t);
 
-              // NEW: notes below text
-              maybeAppendNotes();
+              // Notes under text
+              appendNotesIfNeeded();
             } else if (uuid) {
               loadThumbnail(uuid, i).then(url => {
                 if (url) {
@@ -642,11 +633,22 @@
                   img.src = url;
                   img.className = "slide-thumb";
                   item.appendChild(img);
+
+                  // Notes under image
+                  appendNotesIfNeeded();
+                } else {
+                  // If no image available, still show notes (if any)
+                  appendNotesIfNeeded();
                 }
               });
+            } else {
+              // No text + no uuid, still show notes (if any)
+              appendNotesIfNeeded();
             }
           } else {
+            // "image" preference: show image if available, otherwise show text
             let fallbackTextEl = null;
+
             if (hasText) {
               const t = document.createElement("div");
               t.className = "slide-text";
@@ -654,28 +656,29 @@
               applyTextScale(t, textScale);
               item.appendChild(t);
               fallbackTextEl = t;
-
-              // NEW: notes below text (even in image-pref mode, when text is showing as fallback)
-              maybeAppendNotes();
             }
 
             if (uuid) {
               loadThumbnail(uuid, i).then(url => {
                 if (url) {
-                  // remove fallback text + notes if we swap to image
                   if (fallbackTextEl && fallbackTextEl.parentNode) {
-                    // remove everything after fallbackTextEl too (notes), by rebuilding is overkill;
-                    // simplest: clear item contents except header, then add image.
-                    const headerEl = item.querySelector(".slide-item-header");
-                    item.innerHTML = "";
-                    if (headerEl) item.appendChild(headerEl);
+                    fallbackTextEl.parentNode.removeChild(fallbackTextEl);
                   }
                   const img = document.createElement("img");
                   img.src = url;
                   img.className = "slide-thumb";
                   item.appendChild(img);
+
+                  // Notes under image
+                  appendNotesIfNeeded();
+                } else {
+                  // No image -> keep fallback text (if any), and notes under it
+                  appendNotesIfNeeded();
                 }
               });
+            } else {
+              // No uuid -> keep fallback text (if any), and notes under it
+              appendNotesIfNeeded();
             }
           }
 
@@ -728,7 +731,7 @@
         const themeMode = localStorage.getItem(THEME_KEY) || "system";
         updateThemeSegmentUI(themeMode);
 
-        // NEW: show notes toggle (default off)
+        // NEW: show notes
         document.getElementById("showNotesToggle").checked = getShowNotes();
       }
 
@@ -754,7 +757,6 @@
         setAutoScroll(e.target.checked);
       });
 
-      // NEW: show notes wiring
       document.getElementById("showNotesToggle").addEventListener("change", e => {
         setShowNotes(e.target.checked);
         fetchStatus();
