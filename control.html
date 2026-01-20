@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ICAS Media Control Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --title-color: #d32f2f;
+      --status-grey: #666666;
+
+      --card-bg: #f3f3f3;
+      --card-text: #111111;
+      --border-color: #d0d0d0;
+
+      --btn-bg: #ffffff;
+      --btn-text: #111111;
+      --btn-border: #d0d0d0;
+      --btn-hover: rgba(128,128,128,0.12);
+
+      --accent: #007aff;
+
+      --modal-bg: #ffffff;
+      --modal-shadow: rgba(0,0,0,0.25);
+      --settings-text: #111;
+
+      --danger: #ff5252;
+      --danger-bg: rgba(255, 82, 82, 0.10);
+    }
+
+    body.dark {
+      --bg: #000000;
+      --title-color: #ff5252;
+      --status-grey: #888888;
+
+      --card-bg: #121212;
+      --card-text: #ffffff;
+      --border-color: #444444;
+
+      --btn-bg: #111111;
+      --btn-text: #ffffff;
+      --btn-border: #444444;
+      --btn-hover: rgba(255,255,255,0.08);
+
+      --accent: #ffffff;
+
+      --modal-bg: #111111;
+      --modal-shadow: rgba(0,0,0,0.6);
+      --settings-text: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--card-text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 12px;
+
+      transition: background 0.25s ease, color 0.25s ease;
+      touch-action: manipulation;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 680px;
+      padding: 16px;
+    }
+
+    /* Top bar */
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      gap: 12px;
+    }
+
+    .page-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--status-grey);
+    }
+
+    .top-btn {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--btn-text);
+      opacity: 0.9;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .top-btn:hover { opacity: 1; background: var(--btn-hover); }
+
+    .panel-title {
+      color: var(--title-color);
+      font-size: 1.45rem;
+      font-weight: 800;
+      margin: 6px 0 8px;
+      line-height: 1.1;
+    }
+
+    .desc {
+      color: var(--status-grey);
+      font-size: 0.98rem;
+      line-height: 1.35;
+      margin-bottom: 12px;
+    }
+
+    /* Button grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .preset-btn {
+      width: 100%;
+      text-align: left;
+
+      border-radius: 14px;
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--btn-text);
+
+      padding: 14px 14px;
+      cursor: pointer;
+
+      transition: transform 0.07s ease, filter 0.07s ease, background 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .preset-btn:hover { background: var(--btn-hover); }
+    .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
+    .preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .preset-title {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+      margin-bottom: 6px;
+    }
+
+    .preset-sub {
+      color: var(--status-grey);
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--status-grey);
+      font-size: 0.92rem;
+      background: transparent;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--danger);
+    }
+    .status-dot.ok { background: #00c853; }
+
+    .status-text {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: var(--card-text);
+    }
+
+    /* Settings modal */
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 18px;
+    }
+
+    .settings-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--modal-bg);
+      color: var(--settings-text);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 18px 40px var(--modal-shadow);
+      border: 1px solid var(--border-color);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .settings-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .settings-subtitle {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      line-height: 1.25;
+      color: var(--status-grey);
+    }
+
+    .settings-row-column {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 12px;
+      gap: 6px;
+    }
+
+    .segment {
+      display: flex;
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .segment button {
+      flex: 1;
+      padding: 8px 0;
+      background: transparent;
+      border: none;
+      color: var(--settings-text);
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .segment button:hover { background: rgba(128,128,128,0.12); }
+
+    .segment button.active {
+      background: #ff5252;
+      color: white;
+      font-weight: 700;
+    }
+
+    .select-wrap { position: relative; width: 100%; }
+    .select-wrap::after {
+      content: "▾";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--settings-text);
+      opacity: 0.8;
+      pointer-events: none;
+      font-weight: 900;
+    }
+
+    .settings-select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--settings-text);
+      padding: 10px 40px 10px 12px;
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      font-weight: 700;
+    }
+
+    .small-btn-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .mini-btn {
+      flex: 1;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--settings-text);
+      font-weight: 700;
+      font-size: 0.92rem;
+      padding: 10px 12px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mini-btn:hover { background: rgba(128,128,128,0.12); }
+    .mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .settings-close-btn {
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--settings-text);
+      font-size: 0.95rem;
+      padding: 10px 0;
+      margin-top: 14px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .settings-close-btn:hover { background: rgba(128,128,128,0.12); }
+
+    @media (min-width: 700px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="top-row">
+      <div class="page-title">ICAS Media Control Panel</div>
+      <button class="top-btn" id="settingsButton">Settings</button>
+    </div>
+
+    <div class="panel-title">Presets</div>
+    <div class="desc">
+      These buttons are presets that trigger multiple actions at once (ProPresenter + OBS).
+      You can still control ProPresenter and OBS manually on their own screens anytime.
+    </div>
+
+    <div class="pill-row" aria-live="polite">
+      <span class="pill">
+        <span id="backendDot" class="status-dot"></span>
+        <span class="status-text" id="backendStatus">Backend: Unknown</span>
+      </span>
+      <span class="pill">
+        <span class="status-text" id="lastAction">Last action: —</span>
+      </span>
+    </div>
+
+    <div class="grid" style="margin-top: 12px;">
+      <button class="preset-btn" id="btnStreamBeginning" type="button">
+        <div class="preset-title">Stream Beginning</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to <b>Starting Logo</b> and sets OBS scene to the <b>stream countdown</b>.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnCamera" type="button">
+        <div class="preset-title">Camera</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to <b>Camera</b> and shows the <b>PTZ camera</b> on OBS.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnServiceLogo" type="button">
+        <div class="preset-title">Service Logo</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to <b>Service Logo</b> and shows the <b>Audience Camera</b> on OBS.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnShowSlides" type="button">
+        <div class="preset-title">Show Slides</div>
+        <div class="preset-sub">
+          Clears ProPresenter Announcements and shows <b>ProPresenter Lowerthirds</b> on OBS.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnSpecialLogo" type="button">
+        <div class="preset-title">Special Logo</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to the <b>Special Logo</b> selected in Settings, and shows the <b>Audience Camera</b> on OBS.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnTestimonies" type="button">
+        <div class="preset-title">Testimonies</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to <b>Service Logo</b> and sets OBS scene to <b>Testimonies</b>.
+        </div>
+      </button>
+
+      <button class="preset-btn" id="btnEndingStream" type="button">
+        <div class="preset-title">Ending Stream</div>
+        <div class="preset-sub">
+          Sets ProPresenter Announcement to <b>Ending Logo</b> and sets OBS scene to <b>Stream Ending</b>.
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsOverlay" class="settings-overlay">
+    <div class="settings-card">
+      <div class="settings-title">Settings</div>
+
+      <div class="settings-row-column" style="margin-top: 2px;">
+        <label style="font-weight:700;">Display Theme</label>
+        <div class="segment" id="themeSegment" style="margin-top: 0;">
+          <button data-mode="light">Light</button>
+          <button data-mode="dark">Dark</button>
+          <button data-mode="system">System</button>
+        </div>
+        <div class="settings-subtitle">
+          Sets the control panel appearance only.
+        </div>
+      </div>
+
+      <div class="settings-row-column" style="margin-top: 14px;">
+        <label style="font-weight:700;">Special Logo</label>
+        <div class="select-wrap">
+          <select id="specialLogoSelect" class="settings-select"></select>
+        </div>
+        <div class="settings-subtitle">
+          This is the Announcement used when you press <b>Special Logo</b>.
+        </div>
+
+        <div class="small-btn-row">
+          <button class="mini-btn" id="refreshSpecialLogosBtn" type="button">Refresh List</button>
+          <button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
+        </div>
+
+        <div class="settings-subtitle" id="specialLogoHint" style="margin-top: 8px;">
+          Tip: The list is provided by Hammerspoon (name + UUID).
+        </div>
+      </div>
+
+      <button id="settingsCloseButton" class="settings-close-btn">Close</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ====== CONFIG ======
+      // This is the HTTP server you’ll expose from init.lua (Hammerspoon).
+      // You can change it later without editing the file by setting localStorage key below.
+      const API_BASE_KEY = "icas-media-control-api-base";
+      const DEFAULT_API_BASE = "http://localhost:1337";
+
+      // Theme storage (same pattern as index.html)
+      const THEME_KEY = "icas-theme-mode";
+
+      // Special logo storage
+      const SPECIAL_LOGO_UUID_KEY = "icas-special-logo-uuid";
+
+      function getApiBase() {
+        const v = (localStorage.getItem(API_BASE_KEY) || "").trim();
+        return v || DEFAULT_API_BASE;
+      }
+
+      // Proposed init.lua endpoints (we’re wiring the calls now)
+      // - GET  /health
+      // - POST /preset  { preset: string, special_logo_uuid?: string }
+      // - GET  /special_logos  -> { items: [{ name: string, uuid: string }] }
+      function endpoints() {
+        const base = getApiBase().replace(/\/+$/, "");
+        return {
+          health: `${base}/health`,
+          preset: `${base}/preset`,
+          specialLogos: `${base}/special_logos`
+        };
+      }
+
+      // ====== THEME ======
+      function applyTheme(mode) {
+        if (mode === "light") {
+          document.body.classList.remove("dark");
+        } else if (mode === "dark") {
+          document.body.classList.add("dark");
+        } else {
+          if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.body.classList.add("dark");
+          } else {
+            document.body.classList.remove("dark");
+          }
+        }
+        updateThemeSegmentUI(mode);
+      }
+
+      function updateThemeSegmentUI(mode) {
+        document.querySelectorAll("#themeSegment button").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.mode === mode);
+        });
+      }
+
+      function loadTheme() {
+        const stored = localStorage.getItem(THEME_KEY);
+        applyTheme(stored || "system");
+      }
+
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        const stored = localStorage.getItem(THEME_KEY);
+        if ((stored || "system") === "system") applyTheme("system");
+      });
+
+      // ====== UI HELPERS ======
+      const backendDot = document.getElementById("backendDot");
+      const backendStatus = document.getElementById("backendStatus");
+      const lastAction = document.getElementById("lastAction");
+
+      function setBackendStatus(ok, text) {
+        backendDot.classList.toggle("ok", !!ok);
+        backendStatus.textContent = text || (ok ? "Backend: Connected" : "Backend: Offline");
+      }
+
+      function setLastAction(text) {
+        lastAction.textContent = `Last action: ${text || "—"}`;
+      }
+
+      function setButtonsEnabled(enabled) {
+        document.querySelectorAll(".preset-btn").forEach(b => b.disabled = !enabled);
+      }
+
+      async function testBackend() {
+        const { health } = endpoints();
+        try {
+          const res = await fetch(health, { cache: "no-cache" });
+          if (!res.ok) throw new Error("Bad response");
+          setBackendStatus(true, "Backend: Connected ✔");
+          setButtonsEnabled(true);
+          return true;
+        } catch {
+          setBackendStatus(false, "Backend: Offline");
+          setButtonsEnabled(false);
+          return false;
+        }
+      }
+
+      // ====== SPECIAL LOGOS ======
+      const specialLogoSelect = document.getElementById("specialLogoSelect");
+      const refreshSpecialLogosBtn = document.getElementById("refreshSpecialLogosBtn");
+      const testBackendBtn = document.getElementById("testBackendBtn");
+      const specialLogoHint = document.getElementById("specialLogoHint");
+
+      function getSpecialLogoUuid() {
+        return (localStorage.getItem(SPECIAL_LOGO_UUID_KEY) || "").trim();
+      }
+      function setSpecialLogoUuid(uuid) {
+        localStorage.setItem(SPECIAL_LOGO_UUID_KEY, (uuid || "").trim());
+      }
+
+      function fillSpecialLogoSelect(items) {
+        const prev = getSpecialLogoUuid();
+        specialLogoSelect.innerHTML = "";
+
+        if (!Array.isArray(items) || items.length === 0) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "No special logos found";
+          specialLogoSelect.appendChild(opt);
+          specialLogoSelect.value = "";
+          return;
+        }
+
+        items.forEach(it => {
+          const opt = document.createElement("option");
+          opt.value = String(it.uuid || "");
+          opt.textContent = String(it.name || "(Unnamed)");
+          specialLogoSelect.appendChild(opt);
+        });
+
+        if (prev && items.some(x => String(x.uuid) === prev)) {
+          specialLogoSelect.value = prev;
+        } else {
+          specialLogoSelect.value = String(items[0].uuid || "");
+          setSpecialLogoUuid(specialLogoSelect.value);
+        }
+      }
+
+      async function refreshSpecialLogos() {
+        const { specialLogos } = endpoints();
+        refreshSpecialLogosBtn.disabled = true;
+
+        try {
+          const res = await fetch(specialLogos, { cache: "no-cache" });
+          if (!res.ok) throw new Error("Bad response");
+          const data = await res.json();
+
+          const items = Array.isArray(data?.items) ? data.items : [];
+          fillSpecialLogoSelect(items);
+
+          const selectedName = specialLogoSelect.options[specialLogoSelect.selectedIndex]?.textContent || "—";
+          specialLogoHint.textContent = items.length
+            ? `Selected: ${selectedName}`
+            : "Tip: The list is provided by Hammerspoon (name + UUID).";
+        } catch {
+          fillSpecialLogoSelect([]);
+          specialLogoHint.textContent = "Could not load logos (backend offline).";
+        } finally {
+          refreshSpecialLogosBtn.disabled = false;
+        }
+      }
+
+      specialLogoSelect.addEventListener("change", () => {
+        setSpecialLogoUuid(specialLogoSelect.value);
+        const selectedName = specialLogoSelect.options[specialLogoSelect.selectedIndex]?.textContent || "—";
+        specialLogoHint.textContent = `Selected: ${selectedName}`;
+      });
+
+      // ====== PRESET CALLS ======
+      async function runPreset(presetName) {
+        const ok = await testBackend();
+        if (!ok) {
+          setLastAction("Failed (backend offline)");
+          return;
+        }
+
+        const { preset } = endpoints();
+        const payload = { preset: presetName };
+
+        // Special Logo needs the selected UUID
+        if (presetName === "special_logo") {
+          const uuid = getSpecialLogoUuid();
+          if (uuid) payload.special_logo_uuid = uuid;
+        }
+
+        setLastAction(`Running: ${presetName}`);
+
+        try {
+          const res = await fetch(preset, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error("Bad response");
+
+          // Optional: if init.lua returns json, we can read it, but we don’t need to.
+          setLastAction(`Done: ${presetName}`);
+        } catch {
+          setLastAction(`Failed: ${presetName}`);
+        }
+      }
+
+      // Wire buttons
+      document.getElementById("btnStreamBeginning").onclick = () => runPreset("stream_beginning");
+      document.getElementById("btnCamera").onclick = () => runPreset("camera");
+      document.getElementById("btnServiceLogo").onclick = () => runPreset("service_logo");
+      document.getElementById("btnShowSlides").onclick = () => runPreset("show_slides");
+      document.getElementById("btnSpecialLogo").onclick = () => runPreset("special_logo");
+      document.getElementById("btnTestimonies").onclick = () => runPreset("testimonies");
+      document.getElementById("btnEndingStream").onclick = () => runPreset("ending_stream");
+
+      // ====== SETTINGS MODAL ======
+      const settingsOverlay = document.getElementById("settingsOverlay");
+      const settingsButton = document.getElementById("settingsButton");
+      const settingsCloseButton = document.getElementById("settingsCloseButton");
+
+      function openModal() {
+        settingsOverlay.style.display = "flex";
+      }
+      function closeModal() {
+        settingsOverlay.style.display = "none";
+      }
+
+      settingsButton.onclick = () => openModal();
+      settingsCloseButton.onclick = () => closeModal();
+      settingsOverlay.addEventListener("click", (e) => {
+        if (e.target === settingsOverlay) closeModal();
+      });
+
+      document.querySelectorAll("#themeSegment button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const mode = btn.dataset.mode;
+          localStorage.setItem(THEME_KEY, mode);
+          applyTheme(mode);
+        });
+      });
+
+      refreshSpecialLogosBtn.onclick = refreshSpecialLogos;
+      testBackendBtn.onclick = async () => {
+        const ok = await testBackend();
+        if (ok) await refreshSpecialLogos();
+      };
+
+      // ====== INIT ======
+      async function init() {
+        loadTheme();
+        updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
+
+        setButtonsEnabled(false);
+        setBackendStatus(false, "Backend: Checking…");
+        setLastAction("—");
+
+        const ok = await testBackend();
+        if (ok) {
+          await refreshSpecialLogos();
+        } else {
+          // still populate select with placeholder
+          fillSpecialLogoSelect([]);
+        }
+
+        // Periodic health check (keeps the dot accurate)
+        setInterval(testBackend, 1500);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
