@@ -25,6 +25,7 @@
       --settings-text: #111;
 
       --danger: #ff5252;
+      --ok: #00c853;
     }
 
     body.dark {
@@ -46,6 +47,7 @@
       --settings-text: #ffffff;
 
       --danger: #ff5252;
+      --ok: #00c853;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -139,13 +141,25 @@
       border-radius: 999px;
       background: var(--danger);
     }
-    .status-dot.ok { background: #00c853; }
+    .status-dot.ok { background: var(--ok); }
 
     .status-text {
       font-variant-numeric: tabular-nums;
       font-weight: 800;
       color: var(--card-text);
     }
+
+    .note {
+      margin-top: 10px;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      color: var(--status-grey);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .note b { color: var(--card-text); }
 
     /* Preset buttons */
     .grid {
@@ -351,13 +365,18 @@
     </div>
 
     <div class="pill-row" aria-live="polite">
-      <span class="pill">
+      <span class="pill" title="Cloudflare Tunnel backend status">
         <span id="backendDot" class="status-dot"></span>
         <span class="status-text" id="backendStatus">Backend: Checking…</span>
       </span>
-      <span class="pill">
+      <span class="pill" title="Most recent action run from this page">
         <span class="status-text" id="lastAction">Last action: —</span>
       </span>
+    </div>
+
+    <div class="note" id="apiNote">
+      API Base: <b id="apiBaseText">—</b><br/>
+      If this is wrong, the page will not work from phones/iPads.
     </div>
 
     <div class="grid">
@@ -444,21 +463,28 @@
   <script>
     (function () {
       // ====== CONFIG ======
+      // This page is hosted at icas-clicker.work (GitHub Pages),
+      // BUT the backend is the Cloudflare Tunnel host:
+      //   https://control.icas-clicker.work
       const API_BASE_KEY = "icas-media-control-api-base";
-      const DEFAULT_API_BASE = "http://localhost:1337";
+      const DEFAULT_API_BASE = "https://control.icas-clicker.work";
 
       const THEME_KEY = "icas-theme-mode";
-
-      // Service logo selection persisted
       const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
 
+      function normalizeBase(u) {
+        u = String(u || "").trim();
+        if (!u) return DEFAULT_API_BASE;
+        return u.replace(/\/+$/, "");
+      }
+
       function getApiBase() {
-        const v = (localStorage.getItem(API_BASE_KEY) || "").trim();
+        const v = normalizeBase(localStorage.getItem(API_BASE_KEY));
         return v || DEFAULT_API_BASE;
       }
 
       function endpoints() {
-        const base = getApiBase().replace(/\/+$/, "");
+        const base = getApiBase();
         return {
           health: `${base}/health`,
           serviceLogos: `${base}/service_logos`,
@@ -498,6 +524,8 @@
       const backendStatus = document.getElementById("backendStatus");
       const lastAction = document.getElementById("lastAction");
 
+      const apiBaseText = document.getElementById("apiBaseText");
+
       const serviceLogoSelect = document.getElementById("serviceLogoSelect");
       const refreshLogosBtn = document.getElementById("refreshLogosBtn");
       const testBackendBtn = document.getElementById("testBackendBtn");
@@ -516,6 +544,7 @@
 
       function setButtonsEnabled(enabled) {
         document.querySelectorAll(".preset-btn").forEach(b => b.disabled = !enabled);
+        refreshLogosBtn.disabled = !enabled;
       }
 
       function getServiceLogoUuid() {
@@ -530,18 +559,18 @@
         return opt ? (opt.textContent || "—") : "—";
       }
 
+      function escapeHtml(s) {
+        return String(s || "").replace(/[&<>"']/g, c => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+        }[c]));
+      }
+
       function syncDescriptions() {
         const name = selectedServiceLogoName();
         serviceLogoDesc.innerHTML =
           `Sets ProPresenter Announcement to <b>${escapeHtml(name)}</b>, and shows the <b>Audience Camera</b> on OBS.`;
         testimoniesDesc.innerHTML =
           `Sets ProPresenter Announcement to <b>${escapeHtml(name)}</b> and sets OBS scene to <b>Testimonies</b>.`;
-      }
-
-      function escapeHtml(s) {
-        return String(s || "").replace(/[&<>"']/g, c => ({
-          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-        }[c]));
       }
 
       async function testBackend() {
@@ -552,7 +581,7 @@
           setBackendStatus(true, "Backend: Connected ✔");
           setButtonsEnabled(true);
           return true;
-        } catch {
+        } catch (e) {
           setBackendStatus(false, "Backend: Offline");
           setButtonsEnabled(false);
           return false;
@@ -583,7 +612,6 @@
         if (prev && items.some(x => String(x.uuid) === prev)) {
           serviceLogoSelect.value = prev;
         } else {
-          // Default should be Basic Service Logo if present, else first item.
           const basic = items.find(x => String(x.name) === "Basic Service Logo");
           if (basic) serviceLogoSelect.value = String(basic.uuid || "");
           else serviceLogoSelect.value = String(items[0].uuid || "");
@@ -595,7 +623,6 @@
 
       async function refreshServiceLogos() {
         const { serviceLogos } = endpoints();
-        refreshLogosBtn.disabled = true;
         try {
           const res = await fetch(serviceLogos, { cache: "no-cache" });
           if (!res.ok) throw new Error("Bad response");
@@ -604,8 +631,6 @@
           fillServiceLogoSelect(items);
         } catch {
           fillServiceLogoSelect([]);
-        } finally {
-          refreshLogosBtn.disabled = false;
         }
       }
 
@@ -621,10 +646,10 @@
         const { preset } = endpoints();
         const payload = { preset: presetName };
 
-        // Presets that depend on selected Service Logo UUID
         if (presetName === "service_logo" || presetName === "testimonies") {
           const uuid = getServiceLogoUuid();
-          if (uuid) payload.service_logo_uuid = uuid;
+          if (!uuid) { setLastAction("Failed (no Service Logo selected)"); return; }
+          payload.service_logo_uuid = uuid;
         }
 
         setLastAction(`Running: ${presetName}`);
@@ -682,17 +707,19 @@
         loadTheme();
         updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
 
+        // Always show what base we are calling
+        apiBaseText.textContent = getApiBase();
+
         setButtonsEnabled(false);
         setBackendStatus(false, "Backend: Checking…");
         setLastAction("—");
 
-        // Always try to load the logo list once on startup (even if offline; it will just show placeholder)
         const ok = await testBackend();
         if (ok) await refreshServiceLogos();
         else fillServiceLogoSelect([]);
 
-        // keep dot accurate
-        setInterval(testBackend, 1500);
+        // Light polling (optional): every 10s, not 1.5s
+        setInterval(testBackend, 10000);
       }
 
       init();
