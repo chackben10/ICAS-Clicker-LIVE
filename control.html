@@ -20,14 +20,11 @@
       --btn-border: #d0d0d0;
       --btn-hover: rgba(128,128,128,0.12);
 
-      --accent: #007aff;
-
       --modal-bg: #ffffff;
       --modal-shadow: rgba(0,0,0,0.25);
       --settings-text: #111;
 
       --danger: #ff5252;
-      --danger-bg: rgba(255, 82, 82, 0.10);
     }
 
     body.dark {
@@ -44,11 +41,11 @@
       --btn-border: #444444;
       --btn-hover: rgba(255,255,255,0.08);
 
-      --accent: #ffffff;
-
       --modal-bg: #111111;
       --modal-shadow: rgba(0,0,0,0.6);
       --settings-text: #ffffff;
+
+      --danger: #ff5252;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,11 +67,7 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    .wrapper {
-      width: 100%;
-      max-width: 680px;
-      padding: 16px;
-    }
+    .wrapper { width: 100%; max-width: 680px; padding: 16px; }
 
     /* Top bar */
     .top-row {
@@ -120,47 +113,6 @@
       margin-bottom: 12px;
     }
 
-    /* Button grid */
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    .preset-btn {
-      width: 100%;
-      text-align: left;
-
-      border-radius: 14px;
-      border: 1px solid var(--btn-border);
-      background: var(--btn-bg);
-      color: var(--btn-text);
-
-      padding: 14px 14px;
-      cursor: pointer;
-
-      transition: transform 0.07s ease, filter 0.07s ease, background 0.15s ease;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .preset-btn:hover { background: var(--btn-hover); }
-    .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
-    .preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-    .preset-title {
-      font-size: 1.15rem;
-      font-weight: 900;
-      letter-spacing: 0.2px;
-      margin-bottom: 6px;
-    }
-
-    .preset-sub {
-      color: var(--status-grey);
-      font-size: 0.95rem;
-      line-height: 1.25;
-    }
-
     .pill-row {
       display: flex;
       gap: 8px;
@@ -191,9 +143,109 @@
 
     .status-text {
       font-variant-numeric: tabular-nums;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--card-text);
     }
+
+    /* Preset buttons */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .preset-btn {
+      width: 100%;
+      text-align: left;
+      border-radius: 14px;
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      padding: 14px 14px;
+      cursor: pointer;
+      transition: transform 0.07s ease, filter 0.07s ease, background 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .preset-btn:hover { background: var(--btn-hover); }
+    .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
+    .preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .preset-title {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+      margin-bottom: 6px;
+    }
+
+    .preset-sub {
+      color: var(--status-grey);
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+
+    .below {
+      margin-top: 10px;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      padding: 12px;
+    }
+
+    .below-title {
+      font-weight: 900;
+      margin-bottom: 6px;
+      color: var(--card-text);
+    }
+
+    .select-wrap { position: relative; width: 100%; margin-top: 8px; }
+    .select-wrap::after {
+      content: "▾";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--card-text);
+      opacity: 0.8;
+      pointer-events: none;
+      font-weight: 900;
+    }
+
+    .select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--card-text);
+      padding: 12px 40px 12px 12px;
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      font-weight: 800;
+    }
+
+    .mini-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .mini-btn {
+      flex: 1;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--card-text);
+      font-weight: 800;
+      font-size: 0.92rem;
+      padding: 10px 12px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mini-btn:hover { background: var(--btn-hover); }
+    .mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     /* Settings modal */
     .settings-overlay {
@@ -221,22 +273,15 @@
 
     .settings-title {
       font-size: 1.1rem;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 10px;
-    }
-
-    .settings-subtitle {
-      margin-top: 6px;
-      font-size: 0.85rem;
-      line-height: 1.25;
-      color: var(--status-grey);
     }
 
     .settings-row-column {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      margin-top: 12px;
+      margin-top: 6px;
       gap: 6px;
     }
 
@@ -259,64 +304,15 @@
       font-size: 0.9rem;
       transition: background 0.15s;
       -webkit-tap-highlight-color: transparent;
+      font-weight: 800;
     }
 
     .segment button:hover { background: rgba(128,128,128,0.12); }
-
     .segment button.active {
       background: #ff5252;
       color: white;
-      font-weight: 700;
-    }
-
-    .select-wrap { position: relative; width: 100%; }
-    .select-wrap::after {
-      content: "▾";
-      position: absolute;
-      right: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--settings-text);
-      opacity: 0.8;
-      pointer-events: none;
       font-weight: 900;
     }
-
-    .settings-select {
-      width: 100%;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      background: transparent;
-      color: var(--settings-text);
-      padding: 10px 40px 10px 12px;
-      font-size: 16px;
-      outline: none;
-      -webkit-appearance: none;
-      appearance: none;
-      font-weight: 700;
-    }
-
-    .small-btn-row {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      margin-top: 8px;
-    }
-
-    .mini-btn {
-      flex: 1;
-      border: 1px solid var(--border-color);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--settings-text);
-      font-weight: 700;
-      font-size: 0.92rem;
-      padding: 10px 12px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .mini-btn:hover { background: rgba(128,128,128,0.12); }
-    .mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .settings-close-btn {
       width: 100%;
@@ -329,11 +325,14 @@
       margin-top: 14px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      font-weight: 800;
     }
     .settings-close-btn:hover { background: rgba(128,128,128,0.12); }
 
     @media (min-width: 700px) {
       .grid { grid-template-columns: 1fr 1fr; }
+      .service-span { grid-column: 1 / -1; }
+      .show-span { grid-column: 1 / -1; }
     }
   </style>
 </head>
@@ -354,98 +353,87 @@
     <div class="pill-row" aria-live="polite">
       <span class="pill">
         <span id="backendDot" class="status-dot"></span>
-        <span class="status-text" id="backendStatus">Backend: Unknown</span>
+        <span class="status-text" id="backendStatus">Backend: Checking…</span>
       </span>
       <span class="pill">
         <span class="status-text" id="lastAction">Last action: —</span>
       </span>
     </div>
 
-    <div class="grid" style="margin-top: 12px;">
+    <div class="grid">
       <button class="preset-btn" id="btnStreamBeginning" type="button">
         <div class="preset-title">Stream Beginning</div>
         <div class="preset-sub">
-          Sets ProPresenter Announcement to <b>Starting Logo</b> and sets OBS scene to the <b>stream countdown</b>.
+          Sets ProPresenter to <b>Starting Announcements</b> and sets OBS scene to <b>Stream Start</b>.
         </div>
       </button>
 
       <button class="preset-btn" id="btnCamera" type="button">
         <div class="preset-title">Camera</div>
         <div class="preset-sub">
-          Sets ProPresenter Announcement to <b>Camera</b> and shows the <b>PTZ camera</b> on OBS.
+          Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
         </div>
       </button>
 
-      <button class="preset-btn" id="btnServiceLogo" type="button">
-        <div class="preset-title">Service Logo</div>
-        <div class="preset-sub">
-          Sets ProPresenter Announcement to <b>Service Logo</b> and shows the <b>Audience Camera</b> on OBS.
-        </div>
-      </button>
+      <div class="service-span">
+        <button class="preset-btn" id="btnServiceLogo" type="button" style="width:100%;">
+          <div class="preset-title">Service Logo</div>
+          <div class="preset-sub" id="serviceLogoDesc">
+            Sets ProPresenter Announcement to <b>Basic Service Logo</b>, and shows the <b>Audience Camera</b> on OBS.
+          </div>
+        </button>
 
-      <button class="preset-btn" id="btnShowSlides" type="button">
+        <div class="below">
+          <div class="below-title">Default Service Logo</div>
+          <div class="preset-sub">
+            This selection is used for <b>Service Logo</b> and <b>Testimonies</b>.
+          </div>
+
+          <div class="select-wrap">
+            <select id="serviceLogoSelect" class="select"></select>
+          </div>
+
+          <div class="mini-row">
+            <button class="mini-btn" id="refreshLogosBtn" type="button">Refresh List</button>
+            <button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="preset-btn show-span" id="btnShowSlides" type="button">
         <div class="preset-title">Show Slides</div>
         <div class="preset-sub">
-          Clears ProPresenter Announcements and shows <b>ProPresenter Lowerthirds</b> on OBS.
-        </div>
-      </button>
-
-      <button class="preset-btn" id="btnSpecialLogo" type="button">
-        <div class="preset-title">Special Logo</div>
-        <div class="preset-sub">
-          Sets ProPresenter Announcement to the <b>Special Logo</b> selected in Settings, and shows the <b>Audience Camera</b> on OBS.
+          Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b>.
         </div>
       </button>
 
       <button class="preset-btn" id="btnTestimonies" type="button">
         <div class="preset-title">Testimonies</div>
-        <div class="preset-sub">
-          Sets ProPresenter Announcement to <b>Service Logo</b> and sets OBS scene to <b>Testimonies</b>.
+        <div class="preset-sub" id="testimoniesDesc">
+          Sets ProPresenter Announcement to <b>Basic Service Logo</b> and sets OBS scene to <b>Testimonies</b>.
         </div>
       </button>
 
       <button class="preset-btn" id="btnEndingStream" type="button">
         <div class="preset-title">Ending Stream</div>
         <div class="preset-sub">
-          Sets ProPresenter Announcement to <b>Ending Logo</b> and sets OBS scene to <b>Stream Ending</b>.
+          Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks Screen</b>.
         </div>
       </button>
     </div>
   </div>
 
-  <!-- Settings modal -->
+  <!-- Settings modal (Theme only) -->
   <div id="settingsOverlay" class="settings-overlay">
     <div class="settings-card">
       <div class="settings-title">Settings</div>
 
-      <div class="settings-row-column" style="margin-top: 2px;">
-        <label style="font-weight:700;">Display Theme</label>
+      <div class="settings-row-column">
+        <label style="font-weight:900;">Display Theme</label>
         <div class="segment" id="themeSegment" style="margin-top: 0;">
           <button data-mode="light">Light</button>
           <button data-mode="dark">Dark</button>
           <button data-mode="system">System</button>
-        </div>
-        <div class="settings-subtitle">
-          Sets the control panel appearance only.
-        </div>
-      </div>
-
-      <div class="settings-row-column" style="margin-top: 14px;">
-        <label style="font-weight:700;">Special Logo</label>
-        <div class="select-wrap">
-          <select id="specialLogoSelect" class="settings-select"></select>
-        </div>
-        <div class="settings-subtitle">
-          This is the Announcement used when you press <b>Special Logo</b>.
-        </div>
-
-        <div class="small-btn-row">
-          <button class="mini-btn" id="refreshSpecialLogosBtn" type="button">Refresh List</button>
-          <button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
-        </div>
-
-        <div class="settings-subtitle" id="specialLogoHint" style="margin-top: 8px;">
-          Tip: The list is provided by Hammerspoon (name + UUID).
         </div>
       </div>
 
@@ -456,47 +444,35 @@
   <script>
     (function () {
       // ====== CONFIG ======
-      // This is the HTTP server you’ll expose from init.lua (Hammerspoon).
-      // You can change it later without editing the file by setting localStorage key below.
       const API_BASE_KEY = "icas-media-control-api-base";
       const DEFAULT_API_BASE = "http://localhost:1337";
 
-      // Theme storage (same pattern as index.html)
       const THEME_KEY = "icas-theme-mode";
 
-      // Special logo storage
-      const SPECIAL_LOGO_UUID_KEY = "icas-special-logo-uuid";
+      // Service logo selection persisted
+      const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
 
       function getApiBase() {
         const v = (localStorage.getItem(API_BASE_KEY) || "").trim();
         return v || DEFAULT_API_BASE;
       }
 
-      // Proposed init.lua endpoints (we’re wiring the calls now)
-      // - GET  /health
-      // - POST /preset  { preset: string, special_logo_uuid?: string }
-      // - GET  /special_logos  -> { items: [{ name: string, uuid: string }] }
       function endpoints() {
         const base = getApiBase().replace(/\/+$/, "");
         return {
           health: `${base}/health`,
-          preset: `${base}/preset`,
-          specialLogos: `${base}/special_logos`
+          serviceLogos: `${base}/service_logos`,
+          preset: `${base}/preset`
         };
       }
 
       // ====== THEME ======
       function applyTheme(mode) {
-        if (mode === "light") {
-          document.body.classList.remove("dark");
-        } else if (mode === "dark") {
-          document.body.classList.add("dark");
-        } else {
-          if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            document.body.classList.add("dark");
-          } else {
-            document.body.classList.remove("dark");
-          }
+        if (mode === "light") document.body.classList.remove("dark");
+        else if (mode === "dark") document.body.classList.add("dark");
+        else {
+          if (window.matchMedia("(prefers-color-scheme: dark)").matches) document.body.classList.add("dark");
+          else document.body.classList.remove("dark");
         }
         updateThemeSegmentUI(mode);
       }
@@ -513,14 +489,21 @@
       }
 
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-        const stored = localStorage.getItem(THEME_KEY);
-        if ((stored || "system") === "system") applyTheme("system");
+        const stored = localStorage.getItem(THEME_KEY) || "system";
+        if (stored === "system") applyTheme("system");
       });
 
-      // ====== UI HELPERS ======
+      // ====== UI ======
       const backendDot = document.getElementById("backendDot");
       const backendStatus = document.getElementById("backendStatus");
       const lastAction = document.getElementById("lastAction");
+
+      const serviceLogoSelect = document.getElementById("serviceLogoSelect");
+      const refreshLogosBtn = document.getElementById("refreshLogosBtn");
+      const testBackendBtn = document.getElementById("testBackendBtn");
+
+      const serviceLogoDesc = document.getElementById("serviceLogoDesc");
+      const testimoniesDesc = document.getElementById("testimoniesDesc");
 
       function setBackendStatus(ok, text) {
         backendDot.classList.toggle("ok", !!ok);
@@ -533,6 +516,32 @@
 
       function setButtonsEnabled(enabled) {
         document.querySelectorAll(".preset-btn").forEach(b => b.disabled = !enabled);
+      }
+
+      function getServiceLogoUuid() {
+        return (localStorage.getItem(SERVICE_LOGO_UUID_KEY) || "").trim();
+      }
+      function setServiceLogoUuid(uuid) {
+        localStorage.setItem(SERVICE_LOGO_UUID_KEY, (uuid || "").trim());
+      }
+
+      function selectedServiceLogoName() {
+        const opt = serviceLogoSelect.options[serviceLogoSelect.selectedIndex];
+        return opt ? (opt.textContent || "—") : "—";
+      }
+
+      function syncDescriptions() {
+        const name = selectedServiceLogoName();
+        serviceLogoDesc.innerHTML =
+          `Sets ProPresenter Announcement to <b>${escapeHtml(name)}</b>, and shows the <b>Audience Camera</b> on OBS.`;
+        testimoniesDesc.innerHTML =
+          `Sets ProPresenter Announcement to <b>${escapeHtml(name)}</b> and sets OBS scene to <b>Testimonies</b>.`;
+      }
+
+      function escapeHtml(s) {
+        return String(s || "").replace(/[&<>"']/g, c => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+        }[c]));
       }
 
       async function testBackend() {
@@ -550,29 +559,17 @@
         }
       }
 
-      // ====== SPECIAL LOGOS ======
-      const specialLogoSelect = document.getElementById("specialLogoSelect");
-      const refreshSpecialLogosBtn = document.getElementById("refreshSpecialLogosBtn");
-      const testBackendBtn = document.getElementById("testBackendBtn");
-      const specialLogoHint = document.getElementById("specialLogoHint");
-
-      function getSpecialLogoUuid() {
-        return (localStorage.getItem(SPECIAL_LOGO_UUID_KEY) || "").trim();
-      }
-      function setSpecialLogoUuid(uuid) {
-        localStorage.setItem(SPECIAL_LOGO_UUID_KEY, (uuid || "").trim());
-      }
-
-      function fillSpecialLogoSelect(items) {
-        const prev = getSpecialLogoUuid();
-        specialLogoSelect.innerHTML = "";
+      function fillServiceLogoSelect(items) {
+        const prev = getServiceLogoUuid();
+        serviceLogoSelect.innerHTML = "";
 
         if (!Array.isArray(items) || items.length === 0) {
           const opt = document.createElement("option");
           opt.value = "";
-          opt.textContent = "No special logos found";
-          specialLogoSelect.appendChild(opt);
-          specialLogoSelect.value = "";
+          opt.textContent = "No service logos found";
+          serviceLogoSelect.appendChild(opt);
+          serviceLogoSelect.value = "";
+          syncDescriptions();
           return;
         }
 
@@ -580,62 +577,54 @@
           const opt = document.createElement("option");
           opt.value = String(it.uuid || "");
           opt.textContent = String(it.name || "(Unnamed)");
-          specialLogoSelect.appendChild(opt);
+          serviceLogoSelect.appendChild(opt);
         });
 
         if (prev && items.some(x => String(x.uuid) === prev)) {
-          specialLogoSelect.value = prev;
+          serviceLogoSelect.value = prev;
         } else {
-          specialLogoSelect.value = String(items[0].uuid || "");
-          setSpecialLogoUuid(specialLogoSelect.value);
+          // Default should be Basic Service Logo if present, else first item.
+          const basic = items.find(x => String(x.name) === "Basic Service Logo");
+          if (basic) serviceLogoSelect.value = String(basic.uuid || "");
+          else serviceLogoSelect.value = String(items[0].uuid || "");
+          setServiceLogoUuid(serviceLogoSelect.value);
         }
+
+        syncDescriptions();
       }
 
-      async function refreshSpecialLogos() {
-        const { specialLogos } = endpoints();
-        refreshSpecialLogosBtn.disabled = true;
-
+      async function refreshServiceLogos() {
+        const { serviceLogos } = endpoints();
+        refreshLogosBtn.disabled = true;
         try {
-          const res = await fetch(specialLogos, { cache: "no-cache" });
+          const res = await fetch(serviceLogos, { cache: "no-cache" });
           if (!res.ok) throw new Error("Bad response");
           const data = await res.json();
-
           const items = Array.isArray(data?.items) ? data.items : [];
-          fillSpecialLogoSelect(items);
-
-          const selectedName = specialLogoSelect.options[specialLogoSelect.selectedIndex]?.textContent || "—";
-          specialLogoHint.textContent = items.length
-            ? `Selected: ${selectedName}`
-            : "Tip: The list is provided by Hammerspoon (name + UUID).";
+          fillServiceLogoSelect(items);
         } catch {
-          fillSpecialLogoSelect([]);
-          specialLogoHint.textContent = "Could not load logos (backend offline).";
+          fillServiceLogoSelect([]);
         } finally {
-          refreshSpecialLogosBtn.disabled = false;
+          refreshLogosBtn.disabled = false;
         }
       }
 
-      specialLogoSelect.addEventListener("change", () => {
-        setSpecialLogoUuid(specialLogoSelect.value);
-        const selectedName = specialLogoSelect.options[specialLogoSelect.selectedIndex]?.textContent || "—";
-        specialLogoHint.textContent = `Selected: ${selectedName}`;
+      serviceLogoSelect.addEventListener("change", () => {
+        setServiceLogoUuid(serviceLogoSelect.value);
+        syncDescriptions();
       });
 
-      // ====== PRESET CALLS ======
       async function runPreset(presetName) {
         const ok = await testBackend();
-        if (!ok) {
-          setLastAction("Failed (backend offline)");
-          return;
-        }
+        if (!ok) { setLastAction("Failed (backend offline)"); return; }
 
         const { preset } = endpoints();
         const payload = { preset: presetName };
 
-        // Special Logo needs the selected UUID
-        if (presetName === "special_logo") {
-          const uuid = getSpecialLogoUuid();
-          if (uuid) payload.special_logo_uuid = uuid;
+        // Presets that depend on selected Service Logo UUID
+        if (presetName === "service_logo" || presetName === "testimonies") {
+          const uuid = getServiceLogoUuid();
+          if (uuid) payload.service_logo_uuid = uuid;
         }
 
         setLastAction(`Running: ${presetName}`);
@@ -647,8 +636,6 @@
             body: JSON.stringify(payload)
           });
           if (!res.ok) throw new Error("Bad response");
-
-          // Optional: if init.lua returns json, we can read it, but we don’t need to.
           setLastAction(`Done: ${presetName}`);
         } catch {
           setLastAction(`Failed: ${presetName}`);
@@ -660,21 +647,16 @@
       document.getElementById("btnCamera").onclick = () => runPreset("camera");
       document.getElementById("btnServiceLogo").onclick = () => runPreset("service_logo");
       document.getElementById("btnShowSlides").onclick = () => runPreset("show_slides");
-      document.getElementById("btnSpecialLogo").onclick = () => runPreset("special_logo");
       document.getElementById("btnTestimonies").onclick = () => runPreset("testimonies");
       document.getElementById("btnEndingStream").onclick = () => runPreset("ending_stream");
 
-      // ====== SETTINGS MODAL ======
+      // Settings modal
       const settingsOverlay = document.getElementById("settingsOverlay");
       const settingsButton = document.getElementById("settingsButton");
       const settingsCloseButton = document.getElementById("settingsCloseButton");
 
-      function openModal() {
-        settingsOverlay.style.display = "flex";
-      }
-      function closeModal() {
-        settingsOverlay.style.display = "none";
-      }
+      function openModal() { settingsOverlay.style.display = "flex"; }
+      function closeModal() { settingsOverlay.style.display = "none"; }
 
       settingsButton.onclick = () => openModal();
       settingsCloseButton.onclick = () => closeModal();
@@ -690,13 +672,12 @@
         });
       });
 
-      refreshSpecialLogosBtn.onclick = refreshSpecialLogos;
+      refreshLogosBtn.onclick = refreshServiceLogos;
       testBackendBtn.onclick = async () => {
         const ok = await testBackend();
-        if (ok) await refreshSpecialLogos();
+        if (ok) await refreshServiceLogos();
       };
 
-      // ====== INIT ======
       async function init() {
         loadTheme();
         updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
@@ -705,15 +686,12 @@
         setBackendStatus(false, "Backend: Checking…");
         setLastAction("—");
 
+        // Always try to load the logo list once on startup (even if offline; it will just show placeholder)
         const ok = await testBackend();
-        if (ok) {
-          await refreshSpecialLogos();
-        } else {
-          // still populate select with placeholder
-          fillSpecialLogoSelect([]);
-        }
+        if (ok) await refreshServiceLogos();
+        else fillServiceLogoSelect([]);
 
-        // Periodic health check (keeps the dot accurate)
+        // keep dot accurate
         setInterval(testBackend, 1500);
       }
 
