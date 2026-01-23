@@ -26,6 +26,9 @@
 
       --danger: #ff5252;
       --ok: #00c853;
+
+      /* NEW: scale for preset button text only */
+      --btn-text-scale: 100;
     }
 
     body.dark {
@@ -141,17 +144,22 @@
     .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
     .preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    .preset-title {
-      font-size: 1.15rem;
+    /* NEW: only scale text INSIDE preset buttons */
+    .preset-btn .preset-title {
+      font-size: calc(1.15rem * (var(--btn-text-scale) / 100));
       font-weight: 900;
       letter-spacing: 0.2px;
       margin-bottom: 6px;
     }
-
-    .preset-sub {
+    .preset-btn .preset-sub {
       color: var(--status-grey);
-      font-size: 0.95rem;
+      font-size: calc(0.95rem * (var(--btn-text-scale) / 100));
       line-height: 1.25;
+    }
+
+    /* Make selector scale with button text size too */
+    .preset-btn .select {
+      font-size: calc(16px * (var(--btn-text-scale) / 100));
     }
 
     .selector-row {
@@ -181,7 +189,6 @@
       background: transparent;
       color: var(--card-text);
       padding: 12px 40px 12px 12px;
-      font-size: 16px;
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -325,6 +332,23 @@
       font-weight: 900;
     }
 
+    /* NEW: text size slider row (same vibe as picker) */
+    .slider-row {
+      display: flex;
+      width: 100%;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .slider-row input[type="range"] { flex: 1; }
+    .slider-value {
+      color: var(--status-grey);
+      width: 56px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+    }
+
     .settings-close-btn {
       width: 100%;
       border: 1px solid var(--border-color);
@@ -445,6 +469,18 @@
         </div>
       </div>
 
+      <!-- NEW: Text Size slider (controls ONLY preset button text) -->
+      <div class="settings-section">
+        <div class="settings-label">Button Text Size</div>
+        <div class="slider-row">
+          <input type="range" id="btnTextSizeSlider" min="50" max="300" step="10">
+          <span id="btnTextSizeValue" class="slider-value">100%</span>
+        </div>
+        <div class="settings-muted" style="margin-top: 8px;">
+          Changes text size inside preset buttons (titles, descriptions, and selectors) only.
+        </div>
+      </div>
+
       <div class="settings-section">
         <div class="settings-label">Display Theme</div>
         <div class="segment" id="themeSegment">
@@ -468,6 +504,9 @@
       // Persisted selections
       const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
       const TESTIMONIES_LOGO_UUID_KEY = "icas-testimonies-logo-uuid";
+
+      // NEW: Button text size (same semantics as picker)
+      const BTN_TEXT_SCALE_KEY = "icas-control-btn-text-scale"; // 50..300, default 100
 
       function normalizeBase(u) {
         u = String(u || "").trim();
@@ -514,6 +553,19 @@
         if (stored === "system") applyTheme("system");
       });
 
+      // ====== Button Text Size ======
+      function getBtnTextScale() {
+        const raw = parseInt(localStorage.getItem(BTN_TEXT_SCALE_KEY), 10);
+        return Number.isNaN(raw) ? 100 : Math.min(300, Math.max(50, raw));
+      }
+      function setBtnTextScale(v) {
+        localStorage.setItem(BTN_TEXT_SCALE_KEY, String(v));
+      }
+      function applyBtnTextScale(scale) {
+        const s = Math.min(300, Math.max(50, parseInt(scale, 10) || 100));
+        document.documentElement.style.setProperty("--btn-text-scale", String(s));
+      }
+
       // ====== UI refs ======
       const backendDot = document.getElementById("backendDot");
       const backendStatus = document.getElementById("backendStatus");
@@ -527,6 +579,10 @@
 
       const serviceLogoDesc = document.getElementById("serviceLogoDesc");
       const testimoniesDesc = document.getElementById("testimoniesDesc");
+
+      // NEW: slider refs
+      const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
+      const btnTextSizeValue = document.getElementById("btnTextSizeValue");
 
       // Prevent select taps from triggering the whole button
       function stopBtnClickWhenSelecting(selectEl) {
@@ -637,7 +693,6 @@
           fillSelect(serviceLogoSelect, items, SERVICE_LOGO_UUID_KEY, true);
           fillSelect(testimoniesLogoSelect, items, TESTIMONIES_LOGO_UUID_KEY, true);
 
-          // Ensure defaults saved
           if (!getStored(SERVICE_LOGO_UUID_KEY)) setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
           if (!getStored(TESTIMONIES_LOGO_UUID_KEY)) setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
 
@@ -706,7 +761,19 @@
       const settingsButton = document.getElementById("settingsButton");
       const settingsCloseButton = document.getElementById("settingsCloseButton");
 
-      function openModal() { settingsOverlay.style.display = "flex"; }
+      function syncSettingsUI() {
+        const scale = getBtnTextScale();
+        btnTextSizeSlider.value = scale;
+        btnTextSizeValue.textContent = `${scale}%`;
+
+        const themeMode = localStorage.getItem(THEME_KEY) || "system";
+        updateThemeSegmentUI(themeMode);
+      }
+
+      function openModal() {
+        syncSettingsUI();
+        settingsOverlay.style.display = "flex";
+      }
       function closeModal() { settingsOverlay.style.display = "none"; }
 
       settingsButton.onclick = () => openModal();
@@ -730,9 +797,21 @@
         if (ok) await refreshServiceLogos();
       };
 
+      // Slider behavior (matches picker pattern: live label on input, apply on change)
+      btnTextSizeSlider.addEventListener("input", () => {
+        btnTextSizeValue.textContent = `${btnTextSizeSlider.value}%`;
+      });
+      btnTextSizeSlider.addEventListener("change", () => {
+        setBtnTextScale(btnTextSizeSlider.value);
+        applyBtnTextScale(btnTextSizeSlider.value);
+      });
+
       async function init() {
         loadTheme();
         updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
+
+        // Apply saved button scale immediately
+        applyBtnTextScale(getBtnTextScale());
 
         setButtonsEnabled(false);
         setBackendStatus(false, "Backend: Checking…");
