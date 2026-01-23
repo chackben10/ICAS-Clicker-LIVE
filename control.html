@@ -124,8 +124,9 @@
     .grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: calc(var(--grid-gap-base) * var(--btn-scale)); /* scaled gap between items */
-      margin-top: 12px; /* keep spacing between title/desc and first item unchanged */
+      gap: calc(var(--grid-gap-base) * var(--btn-scale));
+      margin-top: 12px;
+      align-items: stretch; /* ensure cards stretch to row height */
     }
 
     @media (min-width: 700px) {
@@ -137,6 +138,7 @@
       width: 100%;
       display: flex;
       flex-direction: column;
+      height: 100%; /* allow grid row to define height */
     }
 
     .preset-main,
@@ -150,7 +152,6 @@
       -webkit-tap-highlight-color: transparent;
       position: relative;
 
-      /* allow vertical scrolling gestures without accidental presses */
       touch-action: pan-y;
       user-select: none;
       -webkit-user-select: none;
@@ -159,18 +160,27 @@
     }
 
     .preset-main {
-      /* scale the whole "feel" of the button */
       padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
       border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+
+      /* key for equal-height rows: main part expands to fill */
+      flex: 1 1 auto;
+
+      /* keep content top-aligned even when stretched taller */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
 
     /* Attached (no gap) addon button */
     .preset-card.has-addon .preset-main {
       border-bottom-left-radius: 0;
       border-bottom-right-radius: 0;
-      border-bottom-width: 0; /* visually merges borders */
+      border-bottom-width: 0;
     }
+
     .preset-addon {
+      flex: 0 0 auto;
       padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
       border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
       border-top-left-radius: 0;
@@ -243,7 +253,6 @@
         calc(12px * var(--btn-scale))
         calc(12px * var(--btn-scale));
 
-      /* allow scrolling gestures without triggering the button */
       touch-action: pan-y;
     }
 
