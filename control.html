@@ -208,6 +208,32 @@
       touch-action: pan-y;
     }
 
+    /* NEW: Button-inside-button (Safely Clear Slide) */
+    .sub-action-btn {
+      width: 100%;
+      margin-top: calc(12px * var(--btn-scale));
+      border: 0;
+      background: var(--danger);
+      color: #fff;
+      font-weight: 900;
+      border-radius: clamp(10px, calc(14px * var(--btn-scale)), 18px);
+      padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
+      font-size: calc(1.05rem * var(--btn-scale));
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+
+      /* allow scroll gestures */
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .sub-action-btn:hover { filter: brightness(0.98); }
+    .sub-action-btn:active { filter: brightness(0.95); transform: scale(0.995); }
+
+    /* NEW: Highlighted preset title in red (for standalone Safely Clear Slide button) */
+    .preset-title.danger-title { color: var(--danger); }
+
     /* Settings modal */
     .settings-overlay {
       position: fixed;
@@ -399,6 +425,11 @@
         <div class="preset-sub">
           Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
         </div>
+
+        <!-- NEW: inside-button Safely Clear Slide -->
+        <button class="sub-action-btn" id="btnCameraSafeClear" type="button">
+          + Safely Clear Slide
+        </button>
       </button>
 
       <!-- Service Logo button includes its own selector -->
@@ -413,6 +444,11 @@
             <select id="serviceLogoSelect" class="select" title="Default Service Logo"></select>
           </div>
         </div>
+
+        <!-- NEW: inside-button Safely Clear Slide -->
+        <button class="sub-action-btn" id="btnServiceLogoSafeClear" type="button">
+          + Safely Clear Slide
+        </button>
       </button>
 
       <button class="preset-btn" id="btnShowSlides" type="button">
@@ -440,6 +476,22 @@
         <div class="preset-title">Ending Stream</div>
         <div class="preset-sub">
           Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks Screen</b>.
+        </div>
+      </button>
+
+      <!-- NEW: standalone Safely Clear Slide -->
+      <button class="preset-btn" id="btnSafelyClearSlide" type="button">
+        <div class="preset-title danger-title">Safely Clear Slide</div>
+        <div class="preset-sub">
+          Clear the presentation in ProPresenter without affecting the camera feeds of the OBS stream.
+        </div>
+      </button>
+
+      <!-- NEW: NSC setup -->
+      <button class="preset-btn" id="btnNSCSetup" type="button">
+        <div class="preset-title">NSC Setup</div>
+        <div class="preset-sub">
+          Set up ProPresenter to display the iMac screen on all in-house TVs.
         </div>
       </button>
     </div>
@@ -516,12 +568,12 @@
         return normalizeBase(DEFAULT_API_BASE);
       }
 
-      function endpoints() {
+      function endpoints(extraQuery) {
         const base = getApiBase();
         return {
           health: `${base}/health`,
           serviceLogos: `${base}/service_logos`,
-          preset: `${base}/preset`
+          preset: `${base}/preset${extraQuery || ""}`
         };
       }
 
@@ -586,6 +638,12 @@
       const serviceLogoDesc = document.getElementById("serviceLogoDesc");
       const testimoniesDesc = document.getElementById("testimoniesDesc");
 
+      // NEW refs
+      const btnCameraSafeClear = document.getElementById("btnCameraSafeClear");
+      const btnServiceLogoSafeClear = document.getElementById("btnServiceLogoSafeClear");
+      const btnSafelyClearSlide = document.getElementById("btnSafelyClearSlide");
+      const btnNSCSetup = document.getElementById("btnNSCSetup");
+
       // Slider UI
       const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
       const btnTextSizeValue = document.getElementById("btnTextSizeValue");
@@ -598,6 +656,15 @@
       }
       stopBtnClickWhenSelecting(serviceLogoSelect);
       stopBtnClickWhenSelecting(testimoniesLogoSelect);
+
+      // Prevent sub-button taps from triggering the whole button
+      function stopBtnClickWhenSelectingButton(innerBtn) {
+        ["click","pointerdown","touchstart","mousedown"].forEach(evt => {
+          innerBtn.addEventListener(evt, (e) => e.stopPropagation(), { passive: false });
+        });
+      }
+      stopBtnClickWhenSelectingButton(btnCameraSafeClear);
+      stopBtnClickWhenSelectingButton(btnServiceLogoSafeClear);
 
       function setBackendStatus(ok, text) {
         backendDot.classList.toggle("ok", !!ok);
@@ -614,6 +681,14 @@
         testBackendBtn.disabled = false; // always allow manual test attempt
         serviceLogoSelect.disabled = !enabled;
         testimoniesLogoSelect.disabled = !enabled;
+
+        // NEW: inner buttons
+        btnCameraSafeClear.disabled = !enabled;
+        btnServiceLogoSafeClear.disabled = !enabled;
+
+        // NEW: bottom stubs should still require backend to be reachable
+        btnSafelyClearSlide.disabled = !enabled;
+        btnNSCSetup.disabled = !enabled;
       }
 
       function escapeHtml(s) {
@@ -729,7 +804,6 @@
 
         el.addEventListener("pointerdown", (e) => {
           if (el.disabled) return;
-          // Only primary pointer
           if (e.isPrimary === false) return;
 
           activePointerId = e.pointerId;
@@ -758,20 +832,17 @@
         el.addEventListener("pointerup", finish);
         el.addEventListener("pointercancel", () => { activePointerId = null; moved = false; });
 
-        // Prevent the old click from double-firing / firing after scroll
         el.addEventListener("click", (e) => {
-          // If the browser generates a click after a scroll gesture, block it.
-          // (When it was a real tap, pointerup already called handler.)
           e.preventDefault();
           e.stopPropagation();
         }, true);
       }
 
-      async function runPreset(presetName) {
+      async function runPreset(presetName, extraQuery) {
         const ok = await testBackend();
         if (!ok) { setLastAction("Failed (backend offline)"); return; }
 
-        const { preset } = endpoints();
+        const { preset } = endpoints(extraQuery || "");
         const payload = { preset: presetName };
 
         if (presetName === "service_logo") {
@@ -783,7 +854,7 @@
         if (presetName === "testimonies") {
           const uuid = getStored(TESTIMONIES_LOGO_UUID_KEY) || testimoniesLogoSelect.value;
           if (!uuid) { setLastAction("Failed (no Testimonies logo selected)"); return; }
-          payload.service_logo_uuid = uuid; // backend expects service_logo_uuid
+          payload.service_logo_uuid = uuid;
         }
 
         setLastAction(`Running: ${presetName}`);
@@ -801,13 +872,21 @@
         }
       }
 
-      // Wire buttons via tap handler (prevents scroll-presses)
+      // Wire main buttons via tap handler (prevents scroll-presses)
       attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
       attachTapHandler(document.getElementById("btnCamera"), () => runPreset("camera"));
       attachTapHandler(document.getElementById("btnServiceLogo"), () => runPreset("service_logo"));
       attachTapHandler(document.getElementById("btnShowSlides"), () => runPreset("show_slides"));
       attachTapHandler(document.getElementById("btnTestimonies"), () => runPreset("testimonies"));
       attachTapHandler(document.getElementById("btnEndingStream"), () => runPreset("ending_stream"));
+
+      // NEW: inside-button safe clear (adds ?safeclear=true)
+      attachTapHandler(btnCameraSafeClear, () => runPreset("camera", "?safeclear=true"));
+      attachTapHandler(btnServiceLogoSafeClear, () => runPreset("service_logo", "?safeclear=true"));
+
+      // NEW: bottom stub buttons (we'll implement init.lua later)
+      attachTapHandler(btnSafelyClearSlide, () => runPreset("safely_clear_slide"));
+      attachTapHandler(btnNSCSetup, () => runPreset("nsc_setup"));
 
       // Settings modal
       const settingsOverlay = document.getElementById("settingsOverlay");
