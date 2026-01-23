@@ -27,8 +27,8 @@
       --danger: #ff5252;
       --ok: #00c853;
 
-      /* NEW: scale for preset button text only */
-      --btn-text-scale: 100;
+      /* NEW: preset scaling (only affects button content) */
+      --preset-scale: 1;
     }
 
     body.dark {
@@ -133,37 +133,35 @@
       border: 1px solid var(--btn-border);
       background: var(--btn-bg);
       color: var(--btn-text);
-      padding: 14px 14px;
       cursor: pointer;
       transition: transform 0.07s ease, filter 0.07s ease, background 0.15s ease;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       position: relative;
+
+      /* padding scales with slider */
+      padding: calc(14px * var(--preset-scale)) calc(14px * var(--preset-scale));
     }
     .preset-btn:hover { background: var(--btn-hover); }
     .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
     .preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    /* NEW: only scale text INSIDE preset buttons */
-    .preset-btn .preset-title {
-      font-size: calc(1.15rem * (var(--btn-text-scale) / 100));
+    /* Only the text inside buttons scales */
+    .preset-title {
+      font-size: calc(1.15rem * var(--preset-scale));
       font-weight: 900;
       letter-spacing: 0.2px;
-      margin-bottom: 6px;
+      margin-bottom: calc(6px * var(--preset-scale));
     }
-    .preset-btn .preset-sub {
+
+    .preset-sub {
       color: var(--status-grey);
-      font-size: calc(0.95rem * (var(--btn-text-scale) / 100));
+      font-size: calc(0.95rem * var(--preset-scale));
       line-height: 1.25;
     }
 
-    /* Make selector scale with button text size too */
-    .preset-btn .select {
-      font-size: calc(16px * (var(--btn-text-scale) / 100));
-    }
-
     .selector-row {
-      margin-top: 10px;
+      margin-top: calc(10px * var(--preset-scale));
       display: flex;
       gap: 10px;
       align-items: center;
@@ -182,13 +180,15 @@
       font-weight: 900;
     }
 
+    /* Select stays readable on iOS: keep 16px minimum font-size */
     .select {
       width: 100%;
       border-radius: 12px;
       border: 1px solid var(--border-color);
       background: transparent;
       color: var(--card-text);
-      padding: 12px 40px 12px 12px;
+      padding: calc(12px * var(--preset-scale)) 40px calc(12px * var(--preset-scale)) calc(12px * var(--preset-scale));
+      font-size: 16px;
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -332,23 +332,6 @@
       font-weight: 900;
     }
 
-    /* NEW: text size slider row (same vibe as picker) */
-    .slider-row {
-      display: flex;
-      width: 100%;
-      gap: 8px;
-      align-items: center;
-      margin-top: 8px;
-    }
-    .slider-row input[type="range"] { flex: 1; }
-    .slider-value {
-      color: var(--status-grey);
-      width: 56px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      font-weight: 900;
-    }
-
     .settings-close-btn {
       width: 100%;
       border: 1px solid var(--border-color);
@@ -469,15 +452,15 @@
         </div>
       </div>
 
-      <!-- NEW: Text Size slider (controls ONLY preset button text) -->
+      <!-- NEW: Text Size for presets ONLY -->
       <div class="settings-section">
-        <div class="settings-label">Button Text Size</div>
-        <div class="slider-row">
-          <input type="range" id="btnTextSizeSlider" min="50" max="300" step="10">
-          <span id="btnTextSizeValue" class="slider-value">100%</span>
+        <div class="settings-label">Preset Text Size</div>
+        <div class="settings-muted" style="margin-bottom: 8px;">
+          Changes text + padding <b>inside the preset buttons</b> only.
         </div>
-        <div class="settings-muted" style="margin-top: 8px;">
-          Changes text size inside preset buttons (titles, descriptions, and selectors) only.
+        <div style="display:flex; width:100%; gap:8px; align-items:center;">
+          <input type="range" id="textSizeSlider" min="40" max="200" step="10" style="flex:1;">
+          <span id="textSizeValue" style="color:var(--status-grey); width:56px; text-align:right;">100%</span>
         </div>
       </div>
 
@@ -505,8 +488,8 @@
       const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
       const TESTIMONIES_LOGO_UUID_KEY = "icas-testimonies-logo-uuid";
 
-      // NEW: Button text size (same semantics as picker)
-      const BTN_TEXT_SCALE_KEY = "icas-control-btn-text-scale"; // 50..300, default 100
+      // NEW: preset text size
+      const PRESET_TEXT_SCALE_KEY = "icas-control-preset-text-scale"; // percent integer (40..200)
 
       function normalizeBase(u) {
         u = String(u || "").trim();
@@ -553,17 +536,23 @@
         if (stored === "system") applyTheme("system");
       });
 
-      // ====== Button Text Size ======
-      function getBtnTextScale() {
-        const raw = parseInt(localStorage.getItem(BTN_TEXT_SCALE_KEY), 10);
-        return Number.isNaN(raw) ? 100 : Math.min(300, Math.max(50, raw));
+      // ====== PRESET TEXT SIZE (buttons only) ======
+      function getPresetTextScale() {
+        const raw = parseInt(localStorage.getItem(PRESET_TEXT_SCALE_KEY), 10);
+        const v = Number.isNaN(raw) ? 100 : raw;
+        return Math.min(200, Math.max(40, v));
       }
-      function setBtnTextScale(v) {
-        localStorage.setItem(BTN_TEXT_SCALE_KEY, String(v));
+
+      function setPresetTextScale(v) {
+        const n = parseInt(v, 10);
+        if (Number.isNaN(n)) return;
+        const clamped = Math.min(200, Math.max(40, n));
+        localStorage.setItem(PRESET_TEXT_SCALE_KEY, String(clamped));
       }
-      function applyBtnTextScale(scale) {
-        const s = Math.min(300, Math.max(50, parseInt(scale, 10) || 100));
-        document.documentElement.style.setProperty("--btn-text-scale", String(s));
+
+      function applyPresetTextScale(scalePercent) {
+        const scale = (scalePercent || 100) / 100;
+        document.documentElement.style.setProperty("--preset-scale", String(scale));
       }
 
       // ====== UI refs ======
@@ -580,9 +569,9 @@
       const serviceLogoDesc = document.getElementById("serviceLogoDesc");
       const testimoniesDesc = document.getElementById("testimoniesDesc");
 
-      // NEW: slider refs
-      const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
-      const btnTextSizeValue = document.getElementById("btnTextSizeValue");
+      // NEW: slider UI
+      const textSizeSlider = document.getElementById("textSizeSlider");
+      const textSizeValue = document.getElementById("textSizeValue");
 
       // Prevent select taps from triggering the whole button
       function stopBtnClickWhenSelecting(selectEl) {
@@ -761,25 +750,33 @@
       const settingsButton = document.getElementById("settingsButton");
       const settingsCloseButton = document.getElementById("settingsCloseButton");
 
-      function syncSettingsUI() {
-        const scale = getBtnTextScale();
-        btnTextSizeSlider.value = scale;
-        btnTextSizeValue.textContent = `${scale}%`;
-
-        const themeMode = localStorage.getItem(THEME_KEY) || "system";
-        updateThemeSegmentUI(themeMode);
-      }
-
-      function openModal() {
-        syncSettingsUI();
-        settingsOverlay.style.display = "flex";
-      }
+      function openModal() { settingsOverlay.style.display = "flex"; }
       function closeModal() { settingsOverlay.style.display = "none"; }
 
-      settingsButton.onclick = () => openModal();
+      function syncTextSizeUI() {
+        const scale = getPresetTextScale();
+        textSizeSlider.value = scale;
+        textSizeValue.textContent = `${scale}%`;
+        applyPresetTextScale(scale);
+      }
+
+      settingsButton.onclick = () => {
+        syncTextSizeUI();
+        openModal();
+      };
       settingsCloseButton.onclick = () => closeModal();
       settingsOverlay.addEventListener("click", (e) => {
         if (e.target === settingsOverlay) closeModal();
+      });
+
+      // Slider behavior matches picker: show live value on input, apply+persist on change
+      textSizeSlider.addEventListener("input", () => {
+        textSizeValue.textContent = `${textSizeSlider.value}%`;
+        applyPresetTextScale(parseInt(textSizeSlider.value, 10));
+      });
+      textSizeSlider.addEventListener("change", () => {
+        setPresetTextScale(textSizeSlider.value);
+        syncTextSizeUI();
       });
 
       document.querySelectorAll("#themeSegment button").forEach(btn => {
@@ -797,21 +794,12 @@
         if (ok) await refreshServiceLogos();
       };
 
-      // Slider behavior (matches picker pattern: live label on input, apply on change)
-      btnTextSizeSlider.addEventListener("input", () => {
-        btnTextSizeValue.textContent = `${btnTextSizeSlider.value}%`;
-      });
-      btnTextSizeSlider.addEventListener("change", () => {
-        setBtnTextScale(btnTextSizeSlider.value);
-        applyBtnTextScale(btnTextSizeSlider.value);
-      });
-
       async function init() {
         loadTheme();
         updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
 
-        // Apply saved button scale immediately
-        applyBtnTextScale(getBtnTextScale());
+        // Apply preset scale immediately on page load (even if settings never opened)
+        syncTextSizeUI();
 
         setButtonsEnabled(false);
         setBackendStatus(false, "Backend: Checking…");
