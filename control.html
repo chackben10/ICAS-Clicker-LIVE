@@ -29,7 +29,7 @@
 
       /* Button scaling (applies ONLY inside preset buttons) */
       --btn-scale: 1; /* 1 == 100% */
-      --grid-gap-base: 10px; /* changed from 12px; scales with --btn-scale */
+      --grid-gap-base: 10px; /* scaled with --btn-scale */
     }
 
     body.dark {
@@ -69,7 +69,6 @@
       padding-top: 12px;
 
       transition: background 0.25s ease, color 0.25s ease;
-      touch-action: manipulation;
       -webkit-overflow-scrolling: touch;
     }
 
@@ -101,6 +100,7 @@
       background: transparent;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .top-btn:hover { opacity: 1; background: var(--btn-hover); }
 
@@ -127,7 +127,6 @@
       margin-top: 12px; /* keep spacing between title/desc and first button unchanged */
     }
 
-    /* Everything inside preset buttons scales */
     .preset-btn {
       width: 100%;
       text-align: left;
@@ -137,12 +136,16 @@
       cursor: pointer;
       transition: transform 0.07s ease, filter 0.07s ease, background 0.15s ease;
       -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
       position: relative;
 
       /* scale the whole "feel" of the button */
       padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
-      border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px); /* slightly less round overall */
+      border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+
+      /* CRITICAL: allow vertical scrolling gestures on buttons without "sticky press" */
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .preset-btn:hover { background: var(--btn-hover); }
     .preset-btn:active { transform: scale(0.99); filter: brightness(0.98); }
@@ -200,11 +203,10 @@
         calc(40px * var(--btn-scale))
         calc(12px * var(--btn-scale))
         calc(12px * var(--btn-scale));
-    }
 
-    /* Prevent button press when interacting with select */
-    .select, .select-wrap, option { cursor: pointer; }
-    .select { pointer-events: auto; }
+      /* allow scrolling gestures without triggering the button */
+      touch-action: pan-y;
+    }
 
     /* Settings modal */
     .settings-overlay {
@@ -306,6 +308,7 @@
       padding: 10px 12px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .mini-btn:hover { background: rgba(128,128,128,0.12); }
     .mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -330,6 +333,7 @@
       transition: background 0.15s;
       -webkit-tap-highlight-color: transparent;
       font-weight: 900;
+      touch-action: manipulation;
     }
 
     .segment button:hover { background: rgba(128,128,128,0.12); }
@@ -339,7 +343,6 @@
       font-weight: 900;
     }
 
-    /* Text size slider (settings) */
     .settings-row-column {
       display: flex;
       flex-direction: column;
@@ -360,6 +363,7 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       font-weight: 900;
+      touch-action: manipulation;
     }
     .settings-close-btn:hover { background: rgba(128,128,128,0.12); }
 
@@ -468,17 +472,11 @@
         </div>
       </div>
 
-      <!-- NEW: Button Text Size (scales only inside buttons) -->
+      <!-- Button scale slider (no extra text) -->
       <div class="settings-section">
-        <div class="settings-label">Button Text Size</div>
-        <div class="settings-muted">Scales all text/components inside the preset buttons.</div>
-
-        <div class="settings-row-column" style="margin-top: 10px;">
-          <label style="font-weight: 900;">Size</label>
-          <div style="display:flex; width:100%; gap:8px; align-items:center;">
-            <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="flex:1;">
-            <span id="btnTextSizeValue" style="color:var(--status-grey); width:54px; text-align:right;">100%</span>
-          </div>
+        <div style="display:flex; width:100%; gap:8px; align-items:center;">
+          <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="flex:1;">
+          <span id="btnTextSizeValue" style="color:var(--status-grey); width:54px; text-align:right;">100%</span>
         </div>
       </div>
 
@@ -506,7 +504,7 @@
       const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
       const TESTIMONIES_LOGO_UUID_KEY = "icas-testimonies-logo-uuid";
 
-      // NEW: button scaling (40–200)
+      // Button scaling (40–200)
       const BTN_SCALE_KEY = "icas-control-btn-scale";
 
       function normalizeBase(u) {
@@ -588,7 +586,7 @@
       const serviceLogoDesc = document.getElementById("serviceLogoDesc");
       const testimoniesDesc = document.getElementById("testimoniesDesc");
 
-      // NEW: slider UI
+      // Slider UI
       const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
       const btnTextSizeValue = document.getElementById("btnTextSizeValue");
 
@@ -722,6 +720,53 @@
         syncDescriptions();
       });
 
+      // ====== Fix accidental presses during scroll (touch devices) ======
+      // Use pointer events: only fire if it was a "tap" (small movement).
+      function attachTapHandler(el, handler) {
+        let startX = 0, startY = 0, moved = false, activePointerId = null;
+
+        const MOVE_PX = 10;
+
+        el.addEventListener("pointerdown", (e) => {
+          if (el.disabled) return;
+          // Only primary pointer
+          if (e.isPrimary === false) return;
+
+          activePointerId = e.pointerId;
+          moved = false;
+          startX = e.clientX;
+          startY = e.clientY;
+
+          try { el.setPointerCapture(e.pointerId); } catch {}
+        });
+
+        el.addEventListener("pointermove", (e) => {
+          if (activePointerId === null || e.pointerId !== activePointerId) return;
+          const dx = Math.abs(e.clientX - startX);
+          const dy = Math.abs(e.clientY - startY);
+          if (dx > MOVE_PX || dy > MOVE_PX) moved = true;
+        });
+
+        function finish(e) {
+          if (activePointerId === null || e.pointerId !== activePointerId) return;
+          try { el.releasePointerCapture(e.pointerId); } catch {}
+          const shouldFire = !moved;
+          activePointerId = null;
+          if (shouldFire) handler();
+        }
+
+        el.addEventListener("pointerup", finish);
+        el.addEventListener("pointercancel", () => { activePointerId = null; moved = false; });
+
+        // Prevent the old click from double-firing / firing after scroll
+        el.addEventListener("click", (e) => {
+          // If the browser generates a click after a scroll gesture, block it.
+          // (When it was a real tap, pointerup already called handler.)
+          e.preventDefault();
+          e.stopPropagation();
+        }, true);
+      }
+
       async function runPreset(presetName) {
         const ok = await testBackend();
         if (!ok) { setLastAction("Failed (backend offline)"); return; }
@@ -756,13 +801,13 @@
         }
       }
 
-      // Wire buttons (select inside won't trigger because we stopPropagation)
-      document.getElementById("btnStreamBeginning").onclick = () => runPreset("stream_beginning");
-      document.getElementById("btnCamera").onclick = () => runPreset("camera");
-      document.getElementById("btnServiceLogo").onclick = () => runPreset("service_logo");
-      document.getElementById("btnShowSlides").onclick = () => runPreset("show_slides");
-      document.getElementById("btnTestimonies").onclick = () => runPreset("testimonies");
-      document.getElementById("btnEndingStream").onclick = () => runPreset("ending_stream");
+      // Wire buttons via tap handler (prevents scroll-presses)
+      attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
+      attachTapHandler(document.getElementById("btnCamera"), () => runPreset("camera"));
+      attachTapHandler(document.getElementById("btnServiceLogo"), () => runPreset("service_logo"));
+      attachTapHandler(document.getElementById("btnShowSlides"), () => runPreset("show_slides"));
+      attachTapHandler(document.getElementById("btnTestimonies"), () => runPreset("testimonies"));
+      attachTapHandler(document.getElementById("btnEndingStream"), () => runPreset("ending_stream"));
 
       // Settings modal
       const settingsOverlay = document.getElementById("settingsOverlay");
@@ -793,7 +838,7 @@
         if (ok) await refreshServiceLogos();
       };
 
-      // NEW: slider behavior (same pattern as picker.html)
+      // Slider behavior
       function syncBtnSliderUI() {
         const pct = getBtnScalePercent();
         btnTextSizeSlider.value = pct;
