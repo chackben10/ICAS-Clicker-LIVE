@@ -254,44 +254,56 @@
       color: color-mix(in srgb, var(--btn-invert-text) 82%, transparent);
     }
 
-    /* IMPORTANT: keep the selector UI inside preset-main NOT inverted */
-    .preset-main:hover .select,
-    .preset-main:active .select {
+    /* =========================================================
+       ✅ HARD LOCK: keep dropdown + wrapper NOT inverted
+       This fixes iOS/Safari "highlight" behavior by forcing the
+       select area to keep its own colors even when parent inverts.
+       ========================================================= */
+
+    /* Give the selector area its own "surface" that never changes */
+    .selector-row,
+    .select-wrap,
+    .select {
       background: transparent;
       color: var(--card-text);
-      border-color: var(--border-color);
     }
+
+    /* When the parent button is hovered/active, re-assert normal colors
+       AND isolate the select from inherited color by using a dedicated bg */
+    .preset-main:hover .selector-row,
+    .preset-main:active .selector-row,
+    .preset-main:hover .select-wrap,
+    .preset-main:active .select-wrap {
+      background: transparent !important;
+      color: var(--card-text) !important;
+    }
+
+    /* Force the select itself to keep normal theme colors */
+    .preset-main:hover .select,
+    .preset-main:active .select {
+      background-color: color-mix(in srgb, var(--bg) 92%, transparent) !important;
+      color: var(--card-text) !important;
+      border-color: var(--border-color) !important;
+      -webkit-text-fill-color: var(--card-text) !important; /* Safari/iOS */
+      caret-color: var(--card-text) !important;
+    }
+
+    /* Force the arrow to keep normal theme colors */
     .preset-main:hover .select-wrap::after,
     .preset-main:active .select-wrap::after {
-      color: var(--card-text);
-      opacity: 0.85;
+      color: var(--card-text) !important;
+      opacity: 0.85 !important;
     }
-    
-    /* =========================================================
-		   Freeze dropdown menus inside preset buttons
-		   (Service Logo & Testimonies)
-		   ========================================================= */
 
-		/* Prevent color inversion from affecting selects */
-		.preset-main:hover .select,
-		.preset-main:active .select {
-		  background: transparent !important;
-		  color: var(--card-text) !important;
-		  border-color: var(--border-color) !important;
-		}
-
-		/* Prevent arrow from inverting */
-		.preset-main:hover .select-wrap::after,
-		.preset-main:active .select-wrap::after {
-		  color: var(--card-text) !important;
-		  opacity: 0.85 !important;
-		}
-
-		/* Prevent subtext inside selector row from inheriting invert */
-		.preset-main:hover .selector-row,
-		.preset-main:active .selector-row {
-		  color: var(--card-text) !important;
-		}
+    /* Prevent the invert color from leaking into option list on some browsers */
+    .select option {
+      color: #111111;
+      background: #ffffff;
+    }
+    body.dark .select option {
+      color: #ffffff;
+      background: #111111;
+    }
 
     .preset-main:disabled,
     .preset-addon:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
@@ -334,7 +346,7 @@
     .select {
       width: 100%;
       border: 1px solid var(--border-color);
-      background: transparent;
+      background-color: color-mix(in srgb, var(--bg) 92%, transparent);
       color: var(--card-text);
       outline: none;
       -webkit-appearance: none;
