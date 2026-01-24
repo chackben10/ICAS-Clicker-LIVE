@@ -266,6 +266,32 @@
       color: var(--card-text);
       opacity: 0.85;
     }
+    
+    /* =========================================================
+		   Freeze dropdown menus inside preset buttons
+		   (Service Logo & Testimonies)
+		   ========================================================= */
+
+		/* Prevent color inversion from affecting selects */
+		.preset-main:hover .select,
+		.preset-main:active .select {
+		  background: transparent !important;
+		  color: var(--card-text) !important;
+		  border-color: var(--border-color) !important;
+		}
+
+		/* Prevent arrow from inverting */
+		.preset-main:hover .select-wrap::after,
+		.preset-main:active .select-wrap::after {
+		  color: var(--card-text) !important;
+		  opacity: 0.85 !important;
+		}
+
+		/* Prevent subtext inside selector row from inheriting invert */
+		.preset-main:hover .selector-row,
+		.preset-main:active .selector-row {
+		  color: var(--card-text) !important;
+		}
 
     .preset-main:disabled,
     .preset-addon:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
