@@ -254,6 +254,19 @@
       color: color-mix(in srgb, var(--btn-invert-text) 82%, transparent);
     }
 
+    /* IMPORTANT: keep the selector UI inside preset-main NOT inverted */
+    .preset-main:hover .select,
+    .preset-main:active .select {
+      background: transparent;
+      color: var(--card-text);
+      border-color: var(--border-color);
+    }
+    .preset-main:hover .select-wrap::after,
+    .preset-main:active .select-wrap::after {
+      color: var(--card-text);
+      opacity: 0.85;
+    }
+
     .preset-main:disabled,
     .preset-addon:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 
@@ -341,12 +354,19 @@
       color: color-mix(in srgb, var(--danger-invert-text) 80%, transparent);
     }
 
-    /* Red filled addon button (inherits same hover/active invert) */
-    .preset-addon.danger-fill {
-      background: var(--danger);
-      color: #ffffff;
-      border-color: color-mix(in srgb, var(--danger) 70%, var(--btn-border));
-      text-align: center;
+    /* Explicitly ensure the addon danger buttons also invert (Camera + Safely Clear, Service Logo + Safely Clear) */
+    .preset-addon.danger-fill:hover {
+      background: var(--danger-invert-bg);
+      color: var(--danger-invert-text);
+      border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
+      box-shadow: var(--btn-hover-shadow);
+    }
+    .preset-addon.danger-fill:active {
+      background: var(--danger-invert-bg);
+      color: var(--danger-invert-text);
+      border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
+      box-shadow: var(--btn-active-shadow);
+      transform: translateY(1px) scale(0.995);
     }
 
     /* Settings modal */
