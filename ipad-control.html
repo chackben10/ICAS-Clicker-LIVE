@@ -4,54 +4,253 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ICAS iPad Control</title>
+
   <style>
+    :root{
+      /* Set this to match the left page background (default: white) */
+      --page-bg: #ffffff;
+
+      /* Split + divider */
+      --divider-w: 18px;
+      --divider-bg: rgba(0,0,0,0.18);
+      --divider-bg-dark: rgba(255,255,255,0.18);
+      --divider-outline: rgba(0,0,0,0.28);
+      --divider-outline-dark: rgba(255,255,255,0.28);
+
+      /* Default left width if nothing saved yet */
+      --leftW: 50vw;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; width: 100%; }
-    body {
-      background: #000;
+
+    body{
+      background: var(--page-bg);
       overflow: hidden;
       -webkit-overflow-scrolling: touch;
+      touch-action: none; /* we handle drag */
     }
 
-    .split {
+    .split{
       height: 100vh;
       width: 100vw;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      align-items: stretch;
+      background: var(--page-bg);
     }
 
-    iframe {
+    .pane{
+      height: 100%;
+      overflow: hidden;
+      background: var(--page-bg);
+    }
+
+    #leftPane{
+      flex: 0 0 var(--leftW);
+      min-width: 120px;
+      max-width: calc(100vw - 120px - var(--divider-w));
+    }
+
+    #rightPane{
+      flex: 1 1 auto;
+      min-width: 120px;
+      background: var(--page-bg);
+    }
+
+    iframe{
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
-      background: #fff;
+      background: transparent; /* lets the container bg show through */
     }
 
-    /* Thin divider */
-    .left {
-      border-right: 1px solid rgba(255,255,255,0.25);
+    /* Divider */
+    .divider{
+      flex: 0 0 var(--divider-w);
+      width: var(--divider-w);
+      cursor: col-resize;
+      position: relative;
+      background: var(--divider-bg);
+      box-shadow:
+        inset 0 0 0 1px var(--divider-outline);
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* Make it very obvious */
+    .divider::before{
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.35);
+    }
+
+    /* Grabber "dots" */
+    .grabber{
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 56px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.65);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .grabber .dots{
+      width: 6px;
+      height: 36px;
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 4px;
+    }
+
+    .grabber .dots span{
+      display: block;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.35);
+    }
+
+    /* Active drag feedback */
+    .divider.dragging{
+      background: rgba(0,0,0,0.28);
+    }
+    .divider.dragging::before{
+      background: rgba(0,0,0,0.55);
     }
   </style>
 </head>
-<body>
-  <div class="split">
-    <iframe
-      class="left"
-      src="https://icas-clicker.work"
-      title="ICAS Clicker"
-      loading="eager"
-      referrerpolicy="no-referrer"
-      allow="fullscreen"
-    ></iframe>
 
-    <iframe
-      src="https://icas-clicker.work/control"
-      title="ICAS Control"
-      loading="eager"
-      referrerpolicy="no-referrer"
-      allow="fullscreen"
-    ></iframe>
+<body>
+  <div class="split" id="splitRoot">
+    <div class="pane" id="leftPane">
+      <iframe
+        src="https://icas-clicker.work"
+        title="ICAS Clicker"
+        loading="eager"
+        referrerpolicy="no-referrer"
+        allow="fullscreen"
+      ></iframe>
+    </div>
+
+    <div class="divider" id="divider" aria-label="Resize split divider" role="separator" aria-orientation="vertical">
+      <div class="grabber" aria-hidden="true">
+        <div class="dots">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="rightPane">
+      <iframe
+        src="https://icas-clicker.work/control"
+        title="ICAS Control"
+        loading="eager"
+        referrerpolicy="no-referrer"
+        allow="fullscreen"
+      ></iframe>
+    </div>
   </div>
+
+  <script>
+    (function () {
+      const divider = document.getElementById("divider");
+      const splitRoot = document.getElementById("splitRoot");
+
+      const LEFT_W_KEY = "icas-ipad-leftW-px";
+
+      function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
+
+      function applyLeftWidthPx(px) {
+        document.documentElement.style.setProperty("--leftW", px + "px");
+      }
+
+      function getSavedLeftWidthPx() {
+        const raw = parseInt(localStorage.getItem(LEFT_W_KEY), 10);
+        return Number.isFinite(raw) ? raw : null;
+      }
+
+      function saveLeftWidthPx(px) {
+        localStorage.setItem(LEFT_W_KEY, String(Math.round(px)));
+      }
+
+      function initWidth() {
+        const saved = getSavedLeftWidthPx();
+        if (saved != null) {
+          applyLeftWidthPx(saved);
+        } else {
+          // default to 50/50 at current viewport
+          applyLeftWidthPx(Math.round(window.innerWidth * 0.5));
+        }
+      }
+
+      let dragging = false;
+
+      function setFromClientX(clientX) {
+        const rect = splitRoot.getBoundingClientRect();
+        const dividerW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--divider-w")) || 18;
+
+        const minLeft = 120;
+        const maxLeft = (rect.width - dividerW - 120);
+
+        const px = clamp(clientX - rect.left, minLeft, maxLeft);
+        applyLeftWidthPx(px);
+        saveLeftWidthPx(px);
+      }
+
+      divider.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        divider.classList.add("dragging");
+        try { divider.setPointerCapture(e.pointerId); } catch {}
+        setFromClientX(e.clientX);
+        e.preventDefault();
+      });
+
+      divider.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        setFromClientX(e.clientX);
+        e.preventDefault();
+      });
+
+      divider.addEventListener("pointerup", (e) => {
+        dragging = false;
+        divider.classList.remove("dragging");
+        try { divider.releasePointerCapture(e.pointerId); } catch {}
+        e.preventDefault();
+      });
+
+      divider.addEventListener("pointercancel", () => {
+        dragging = false;
+        divider.classList.remove("dragging");
+      });
+
+      // Keep the split sane on rotate/resize
+      window.addEventListener("resize", () => {
+        const rect = splitRoot.getBoundingClientRect();
+        const dividerW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--divider-w")) || 18;
+        const minLeft = 120;
+        const maxLeft = (rect.width - dividerW - 120);
+
+        const saved = getSavedLeftWidthPx();
+        const px = clamp(saved != null ? saved : rect.width * 0.5, minLeft, maxLeft);
+        applyLeftWidthPx(px);
+        saveLeftWidthPx(px);
+      });
+
+      initWidth();
+    })();
+  </script>
 </body>
 </html>
