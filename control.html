@@ -256,11 +256,8 @@
 
     /* =========================================================
        ✅ HARD LOCK: keep dropdown + wrapper NOT inverted
-       This fixes iOS/Safari "highlight" behavior by forcing the
-       select area to keep its own colors even when parent inverts.
        ========================================================= */
 
-    /* Give the selector area its own "surface" that never changes */
     .selector-row,
     .select-wrap,
     .select {
@@ -268,8 +265,6 @@
       color: var(--card-text);
     }
 
-    /* When the parent button is hovered/active, re-assert normal colors
-       AND isolate the select from inherited color by using a dedicated bg */
     .preset-main:hover .selector-row,
     .preset-main:active .selector-row,
     .preset-main:hover .select-wrap,
@@ -278,24 +273,21 @@
       color: var(--card-text) !important;
     }
 
-    /* Force the select itself to keep normal theme colors */
     .preset-main:hover .select,
     .preset-main:active .select {
       background-color: color-mix(in srgb, var(--bg) 92%, transparent) !important;
       color: var(--card-text) !important;
       border-color: var(--border-color) !important;
-      -webkit-text-fill-color: var(--card-text) !important; /* Safari/iOS */
+      -webkit-text-fill-color: var(--card-text) !important;
       caret-color: var(--card-text) !important;
     }
 
-    /* Force the arrow to keep normal theme colors */
     .preset-main:hover .select-wrap::after,
     .preset-main:active .select-wrap::after {
       color: var(--card-text) !important;
       opacity: 0.85 !important;
     }
 
-    /* Prevent the invert color from leaking into option list on some browsers */
     .select option {
       color: #111111;
       background: #ffffff;
@@ -392,7 +384,6 @@
       color: color-mix(in srgb, var(--danger-invert-text) 80%, transparent);
     }
 
-    /* Explicitly ensure the addon danger buttons also invert (Camera + Safely Clear, Service Logo + Safely Clear) */
     .preset-addon.danger-fill:hover {
       background: var(--danger-invert-bg);
       color: var(--danger-invert-text);
@@ -592,7 +583,6 @@
       <button class="top-btn" id="settingsButton">Settings</button>
     </div>
 
-    <!-- Wrap title + description so we can hide both cleanly -->
     <div class="presets-header" id="presetsHeader">
       <div class="panel-title">Presets</div>
       <div class="desc">
@@ -676,6 +666,22 @@
         </button>
       </div>
 
+      <!-- NEW: Set Macro + selector (after Ending Stream, before Safely Clear Slide) -->
+      <div class="preset-card" id="cardSetMacro">
+        <button class="preset-main" id="btnSetMacro" type="button">
+          <div class="preset-title">Set Macro</div>
+          <div class="preset-sub" id="macroDesc">
+            Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
+          </div>
+
+          <div class="selector-row" aria-label="Macro selector">
+            <div class="select-wrap" style="flex: 1;">
+              <select id="macroSelect" class="select" title="Control Macro"></select>
+            </div>
+          </div>
+        </button>
+      </div>
+
       <!-- Standalone Safely Clear Slide (RED background) -->
       <div class="preset-card" id="cardSafelyClearSlide">
         <button class="preset-main danger-fill" id="btnSafelyClearSlide" type="button">
@@ -725,7 +731,6 @@
         </div>
       </div>
 
-      <!-- Show Description toggle -->
       <div class="settings-section">
         <div class="settings-label">Show Description</div>
         <div class="settings-muted">Hide/show the “Presets” header and description on the main page.</div>
@@ -737,7 +742,6 @@
         </div>
       </div>
 
-      <!-- Button scale slider (no extra text / no % label) -->
       <div class="settings-section">
         <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
       </div>
@@ -766,11 +770,25 @@
       const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
       const TESTIMONIES_LOGO_UUID_KEY = "icas-testimonies-logo-uuid";
 
+      // NEW: macro selection persistence
+      const MACRO_NAME_KEY = "icas-control-macro-name";
+
       // Button scaling (40–200)
       const BTN_SCALE_KEY = "icas-control-btn-scale";
 
       // Show/hide Presets header+desc
       const SHOW_DESC_KEY = "icas-control-show-description";
+
+      // NEW: fallback macro list (used if backend doesn't yet provide /macros)
+      const FALLBACK_MACROS = [
+        "Bible Macro",
+        "Malayalam Songs Macro",
+        "[Aud] Malayalam Song Macro",
+        "English Songs Macro",
+        "[Aud] English Songs Macro",
+        "Presentation Macro",
+        "Presentation Streamer Macro"
+      ];
 
       function normalizeBase(u) {
         u = String(u || "").trim();
@@ -786,7 +804,11 @@
         return {
           health: `${base}/health`,
           serviceLogos: `${base}/service_logos`,
-          preset: `${base}/preset`
+          preset: `${base}/preset`,
+          // NEW: (will work once init.lua exposes it)
+          macros: `${base}/macros`,
+          // NEW: (will work once init.lua exposes it)
+          macro: `${base}/macro`
         };
       }
 
@@ -871,6 +893,11 @@
       const serviceLogoDesc = document.getElementById("serviceLogoDesc");
       const testimoniesDesc = document.getElementById("testimoniesDesc");
 
+      // NEW: macro UI
+      const macroSelect = document.getElementById("macroSelect");
+      const macroDesc = document.getElementById("macroDesc");
+      const btnSetMacro = document.getElementById("btnSetMacro");
+
       // Buttons
       const btnStreamBeginning = document.getElementById("btnStreamBeginning");
       const btnCamera = document.getElementById("btnCamera");
@@ -890,12 +917,14 @@
 
       // Prevent select taps from triggering the main button (and allow scrolling)
       function stopBtnClickWhenSelecting(selectEl) {
+        if (!selectEl) return;
         ["click","pointerdown","touchstart","mousedown"].forEach(evt => {
           selectEl.addEventListener(evt, (e) => e.stopPropagation(), { passive: true });
         });
       }
       stopBtnClickWhenSelecting(serviceLogoSelect);
       stopBtnClickWhenSelecting(testimoniesLogoSelect);
+      stopBtnClickWhenSelecting(macroSelect);
 
       function setBackendStatus(ok, text) {
         backendDot.classList.toggle("ok", !!ok);
@@ -911,13 +940,15 @@
           btnStreamBeginning, btnCamera, btnServiceLogo, btnShowSlides,
           btnTestimonies, btnEndingStream,
           btnCameraSafeClear, btnServiceLogoSafeClear,
-          btnSafelyClearSlide, btnNSCSetup
+          btnSafelyClearSlide, btnNSCSetup,
+          btnSetMacro
         ].forEach(b => { if (b) b.disabled = !enabled; });
 
         refreshLogosBtn.disabled = !enabled;
         testBackendBtn.disabled = false; // always allow manual test attempt
         serviceLogoSelect.disabled = !enabled;
         testimoniesLogoSelect.disabled = !enabled;
+        if (macroSelect) macroSelect.disabled = !enabled;
       }
 
       function escapeHtml(s) {
@@ -930,6 +961,7 @@
       function setStored(key, val) { localStorage.setItem(key, String(val || "").trim()); }
 
       function selectedName(selectEl) {
+        if (!selectEl) return "—";
         const opt = selectEl.options[selectEl.selectedIndex];
         return opt ? (opt.textContent || "—") : "—";
       }
@@ -937,11 +969,16 @@
       function syncDescriptions() {
         const sName = selectedName(serviceLogoSelect);
         const tName = selectedName(testimoniesLogoSelect);
+        const mName = selectedName(macroSelect);
 
         serviceLogoDesc.innerHTML =
           `Sets ProPresenter Announcement to <b>${escapeHtml(sName)}</b>, and shows the <b>Audience Camera</b> on OBS.`;
         testimoniesDesc.innerHTML =
           `Sets ProPresenter Announcement to <b>${escapeHtml(tName)}</b> and sets OBS scene to <b>Testimonies</b>.`;
+        if (macroDesc) {
+          macroDesc.innerHTML =
+            `Triggers ProPresenter Macro: <b>${escapeHtml(mName)}</b> (sets look for In-House TVs + OBS).`;
+        }
       }
 
       async function testBackend() {
@@ -992,6 +1029,36 @@
         }
       }
 
+      // NEW: fill macro select (name list)
+      function fillMacroSelect(selectEl, names, storageKey) {
+        const prev = getStored(storageKey);
+        selectEl.innerHTML = "";
+
+        const list = Array.isArray(names) ? names.filter(Boolean).map(String) : [];
+        if (list.length === 0) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "No macros found";
+          selectEl.appendChild(opt);
+          selectEl.value = "";
+          return;
+        }
+
+        list.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          selectEl.appendChild(opt);
+        });
+
+        if (prev && list.includes(prev)) {
+          selectEl.value = prev;
+        } else {
+          selectEl.value = list[0];
+          setStored(storageKey, selectEl.value);
+        }
+      }
+
       async function refreshServiceLogos() {
         const { serviceLogos } = endpoints();
         try {
@@ -1014,6 +1081,25 @@
         }
       }
 
+      // NEW: try to pull macros from backend; if not available yet, use fallback list
+      async function refreshMacros() {
+        if (!macroSelect) return;
+
+        const { macros } = endpoints();
+        try {
+          const res = await fetch(macros, { cache: "no-cache" });
+          if (!res.ok) throw new Error("Bad response");
+          const data = await res.json();
+          const items = Array.isArray(data?.items) ? data.items : [];
+          const names = items.map(x => x?.name).filter(Boolean);
+          fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
+        } catch {
+          fillMacroSelect(macroSelect, FALLBACK_MACROS, MACRO_NAME_KEY);
+        } finally {
+          syncDescriptions();
+        }
+      }
+
       serviceLogoSelect.addEventListener("change", () => {
         setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
         syncDescriptions();
@@ -1023,6 +1109,13 @@
         setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
         syncDescriptions();
       });
+
+      if (macroSelect) {
+        macroSelect.addEventListener("change", () => {
+          setStored(MACRO_NAME_KEY, macroSelect.value);
+          syncDescriptions();
+        });
+      }
 
       // ====== Fix accidental presses during scroll (touch devices) ======
       function attachTapHandler(el, handler) {
@@ -1128,12 +1221,39 @@
         }
       }
 
+      // NEW: run macro (will start working once init.lua has /macro endpoint)
+      async function runMacro() {
+        const ok = await testBackend();
+        if (!ok) { setLastAction("Failed (backend offline)"); return; }
+
+        const { macro } = endpoints();
+        const name = getStored(MACRO_NAME_KEY) || (macroSelect ? macroSelect.value : "");
+        if (!name) { setLastAction("Failed (no macro selected)"); return; }
+
+        setLastAction(`Running macro: ${name}`);
+
+        try {
+          const res = await fetch(macro, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+          });
+          if (!res.ok) throw new Error("Bad response");
+          setLastAction(`Done macro: ${name}`);
+        } catch {
+          setLastAction(`Failed macro: ${name}`);
+        }
+      }
+
       attachTapHandler(btnStreamBeginning, () => runPreset("stream_beginning"));
       attachTapHandler(btnCamera, () => runPreset("camera"));
       attachTapHandler(btnServiceLogo, () => runPreset("service_logo"));
       attachTapHandler(btnShowSlides, () => runPreset("show_slides"));
       attachTapHandler(btnTestimonies, () => runPreset("testimonies"));
       attachTapHandler(btnEndingStream, () => runPreset("ending_stream"));
+
+      // NEW
+      attachTapHandler(btnSetMacro, () => runMacro());
 
       attachTapHandler(btnCameraSafeClear, () => runPresetSafeClear("camera"));
       attachTapHandler(btnServiceLogoSafeClear, () => runPresetSafeClear("service_logo"));
@@ -1162,11 +1282,17 @@
         });
       });
 
-      refreshLogosBtn.onclick = refreshServiceLogos;
+      refreshLogosBtn.onclick = async () => {
+        await refreshServiceLogos();
+        await refreshMacros();
+      };
 
       testBackendBtn.onclick = async () => {
         const ok = await testBackend();
-        if (ok) await refreshServiceLogos();
+        if (ok) {
+          await refreshServiceLogos();
+          await refreshMacros();
+        }
       };
 
       function syncBtnSliderUI() {
@@ -1183,7 +1309,6 @@
         setBtnScalePercent(btnTextSizeSlider.value);
       });
 
-      // Toggle handler
       if (showDescToggle) {
         showDescToggle.addEventListener("change", () => {
           setShowDesc(showDescToggle.checked);
@@ -1194,18 +1319,24 @@
         loadTheme();
         updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
 
-        // default ON if unset
         applyShowDesc(getShowDesc());
-
         syncBtnSliderUI();
 
         setButtonsEnabled(false);
         setBackendStatus(false, "Backend: Checking…");
         setLastAction("—");
 
+        // Populate macro selector immediately (fallback), then try backend
+        if (macroSelect) {
+          fillMacroSelect(macroSelect, FALLBACK_MACROS, MACRO_NAME_KEY);
+        }
+        syncDescriptions();
+
         const ok = await testBackend();
-        if (ok) await refreshServiceLogos();
-        else {
+        if (ok) {
+          await refreshServiceLogos();
+          await refreshMacros();
+        } else {
           fillSelect(serviceLogoSelect, [], SERVICE_LOGO_UUID_KEY, true);
           fillSelect(testimoniesLogoSelect, [], TESTIMONIES_LOGO_UUID_KEY, true);
           syncDescriptions();
