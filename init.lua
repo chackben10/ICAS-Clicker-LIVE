@@ -1,8 +1,5 @@
 ------------------------------------------------------------
--- ProPresenter Remote Control via Clicker + HTTP Server
--- + Bible look enforcement
--- + HTTP API for slides + control presets (one-shot)
--- + OBS Bridge start/watch (no auto toggles)
+-- ProPresenter Remote Control via Clicker + HTTP Server + OBS Control
 ------------------------------------------------------------
 
 proRemote = proRemote or {}
@@ -16,7 +13,8 @@ proRemote.check_for_bible = true
 proRemote.BIBLE_CHECK_INTERVAL_SEC = 0.75
 proRemote.BIBLE_MACRO_COOLDOWN_SEC = 2.5
 
--- Clicker keys
+-- Clicker keys (Hammerspoon keycodes)
+-- 69 = 'E' on US keyboard, 78 = 'N' on US keyboard
 proRemote.nextSlideKey = 69
 proRemote.prevSlideKey = 78
 
@@ -77,14 +75,12 @@ proRemote.PRESET_STARTING_ANNOUNCEMENTS_UUID = "C62E6449-3FD6-42C1-BDF4-CABCA5F8
 proRemote.PRESET_PTZ_CAMERA_UUID            = "D47223A2-73BD-4C86-BB82-0D95E90D83F5"
 proRemote.PRESET_ENDING_ANNOUNCEMENTS_UUID  = "9CAAE21A-5AB2-41B3-B004-4135B36E134B"
 
--- NEW: Utility presentations for one-shot triggers
--- Blank Preview: 7475C13E-FE99-4AF1-8760-526A845A1860
--- iMac Screen Share: AC813C59-FF90-483F-8532-406CF8DD056A
+-- Utility presentations for one-shot triggers
 proRemote.PRESET_BLANK_PREVIEW_UUID   = "7475C13E-FE99-4AF1-8760-526A845A1860"
 proRemote.PRESET_IMAC_SCREEN_UUID     = "AC813C59-FF90-483F-8532-406CF8DD056A"
 proRemote.SAFECLEAR_DELAY_SEC         = 0.50
 
--- Service Logo dictionary (easy to update)
+-- Service Logo dictionary
 -- Add/remove entries here.
 proRemote.SERVICE_LOGOS = {
   { name = "Basic Service Logo",     uuid = "4ED2B2D8-EFE7-4875-BE88-186756A5E57E" },
@@ -93,7 +89,23 @@ proRemote.SERVICE_LOGOS = {
 }
 
 ------------------------------------------------------------
--- NEW: Timer proxy config (use EXACT working ProPresenter URLs)
+-- NEW: Macro dictionary (NAME triggers)
+-- ProPresenter API: /v1/macro/[name]/trigger
+-- Add/remove entries here (names must match exactly).
+------------------------------------------------------------
+
+proRemote.MACROS = {
+  { name = "Bible Macro" },
+  { name = "Malayalam Songs Macro" },
+  { name = "[Aud] Malayalam Song Macro" },
+  { name = "English Songs Macro" },
+  { name = "[Aud] English Songs Macro" },
+  { name = "Presentation Macro" },
+  { name = "Presentation Streamer Macro" },
+}
+
+------------------------------------------------------------
+-- Timer proxy config (use EXACT working ProPresenter URLs)
 ------------------------------------------------------------
 
 proRemote.PROPRESENTER_TIMER_START = "http://localhost:49232/v1/timer/Service%20Countdown/start"
@@ -147,7 +159,7 @@ local function toBoolish(v)
 end
 
 ------------------------------------------------------------
--- NEW: Timer actions (proxy to ProPresenter)
+-- Timer actions (proxy to ProPresenter)
 ------------------------------------------------------------
 
 local function proTimerStart()
@@ -268,6 +280,32 @@ local function triggerFocusedSlide(index)
 end
 
 ------------------------------------------------------------
+-- NEW: Clicker key listener (THIS WAS MISSING)
+------------------------------------------------------------
+
+local function startClickerListener()
+  -- Stop existing listener (reload-safe)
+  if proRemote._clickerTap then
+    pcall(function() proRemote._clickerTap:stop() end)
+    proRemote._clickerTap = nil
+  end
+
+  proRemote._clickerTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e)
+    local keyCode = e:getKeyCode()
+    if keyCode == proRemote.nextSlideKey then
+      pcall(triggerNextSlide)
+      return true -- swallow so it doesn't type
+    elseif keyCode == proRemote.prevSlideKey then
+      pcall(triggerPreviousSlide)
+      return true -- swallow so it doesn't type
+    end
+    return false
+  end)
+
+  proRemote._clickerTap:start()
+end
+
+------------------------------------------------------------
 -- Helpers: focused + destination check
 ------------------------------------------------------------
 
@@ -365,11 +403,6 @@ local function fetchFullPresentationJSON()
     return '{"error":"cannot fetch presentation by uuid"}'
   end
 
-  -- Extra safety: if the fetched presentation is Blank Preview, hide it
-  if isBlankPreviewUUID(focused.uuid) then
-    return blankPresentationResponse("blank_preview")
-  end
-
   local dest = presentationDestinationFromObj(fullObj)
 
   ----------------------------------------------------------
@@ -387,7 +420,6 @@ local function fetchFullPresentationJSON()
       return blankPresentationResponse("focused_is_announcements")
     end
 
-    -- NEW: if refocused becomes Blank Preview, hide it
     if isBlankPreviewUUID(focused2.uuid) then
       return blankPresentationResponse("blank_preview")
     end
@@ -405,7 +437,6 @@ local function fetchFullPresentationJSON()
     return blankPresentationResponse("focused_is_announcements")
   end
 
-  -- If destination is "presentation" (or anything else), show as before
   return fullBody
 end
 
@@ -456,6 +487,49 @@ end
 
 local function proClearAnnouncementsLayer()
   hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS, {}, function() end)
+end
+
+------------------------------------------------------------
+-- NEW: ProPresenter macros (name-based trigger)
+------------------------------------------------------------
+
+local function proTriggerMacroByName(macroName)
+  macroName = trim(macroName)
+  if macroName == "" then return false end
+
+  -- /v1/macro/[name]/trigger (name must be URL-encoded)
+  local url = string.format(
+    "http://localhost:49232/v1/macro/%s/trigger",
+    hs.http.encodeForQuery(macroName)
+  )
+
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function getMacrosList()
+  local items = {}
+  for _, it in ipairs(proRemote.MACROS or {}) do
+    if type(it) == "table" then
+      local nm = tostring(it.name or "")
+      nm = trim(nm)
+      if nm ~= "" then
+        table.insert(items, { name = nm })
+      end
+    end
+  end
+  return items
+end
+
+local function macroNameAllowed(name)
+  name = trim(name)
+  if name == "" then return false end
+  for _, it in ipairs(proRemote.MACROS or {}) do
+    if type(it) == "table" and trim(it.name or "") == name then
+      return true
+    end
+  end
+  return false
 end
 
 ------------------------------------------------------------
@@ -630,6 +704,9 @@ local function handleHttpPath(method, rawPath, body)
     proTimerStopReset()
     return "OK\n", 200, "text/plain"
 
+  ----------------------------------------------------------
+  -- Presentation / slide endpoints
+  ----------------------------------------------------------
   elseif p == "/active-presentation" then
     return fetchFullPresentationJSON(), 200, "application/json"
 
@@ -650,10 +727,50 @@ local function handleHttpPath(method, rawPath, body)
   elseif p == "/health" then
     return "OK", 200, "text/plain"
 
+  ----------------------------------------------------------
+  -- Service logos list (existing)
+  ----------------------------------------------------------
   elseif p == "/service_logos" then
     local out = { items = getServiceLogosList() }
     return jsonResponse(out), 200, "application/json"
 
+  ----------------------------------------------------------
+  -- NEW: Macros list + trigger
+  ----------------------------------------------------------
+  elseif p == "/macros" then
+    local out = { items = getMacrosList() }
+    return jsonResponse(out), 200, "application/json"
+
+  elseif p == "/macro" then
+    if method ~= "POST" then
+      return "Method Not Allowed", 405, "text/plain"
+    end
+
+    local obj = decodeJson(body or "")
+    if type(obj) ~= "table" then
+      return jsonResponse({ ok=false, error="bad_json" }), 400, "application/json"
+    end
+
+    -- Accept either { name: "..." } or { macro_name: "..." }
+    local macroName = trim(obj.name or obj.macro_name or "")
+    if macroName == "" then
+      return jsonResponse({ ok=false, error="missing_macro_name" }), 400, "application/json"
+    end
+
+    if not macroNameAllowed(macroName) then
+      return jsonResponse({ ok=false, error="macro_not_in_list", name=macroName }), 400, "application/json"
+    end
+
+    local ok = proTriggerMacroByName(macroName)
+    if not ok then
+      return jsonResponse({ ok=false, error="trigger_failed" }), 500, "application/json"
+    end
+
+    return jsonResponse({ ok=true, name=macroName }), 200, "application/json"
+
+  ----------------------------------------------------------
+  -- Presets (existing)
+  ----------------------------------------------------------
   elseif p == "/preset" then
     if method ~= "POST" then
       return "Method Not Allowed", 405, "text/plain"
@@ -675,11 +792,9 @@ local function handleHttpPath(method, rawPath, body)
       return jsonResponse({ ok=true }), 200, "application/json"
 
     elseif preset == "camera" then
-      -- Camera button behavior
       proTriggerPresentationUUID(proRemote.PRESET_PTZ_CAMERA_UUID)
       obsSetSceneWithTransitionPolicy("PTZ Camera")
 
-      -- If called with ?safeclear=true, trigger Blank Preview AFTER a short delay
       if doSafeClear then
         proTriggerPresentationUUIDAfter(proRemote.PRESET_BLANK_PREVIEW_UUID, delay)
       end
@@ -696,11 +811,9 @@ local function handleHttpPath(method, rawPath, body)
         return jsonResponse({ ok=false, error="missing_service_logo_uuid" }), 400, "application/json"
       end
 
-      -- Service Logo button behavior
       proTriggerPresentationUUID(serviceLogoUuid)
       obsSetSceneWithTransitionPolicy("Audience Camera")
 
-      -- If called with ?safeclear=true, trigger Blank Preview AFTER a short delay
       if doSafeClear then
         proTriggerPresentationUUIDAfter(proRemote.PRESET_BLANK_PREVIEW_UUID, delay)
       end
@@ -720,16 +833,12 @@ local function handleHttpPath(method, rawPath, body)
       obsSetSceneWithTransitionPolicy("Thanks Screen")
       return jsonResponse({ ok=true }), 200, "application/json"
 
-    ----------------------------------------------------------
-    -- NEW buttons that were previously not implemented
-    ----------------------------------------------------------
     elseif preset == "safely_clear_slide" then
-      -- No wait: immediately trigger Blank Preview
       proTriggerPresentationUUID(proRemote.PRESET_BLANK_PREVIEW_UUID)
       return jsonResponse({ ok=true }), 200, "application/json"
 
     elseif preset == "nsc_setup" then
-      -- No wait: immediately trigger iMac Screen Share
+      proClearAnnouncementsLayer()
       proTriggerPresentationUUID(proRemote.PRESET_IMAC_SCREEN_UUID)
       return jsonResponse({ ok=true }), 200, "application/json"
 
@@ -775,8 +884,9 @@ proRemote.server:start()
 ------------------------------------------------------------
 
 startBibleTimer()
+startClickerListener()
 
 bridgeStart()
 bridgeWatchdogStart()
 
-hs.alert.show("ProPresenter remote ready")
+hs.alert.show("ProPresenter Remote/OBS Remote Control Ready")0
