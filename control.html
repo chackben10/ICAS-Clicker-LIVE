@@ -930,7 +930,7 @@
           btnSafelyClearSlide, btnNSCSetup
         ].forEach(b => { if (b) b.disabled = !enabled; });
         
-        // Macro button + select are controlled by refreshMacros()
+        // Macro button + select are controlled by ()
 				if (btnSetMacro) btnSetMacro.disabled = true;
         if (macroSelect) macroSelect.disabled = true;
         
@@ -1070,34 +1070,39 @@
         }
       }
 
-      // Macros MUST come from backend (/macros). No fallback.
       async function refreshMacros() {
-        if (!macroSelect) return;
-        
-        const { macros } = endpoints();
-        try {
-          const res = await fetch(macros, { cache: "no-cache" });
-          if (!res.ok) throw new Error("Bad response");
-          
-          const data = await res.json();
-          const items = Array.isArray(data?.items) ? data.items : [];
-          const names = items.map(x => x?.name).filter(Boolean);
-          
-          fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
-          
-          const hasAny = Array.isArray(names) && names.length > 0 && String(names[0] || "").trim() !== "";
-          
-          if (btnSetMacro) btnSetMacro.disabled = !hasAny;
-          macroSelect.disabled = !hasAny;
-        } catch {
-          fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
-          
-          if (btnSetMacro) btnSetMacro.disabled = true;
-          macroSelect.disabled = true;
-        } finally {
-          syncDescriptions();
-        }
-      }
+		  if (!macroSelect) return;
+		  
+		  // 1. Keep track of current state, but don't force-disable 
+		  // unless you specifically want to prevent double-clicks during the fetch.
+		  const { macros } = endpoints();
+		
+		  try {
+		    const res = await fetch(macros, { cache: "no-cache" });
+		    if (!res.ok) throw new Error("Bad response");
+		    
+		    const data = await res.json();
+		    const items = Array.isArray(data?.items) ? data.items : [];
+		    const names = items.map(x => x?.name).filter(Boolean);
+		    
+		    fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
+		    
+		    // 2. CHECK: If we have macros, ENABLE the button and select
+		    const hasAny = names.length > 0;
+		    
+		    if (btnSetMacro) btnSetMacro.disabled = !hasAny; // Re-enable if list is not empty
+		    macroSelect.disabled = !hasAny;
+		
+		  } catch (err) {
+		    console.error("Macro refresh failed:", err);
+		    fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
+		    
+		    if (btnSetMacro) btnSetMacro.disabled = true;
+		    macroSelect.disabled = true;
+		  } finally {
+		    syncDescriptions();
+		  }
+	  }
 
       serviceLogoSelect.addEventListener("change", () => {
         setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
