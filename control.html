@@ -923,22 +923,22 @@
       }
 
       function setButtonsEnabled(enabled) {
-        [
-          btnStreamBeginning, btnCamera, btnServiceLogo, btnShowSlides,
-          btnTestimonies, btnEndingStream,
-          btnCameraSafeClear, btnServiceLogoSafeClear,
-          btnSafelyClearSlide, btnNSCSetup
-        ].forEach(b => { if (b) b.disabled = !enabled; });
-        
-        // Macro button + select are controlled by ()
-				if (btnSetMacro) btnSetMacro.disabled = true;
-        if (macroSelect) macroSelect.disabled = true;
-        
-        refreshLogosBtn.disabled = !enabled;
-        testBackendBtn.disabled = false; // always allow manual test attempt
-				serviceLogoSelect.disabled = !enabled;
-        testimoniesLogoSelect.disabled = !enabled;
-      }
+		  [
+		    btnStreamBeginning, btnCamera, btnServiceLogo, btnShowSlides,
+		    btnTestimonies, btnEndingStream,
+		    btnCameraSafeClear, btnServiceLogoSafeClear,
+		    btnSafelyClearSlide, btnNSCSetup,
+		    btnSetMacro // <-- Add this here
+		  ].forEach(b => { if (b) b.disabled = !enabled; });
+		  
+		  // Remove the two lines that were hard-coded to 'true'
+		  if (macroSelect) macroSelect.disabled = !enabled; 
+		  
+		  refreshLogosBtn.disabled = !enabled;
+		  testBackendBtn.disabled = false; 
+		  serviceLogoSelect.disabled = !enabled;
+		  testimoniesLogoSelect.disabled = !enabled;
+	  }
 
       function escapeHtml(s) {
         return String(s || "").replace(/[&<>"']/g, c => ({
@@ -1320,42 +1320,33 @@
       }
 
       async function init() {
-        loadTheme();
-        updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
-
-        applyShowDesc(getShowDesc());
-        syncBtnSliderUI();
-
-        setButtonsEnabled(false);
-        setBackendStatus(false, "Backend: Checking…");
-        setLastAction("—");
-
-        // Start empty; macros are loaded ONLY from backend
-        if (macroSelect) {
-          fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
-          btnSetMacro.disabled = true;
-          macroSelect.disabled = true;
-        }
-        syncDescriptions();
-
-        const ok = await testBackend();
-        if (ok) {
-          await refreshServiceLogos();
-          await refreshMacros();
-        } else {
-          fillSelect(serviceLogoSelect, [], SERVICE_LOGO_UUID_KEY, true);
-          fillSelect(testimoniesLogoSelect, [], TESTIMONIES_LOGO_UUID_KEY, true);
-          
-          if (macroSelect) {
-            fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
-            btnSetMacro.disabled = true;
-            macroSelect.disabled = true;
-          }
-          syncDescriptions();
-        }
-
-        setInterval(testBackend, 10000);
-      }
+		  loadTheme();
+		  updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
+		
+		  applyShowDesc(getShowDesc());
+		  syncBtnSliderUI();
+		
+		  setButtonsEnabled(false);
+		  setBackendStatus(false, "Backend: Checking…");
+		  setLastAction("—");
+		
+		  syncDescriptions();
+		
+		  // Create a reusable refresh function
+		  const fullRefresh = async () => {
+		    const ok = await testBackend();
+		    if (ok) {
+		      await refreshServiceLogos();
+		      await refreshMacros();
+		    }
+		  };
+		
+		  // Run it once on startup
+		  await fullRefresh();
+		
+		  // Run it every 10 seconds to keep all computers active
+		  setInterval(fullRefresh, 10000); 
+	  }
 
       init();
     })();
