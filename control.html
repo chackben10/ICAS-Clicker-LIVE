@@ -81,312 +81,63 @@
       gap: 12px;
     }
 
-    .page-title {
-      font-size: 1.15rem;
-      font-weight: 600;
-      color: var(--status-grey);
-    }
+    .page-title { font-size: 1.15rem; font-weight: 600; color: var(--status-grey); }
 
     .top-btn {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--btn-text);
-      opacity: 0.9;
-      padding: 6px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--border-color);
-      background: transparent;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.10s ease;
+      font-size: 0.9rem; font-weight: 500; color: var(--btn-text); opacity: 0.9;
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-color);
+      background: transparent; cursor: pointer; transition: all 0.15s ease;
     }
 
-    .top-btn:hover {
-      opacity: 1;
-      background: var(--btn-invert-bg);
-      color: var(--btn-invert-text);
-      box-shadow: var(--btn-hover-shadow);
-    }
-    .top-btn:active {
-      background: var(--btn-invert-bg);
-      color: var(--btn-invert-text);
-      box-shadow: var(--btn-active-shadow);
-      transform: translateY(1px) scale(0.995);
+    .top-btn:hover { background: var(--btn-invert-bg); color: var(--btn-invert-text); box-shadow: var(--btn-hover-shadow); }
+
+    .panel-title { color: var(--title-color); font-size: 1.45rem; font-weight: 800; margin: 6px 0 8px; }
+
+    .desc { color: var(--status-grey); font-size: 0.98rem; line-height: 1.35; margin-bottom: 12px; }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: calc(var(--grid-gap-base) * var(--btn-scale)); margin-top: 12px; }
+    @media (min-width: 700px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+    .preset-card { width: 100%; display: flex; flex-direction: column; height: 100%; }
+    .preset-main, .preset-addon {
+      width: 100%; text-align: left; border: 1px solid var(--btn-border); background: var(--btn-bg);
+      color: var(--btn-text); cursor: pointer; position: relative; transition: all 0.15s ease;
     }
 
-    .panel-title {
-      color: var(--title-color);
-      font-size: 1.45rem;
-      font-weight: 800;
-      margin: 6px 0 8px;
-      line-height: 1.1;
-    }
+    .preset-main { padding: calc(14px * var(--btn-scale)); border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px); flex: 1 1 auto; display: flex; flex-direction: column; }
+    .preset-card.has-addon .preset-main { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-width: 0; }
+    .preset-addon { padding: calc(14px * var(--btn-scale)); border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px); border-top-left-radius: 0; border-top-right-radius: 0; text-align: center; font-size: calc(1.05rem * var(--btn-scale)); font-weight: 900; }
 
-    .desc {
-      color: var(--status-grey);
-      font-size: 0.98rem;
-      line-height: 1.35;
-      margin-bottom: 12px;
-    }
+    .preset-main:hover, .preset-addon:hover { background: var(--btn-invert-bg); color: var(--btn-invert-text); box-shadow: var(--btn-hover-shadow); }
+    .preset-main:active, .preset-addon:active { transform: translateY(1px) scale(0.995); box-shadow: var(--btn-active-shadow); }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: calc(var(--grid-gap-base) * var(--btn-scale));
-      margin-top: 12px;
-      align-items: stretch;
-    }
+    .preset-title { font-size: calc(1.15rem * var(--btn-scale)); font-weight: 900; margin-bottom: calc(6px * var(--btn-scale)); line-height: 1.15; }
+    .preset-sub { color: var(--status-grey); font-size: calc(0.95rem * var(--btn-scale)); line-height: 1.25; }
 
-    @media (min-width: 700px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
+    .select-wrap { position: relative; width: 100%; margin-top: 10px; }
+    .select { width: 100%; border: 1px solid var(--border-color); background: color-mix(in srgb, var(--bg) 92%, transparent); color: var(--card-text); border-radius: 10px; padding: 10px; font-weight: 800; -webkit-appearance: none; appearance: none; }
+    .select-wrap::after { content: "▾"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; font-weight: 900; }
 
-    .preset-card {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
+    .danger-fill { background: var(--danger); color: #ffffff; }
+    .danger-fill:hover { background: var(--danger-invert-bg); color: var(--danger-invert-text); }
 
-    .preset-main,
-    .preset-addon {
-      width: 100%;
-      text-align: left;
-      border: 1px solid var(--btn-border);
-      background: var(--btn-bg);
-      color: var(--btn-text);
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      position: relative;
-      touch-action: pan-y;
-      user-select: none;
-      -webkit-user-select: none;
-      transition: transform 0.10s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-      box-shadow: 0 0 0 rgba(0,0,0,0);
-    }
+    /* Audio Modal Styles */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 999; padding: 18px; }
+    .modal-card { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); box-shadow: 0 20px 40px var(--modal-shadow); }
+    
+    .segment { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+    .segment button { flex: 1; padding: 12px; background: transparent; border: none; color: var(--settings-text); font-weight: 900; cursor: pointer; }
+    .segment button.active { background: var(--title-color); color: white; }
 
-    .preset-main {
-      padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
-      border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-    }
+    .audio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .audio-btn { padding: 15px 5px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--btn-bg); color: var(--btn-text); font-weight: 900; font-size: 1.1rem; text-align: center; cursor: pointer; }
+    .audio-btn:active { transform: scale(0.95); background: var(--btn-invert-bg); color: var(--btn-invert-text); }
 
-    .preset-card.has-addon .preset-main {
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
-      border-bottom-width: 0;
-    }
+    .settings-close-btn { width: 100%; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--settings-text); font-size: 1rem; padding: 14px; margin-top: 10px; cursor: pointer; font-weight: 900; }
 
-    .preset-addon {
-      flex: 0 0 auto;
-      padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
-      border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
-      border-top-left-radius: 0;
-      border-top-right-radius: 0;
-      text-align: center;
-      font-size: calc(1.05rem * var(--btn-scale));
-      font-weight: 900;
-      letter-spacing: 0.2px;
-    }
-
-    .preset-main:hover, .preset-addon:hover {
-      background: var(--btn-invert-bg);
-      color: var(--btn-invert-text);
-      border-color: color-mix(in srgb, var(--btn-invert-bg) 30%, var(--btn-border));
-      box-shadow: var(--btn-hover-shadow);
-    }
-
-    .preset-main:active, .preset-addon:active {
-      background: var(--btn-invert-bg);
-      color: var(--btn-invert-text);
-      border-color: color-mix(in srgb, var(--btn-invert-bg) 35%, var(--btn-border));
-      box-shadow: var(--btn-active-shadow);
-      transform: translateY(1px) scale(0.995);
-    }
-
-    .selector-row, .select-wrap, .select {
-      background: transparent;
-      color: var(--card-text);
-    }
-
-    .select option { color: #111111; background: #ffffff; }
-    body.dark .select option { color: #ffffff; background: #111111; }
-
-    .preset-main:disabled, .preset-addon:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
-
-    .preset-title {
-      font-size: calc(1.15rem * var(--btn-scale));
-      font-weight: 900;
-      letter-spacing: 0.2px;
-      margin-bottom: calc(6px * var(--btn-scale));
-      line-height: 1.15;
-    }
-
-    .preset-sub {
-      color: var(--status-grey);
-      font-size: calc(0.95rem * var(--btn-scale));
-      line-height: 1.25;
-    }
-
-    .selector-row {
-      margin-top: calc(10px * var(--btn-scale));
-      display: flex;
-      gap: calc(10px * var(--btn-scale));
-      align-items: center;
-    }
-
-    .select-wrap { position: relative; width: 100%; }
-    .select-wrap::after {
-      content: "▾";
-      position: absolute;
-      right: calc(14px * var(--btn-scale));
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--card-text);
-      opacity: 0.8;
-      pointer-events: none;
-      font-weight: 900;
-      font-size: calc(1rem * var(--btn-scale));
-    }
-
-    .select {
-      width: 100%;
-      border: 1px solid var(--border-color);
-      background-color: color-mix(in srgb, var(--bg) 92%, transparent);
-      color: var(--card-text);
-      outline: none;
-      -webkit-appearance: none;
-      appearance: none;
-      font-weight: 800;
-      border-radius: clamp(8px, calc(11px * var(--btn-scale)), 14px);
-      font-size: calc(16px * var(--btn-scale));
-      padding: calc(12px * var(--btn-scale)) calc(40px * var(--btn-scale)) calc(12px * var(--btn-scale)) calc(12px * var(--btn-scale));
-      touch-action: pan-y;
-    }
-
-    .danger-fill {
-      background: var(--danger);
-      color: #ffffff;
-      border-color: color-mix(in srgb, var(--danger) 70%, var(--btn-border));
-    }
-    .danger-fill .preset-sub { color: rgba(255,255,255,0.92); }
-
-    .danger-fill:hover {
-      background: var(--danger-invert-bg);
-      color: var(--danger-invert-text);
-      border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
-      box-shadow: var(--btn-hover-shadow);
-    }
-    .danger-fill:active {
-      background: var(--danger-invert-bg);
-      color: var(--danger-invert-text);
-      border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
-      box-shadow: var(--btn-active-shadow);
-      transform: translateY(1px) scale(0.995);
-    }
-
-    /* Modal Styling */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 18px;
-    }
-
-    .modal-card {
-      width: 100%;
-      max-width: 500px;
-      background: var(--modal-bg);
-      color: var(--settings-text);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 18px 40px var(--modal-shadow);
-      border: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .segment {
-      display: flex;
-      width: 100%;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    .segment button {
-      flex: 1;
-      padding: 10px 0;
-      background: transparent;
-      border: none;
-      color: var(--settings-text);
-      cursor: pointer;
-      font-size: 0.95rem;
-      transition: background 0.15s, color 0.15s;
-      font-weight: 900;
-      touch-action: manipulation;
-    }
-
-    .segment button.active {
-      background: var(--title-color);
-      color: white;
-    }
-
-    /* 3x4 grid for keys */
-    .audio-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .audio-btn {
-      padding: 15px 5px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--btn-bg);
-      color: var(--btn-text);
-      font-weight: 900;
-      font-size: 1.1rem;
-      text-align: center;
-      cursor: pointer;
-      transition: transform 0.1s, background 0.1s;
-    }
-
-    .audio-btn:active {
-      transform: scale(0.95);
-      background: var(--btn-invert-bg);
-      color: var(--btn-invert-text);
-    }
-
-    .settings-close-btn {
-      width: 100%;
-      border: 1px solid var(--border-color);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--settings-text);
-      font-size: 0.95rem;
-      padding: 12px 0;
-      cursor: pointer;
-      font-weight: 900;
-      transition: background 0.1s;
-    }
-
-    .settings-section {
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 12px;
-      margin-top: 12px;
-    }
+    .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border-color); border-radius: 999px; padding: 8px 12px; color: var(--status-grey); font-size: 0.92rem; }
+    .status-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--danger); }
+    .status-dot.ok { background: var(--ok); }
   </style>
 </head>
 
@@ -397,117 +148,78 @@
       <button class="top-btn" id="settingsButton">Settings</button>
     </div>
 
-    <div class="presets-header" id="presetsHeader">
+    <div id="presetsHeader">
       <div class="panel-title">Presets</div>
-      <div class="desc">
-        These buttons trigger multiple actions (ProPresenter + OBS). Control audio pads and more here.
-      </div>
+      <div class="desc">Trigger ProPresenter + OBS actions simultaneously.</div>
     </div>
 
     <div class="grid">
-      <div class="preset-card" id="cardStreamBeginning">
-        <button class="preset-main" id="btnStreamBeginning">
-          <div class="preset-title">Stream Beginning</div>
-          <div class="preset-sub">Sets ProPresenter to <b>Starting Announcements</b> and OBS to <b>Stream Start</b>.</div>
-        </button>
-      </div>
-
-      <div class="preset-card has-addon" id="cardCamera">
-        <button class="preset-main" id="btnCamera">
-          <div class="preset-title">Camera</div>
-          <div class="preset-sub">Sets ProPresenter and OBS to <b>PTZ Camera</b>.</div>
-        </button>
+      <div class="preset-card"><button class="preset-main" id="btnStreamBeginning"><div class="preset-title">Stream Beginning</div><div class="preset-sub">Sets Starting Announcements and Stream Start scene.</div></button></div>
+      
+      <div class="preset-card has-addon">
+        <button class="preset-main" id="btnCamera"><div class="preset-title">Camera</div><div class="preset-sub">Sets PTZ Camera on both systems.</div></button>
         <button class="preset-addon danger-fill" id="btnCameraSafeClear">Camera + Safely Clear Slide</button>
       </div>
 
-      <div class="preset-card has-addon" id="cardServiceLogo">
+      <div class="preset-card has-addon">
         <button class="preset-main" id="btnServiceLogo">
           <div class="preset-title">Service Logo</div>
-          <div class="preset-sub" id="serviceLogoDesc">Sets Announcement logo and OBS to <b>Audience Camera</b>.</div>
-          <div class="selector-row"><div class="select-wrap"><select id="serviceLogoSelect" class="select"></select></div></div>
+          <div class="preset-sub" id="serviceLogoDesc">Sets logo and Audience Camera.</div>
+          <div class="select-wrap"><select id="serviceLogoSelect" class="select"></select></div>
         </button>
         <button class="preset-addon danger-fill" id="btnServiceLogoSafeClear">Logo + Safely Clear Slide</button>
       </div>
 
-      <div class="preset-card" id="cardShowSlides">
-        <button class="preset-main" id="btnShowSlides">
-          <div class="preset-title">Show Slides</div>
-          <div class="preset-sub">Clears Announcements and sets OBS to <b>ProPresenter Input</b>.</div>
-        </button>
-      </div>
+      <div class="preset-card"><button class="preset-main" id="btnShowSlides"><div class="preset-title">Show Slides</div><div class="preset-sub">Clears Announcements and sets ProPresenter Input.</div></button></div>
 
-      <div class="preset-card" id="cardTestimonies">
+      <div class="preset-card">
         <button class="preset-main" id="btnTestimonies">
           <div class="preset-title">Testimonies</div>
-          <div class="preset-sub" id="testimoniesDesc">Sets Announcement logo and OBS to <b>Testimonies</b>.</div>
-          <div class="selector-row"><div class="select-wrap"><select id="testimoniesLogoSelect" class="select"></select></div></div>
+          <div class="preset-sub" id="testimoniesDesc">Sets logo and Testimonies scene.</div>
+          <div class="select-wrap"><select id="testimoniesLogoSelect" class="select"></select></div>
         </button>
       </div>
 
-      <div class="preset-card" id="cardEndingStream">
-        <button class="preset-main" id="btnEndingStream">
-          <div class="preset-title">Ending Stream</div>
-          <div class="preset-sub">Sets ProPresenter to <b>Ending Announcements</b> and OBS to <b>Thanks Screen</b>.</div>
-        </button>
-      </div>
+      <div class="preset-card"><button class="preset-main" id="btnEndingStream"><div class="preset-title">Ending Stream</div><div class="preset-sub">Sets Ending Announcements and Thanks Screen.</div></button></div>
 
-      <div class="preset-card" id="cardSetMacro">
+      <div class="preset-card">
         <button class="preset-main" id="btnSetMacro">
           <div class="preset-title">Set Macro</div>
-          <div class="preset-sub" id="macroDesc">Triggers ProPresenter Macro for look management.</div>
-          <div class="selector-row"><div class="select-wrap"><select id="macroSelect" class="select"></select></div></div>
+          <div class="preset-sub" id="macroDesc">Triggers Look Macro.</div>
+          <div class="select-wrap"><select id="macroSelect" class="select"></select></div>
         </button>
       </div>
 
-      <div class="preset-card" id="cardSafelyClearSlide">
-        <button class="preset-main danger-fill" id="btnSafelyClearSlide">
-          <div class="preset-title">Safely Clear Slide</div>
-          <div class="preset-sub">Clear ProPresenter without affecting OBS camera feeds.</div>
-        </button>
-      </div>
+      <div class="preset-card"><button class="preset-main danger-fill" id="btnSafelyClearSlide"><div class="preset-title">Safely Clear Slide</div><div class="preset-sub">Clear ProPresenter without affecting OBS stream.</div></button></div>
 
-      <div class="preset-card" id="cardAudioControl">
-        <button class="preset-main" id="btnAudioControl" style="background: color-mix(in srgb, var(--title-color) 5%, var(--btn-bg));">
+      <div class="preset-card">
+        <button class="preset-main" id="btnAudioControl">
           <div class="preset-title">Control Background Pads Audio</div>
-          <div class="preset-sub">Open the pad controller to play ambient drones in various keys.</div>
+          <div class="preset-sub">Open pad controller to play ambient drones in various keys.</div>
         </button>
       </div>
 
-      <div class="preset-card" id="cardNSCSetup">
-        <button class="preset-main" id="btnNSCSetup">
-          <div class="preset-title">NSC setup</div>
-          <div class="preset-sub">Display iMac screen on all in-house TVs.</div>
-        </button>
-      </div>
+      <div class="preset-card"><button class="preset-main" id="btnNSCSetup"><div class="preset-title">NSC setup</div><div class="preset-sub">Display iMac screen on all in-house TVs.</div></button></div>
     </div>
   </div>
 
   <div id="audioOverlay" class="overlay">
     <div class="modal-card">
       <div class="panel-title" style="margin-top:0;">Ambient Pads</div>
-      
       <div class="segment" id="audioPlaylistSegment"></div>
-
       <div id="audioGrid" class="audio-grid"></div>
-
-      <button class="preset-main danger-fill" id="btnClearAudio" style="margin-bottom:12px; padding:12px; border-radius:8px;">
-        <div class="preset-title" style="margin:0; text-align:center;">Clear Ambient Audio</div>
-      </button>
-
+      <button class="preset-main danger-fill" id="btnClearAudio" style="margin-bottom:10px; border-radius:8px; text-align:center;"><div class="preset-title" style="margin:0;">Clear Ambient Audio</div></button>
       <button id="audioCloseButton" class="settings-close-btn">Close</button>
     </div>
   </div>
 
   <div id="settingsOverlay" class="overlay">
-    <div class="settings-card modal-card">
-      <div class="settings-title panel-title">Settings</div>
-      <div class="settings-section">
-        <div id="backendStatus">Backend: Checking…</div>
-        <button class="mini-btn" id="refreshLogosBtn">Refresh Lists</button>
-      </div>
-      <div class="settings-section">
-        <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
-      </div>
+    <div class="modal-card">
+      <div class="panel-title">Settings</div>
+      <div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div>
+      <div style="margin-top:10px;"><span id="lastAction">Last action: —</span></div>
+      <button class="settings-close-btn" id="refreshLogosBtn">Refresh Lists</button>
+      <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%; margin-top:20px;">
       <button id="settingsCloseButton" class="settings-close-btn">Close</button>
     </div>
   </div>
@@ -527,94 +239,156 @@
         audioClear: `${DEFAULT_API_BASE}/audio/clear`
       };
 
-      let activePlaylist = "";
+      // Persistence Keys
+      const SERVICE_LOGO_KEY = "icas-service-logo-uuid";
+      const TESTIMONIES_LOGO_KEY = "icas-testimonies-logo-uuid";
+      const MACRO_NAME_KEY = "icas-macro-name";
 
-      // ====== THEME & UI ======
-      function applyTheme() {
-        const mode = localStorage.getItem("theme") || "system";
-        if (mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-          document.body.classList.add("dark");
-        } else {
-          document.body.classList.remove("dark");
-        }
+      // Re-inserting the robust tap handler from your original code
+      function attachTapHandler(el, handler) {
+        if (!el) return;
+        let startX = 0, startY = 0, moved = false, activePointerId = null;
+        el.addEventListener("pointerdown", (e) => {
+          if (el.disabled) return;
+          activePointerId = e.pointerId; moved = false;
+          startX = e.clientX; startY = e.clientY;
+          try { el.setPointerCapture(e.pointerId); } catch {}
+        });
+        el.addEventListener("pointermove", (e) => {
+          if (activePointerId === null || e.pointerId !== activePointerId) return;
+          if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) moved = true;
+        });
+        el.addEventListener("pointerup", (e) => {
+          if (activePointerId === null || e.pointerId !== activePointerId) return;
+          try { el.releasePointerCapture(e.pointerId); } catch {}
+          if (!moved) handler();
+          activePointerId = null;
+        });
       }
 
-      // ====== AUDIO LOGIC ======
+      function setLastAction(text) { document.getElementById("lastAction").textContent = `Last action: ${text}`; }
+
+      // UI Sync
+      function syncDescriptions() {
+        const sName = document.getElementById("serviceLogoSelect").selectedOptions[0]?.text || "—";
+        const tName = document.getElementById("testimoniesLogoSelect").selectedOptions[0]?.text || "—";
+        const mName = document.getElementById("macroSelect").selectedOptions[0]?.text || "—";
+        document.getElementById("serviceLogoDesc").innerHTML = `Sets ProPresenter Announcement to <b>${sName}</b>, and shows the <b>Audience Camera</b> on OBS.`;
+        document.getElementById("testimoniesDesc").innerHTML = `Sets ProPresenter Announcement to <b>${tName}</b> and sets OBS scene to <b>Testimonies</b>.`;
+        document.getElementById("macroDesc").innerHTML = `Triggers ProPresenter Macro: <b>${mName}</b>.`;
+      }
+
+      async function testBackend() {
+        try {
+          const res = await fetch(API.health);
+          const ok = res.ok;
+          document.getElementById("backendDot").classList.toggle("ok", ok);
+          document.getElementById("backendStatus").textContent = ok ? "Connected ✔" : "Offline";
+          return ok;
+        } catch { return false; }
+      }
+
+      // Logic for Logos, Macros, and Audio
+      async function refreshData() {
+        const ok = await testBackend();
+        if (!ok) return;
+
+        // Logos
+        try {
+          const res = await fetch(API.logos);
+          const data = await res.json();
+          [document.getElementById("serviceLogoSelect"), document.getElementById("testimoniesLogoSelect")].forEach((sel, i) => {
+            const key = i === 0 ? SERVICE_LOGO_KEY : TESTIMONIES_LOGO_KEY;
+            const prev = localStorage.getItem(key);
+            sel.innerHTML = data.items.map(it => `<option value="${it.uuid}">${it.name}</option>`).join("");
+            if (prev) sel.value = prev;
+            else localStorage.setItem(key, sel.value);
+          });
+        } catch {}
+
+        // Macros
+        try {
+          const res = await fetch(API.macros);
+          const data = await res.json();
+          const sel = document.getElementById("macroSelect");
+          const prev = localStorage.getItem(MACRO_NAME_KEY);
+          sel.innerHTML = data.items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
+          if (prev) sel.value = prev;
+        } catch {}
+
+        syncDescriptions();
+      }
+
       async function loadAudioPlaylists() {
         try {
           const res = await fetch(API.audioPlaylists);
           const data = await res.json();
           const container = document.getElementById("audioPlaylistSegment");
-          container.innerHTML = "";
-          
-          data.items.forEach((name, i) => {
-            const btn = document.createElement("button");
-            btn.textContent = name;
-            if (i === 0) { btn.classList.add("active"); activePlaylist = name; }
-            btn.onclick = () => {
-              document.querySelectorAll("#audioPlaylistSegment button").forEach(b => b.classList.remove("active"));
-              btn.classList.add("active");
-              activePlaylist = name;
-              loadAudioTracks(name);
-            };
-            container.appendChild(btn);
-          });
-          if (activePlaylist) loadAudioTracks(activePlaylist);
-        } catch (e) { console.error("Audio playlists failed", e); }
+          container.innerHTML = data.items.map((name, i) => `<button class="${i===0?'active':''}" onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active');window.loadTracks('${name}')">${name}</button>`).join("");
+          if (data.items[0]) window.loadTracks(data.items[0]);
+        } catch {}
       }
 
-      async function loadAudioTracks(playlistName) {
+      window.loadTracks = async (name) => {
         try {
-          const res = await fetch(`${API.audioTracks}?playlist=${encodeURIComponent(playlistName)}`);
+          const res = await fetch(`${API.audioTracks}?playlist=${encodeURIComponent(name)}`);
           const data = await res.json();
-          const grid = document.getElementById("audioGrid");
-          grid.innerHTML = "";
-
-          data.items.forEach(trackFullName => {
-            const cleanName = trackFullName.replace(/\.[^/.]+$/, ""); // Strip extension
-            const btn = document.createElement("div");
-            btn.className = "audio-btn";
-            btn.textContent = cleanName;
-            btn.onclick = () => triggerAudio(playlistName, trackFullName);
-            grid.appendChild(btn);
-          });
-        } catch (e) { console.error("Tracks failed", e); }
-      }
-
-      async function triggerAudio(playlist, track) {
-        await fetch(API.audioTrigger, {
-          method: "POST",
-          body: JSON.stringify({ playlist, track }),
-          headers: {"Content-Type": "application/json"}
-        });
-      }
-
-      async function clearAudio() {
-        await fetch(API.audioClear, { method: "POST" });
-      }
-
-      // ====== CORE UI HANDLERS ======
-      const audioOverlay = document.getElementById("audioOverlay");
-      document.getElementById("btnAudioControl").onclick = () => {
-        audioOverlay.style.display = "flex";
-        loadAudioPlaylists();
+          document.getElementById("audioGrid").innerHTML = data.items.map(t => `<div class="audio-btn" onclick="window.triggerAudio('${name}','${t}')">${t.replace(/\.[^/.]+$/, "")}</div>`).join("");
+        } catch {}
       };
-      document.getElementById("audioCloseButton").onclick = () => audioOverlay.style.display = "none";
-      document.getElementById("btnClearAudio").onclick = () => clearAudio();
 
-      // (Simplified existing logic for brevity - keeping your patterns)
-      document.getElementById("btnSafelyClearSlide").onclick = () => runPreset("safely_clear_slide");
-      document.getElementById("btnNSCSetup").onclick = () => runPreset("nsc_setup");
+      window.triggerAudio = async (playlist, track) => {
+        setLastAction(`Playing Pad: ${track}`);
+        await fetch(API.audioTrigger, { method: "POST", body: JSON.stringify({ playlist, track }), headers: {"Content-Type": "application/json"}});
+      };
 
-      async function runPreset(name) {
-        await fetch(API.preset, {
-          method: "POST",
-          body: JSON.stringify({ preset: name }),
-          headers: {"Content-Type": "application/json"}
-        });
+      async function runPreset(name, extra = {}) {
+        setLastAction(`Running: ${name}`);
+        const payload = { preset: name, ...extra };
+        if (name === "service_logo") payload.service_logo_uuid = localStorage.getItem(SERVICE_LOGO_KEY);
+        if (name === "testimonies") payload.service_logo_uuid = localStorage.getItem(TESTIMONIES_LOGO_KEY);
+        try {
+          await fetch(API.preset, { method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"}});
+          setLastAction(`Done: ${name}`);
+        } catch { setLastAction(`Failed: ${name}`); }
       }
 
-      applyTheme();
+      // Event listeners
+      attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
+      attachTapHandler(document.getElementById("btnCamera"), () => runPreset("camera"));
+      attachTapHandler(document.getElementById("btnCameraSafeClear"), () => {
+          const u = API.preset + "?safeclear=true";
+          fetch(u, { method: "POST", body: JSON.stringify({ preset: "camera" }), headers: {"Content-Type": "application/json"}});
+      });
+      attachTapHandler(document.getElementById("btnServiceLogo"), () => runPreset("service_logo"));
+      attachTapHandler(document.getElementById("btnServiceLogoSafeClear"), () => {
+          const u = API.preset + "?safeclear=true";
+          fetch(u, { method: "POST", body: JSON.stringify({ preset: "service_logo", service_logo_uuid: localStorage.getItem(SERVICE_LOGO_KEY) }), headers: {"Content-Type": "application/json"}});
+      });
+      attachTapHandler(document.getElementById("btnShowSlides"), () => runPreset("show_slides"));
+      attachTapHandler(document.getElementById("btnTestimonies"), () => runPreset("testimonies"));
+      attachTapHandler(document.getElementById("btnEndingStream"), () => runPreset("ending_stream"));
+      attachTapHandler(document.getElementById("btnSafelyClearSlide"), () => runPreset("safely_clear_slide"));
+      attachTapHandler(document.getElementById("btnNSCSetup"), () => runPreset("nsc_setup"));
+      attachTapHandler(document.getElementById("btnSetMacro"), async () => {
+        const name = localStorage.getItem(MACRO_NAME_KEY);
+        await fetch(API.macro, { method: "POST", body: JSON.stringify({ name }), headers: {"Content-Type": "application/json"}});
+      });
+
+      document.getElementById("btnAudioControl").onclick = () => { document.getElementById("audioOverlay").style.display = "flex"; loadAudioPlaylists(); };
+      document.getElementById("audioCloseButton").onclick = () => document.getElementById("audioOverlay").style.display = "none";
+      document.getElementById("btnClearAudio").onclick = () => fetch(API.audioClear, { method: "POST" });
+      
+      document.getElementById("settingsButton").onclick = () => document.getElementById("settingsOverlay").style.display = "flex";
+      document.getElementById("settingsCloseButton").onclick = () => document.getElementById("settingsOverlay").style.display = "none";
+
+      document.getElementById("serviceLogoSelect").onchange = (e) => { localStorage.setItem(SERVICE_LOGO_KEY, e.target.value); syncDescriptions(); };
+      document.getElementById("testimoniesLogoSelect").onchange = (e) => { localStorage.setItem(TESTIMONIES_LOGO_KEY, e.target.value); syncDescriptions(); };
+      document.getElementById("macroSelect").onchange = (e) => { localStorage.setItem(MACRO_NAME_KEY, e.target.value); syncDescriptions(); };
+
+      // Initialize
+      refreshData();
+      setInterval(refreshData, 10000);
     })();
   </script>
 </body>
