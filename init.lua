@@ -14,26 +14,33 @@ proRemote.BIBLE_CHECK_INTERVAL_SEC = 0.75
 proRemote.BIBLE_MACRO_COOLDOWN_SEC = 2.5
 
 -- Clicker keys (Hammerspoon keycodes)
--- 69 = 'E' on US keyboard, 78 = 'N' on US keyboard
 proRemote.nextSlideKey = 69
 proRemote.prevSlideKey = 78
 
 -- ProPresenter endpoints
-proRemote.PROPRESENTER_ACTIVE_BASE  = "http://localhost:49232/v1/presentation/active"
-proRemote.PROPRESENTER_FOCUSED_BASE = "http://localhost:49232/v1/presentation/focused"
-proRemote.PROPRESENTER_UUID_BASE    = "http://localhost:49232/v1/presentation"
-proRemote.PROPRESENTER_SLIDE_INDEX  = "http://localhost:49232/v1/presentation/slide_index"
+proRemote.PRO_PORT = "49232"
+proRemote.PROPRESENTER_ACTIVE_BASE  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/active"
+proRemote.PROPRESENTER_FOCUSED_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/focused"
+proRemote.PROPRESENTER_UUID_BASE    = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation"
+proRemote.PROPRESENTER_SLIDE_INDEX  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/slide_index"
 
-proRemote.PROPRESENTER_LOOK_CURRENT = "http://localhost:49232/v1/look/current"
+proRemote.PROPRESENTER_LOOK_CURRENT = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/look/current"
 proRemote.BIBLE_LOOK_NAME           = "Bible"
-proRemote.BIBLE_MACRO_TRIGGER_URL   = "http://localhost:49232/v1/macro/69293C79-69BB-4061-86E1-76F627CB3085/trigger"
+proRemote.BIBLE_MACRO_TRIGGER_URL   = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/macro/69293C79-69BB-4061-86E1-76F627CB3085/trigger"
+
+-- Audio Config
+proRemote.AUDIO_PLAYLISTS = { "Major", "Minor", "Neutral" }
+proRemote.PROPRESENTER_AUDIO_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/audio/playlist"
+proRemote.PROPRESENTER_CLEAR_AUDIO = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/audio"
+proRemote._audioCache = {} 
+proRemote.AUDIO_CACHE_TTL = 300 -- 5 minutes
 
 -- Try to force a "real" presentation into focus if focused is announcements
-proRemote.PROPRESENTER_ACTIVE_FOCUS = "http://localhost:49232/v1/presentation/active/focus"
+proRemote.PROPRESENTER_ACTIVE_FOCUS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/active/focus"
 proRemote.FOCUSED_RECHECK_DELAY_SEC = 0.20
 
 -- Clear announcements layer
-proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS = "http://localhost:49232/v1/clear/layer/announcements"
+proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/announcements"
 
 proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_ACTIVE_BASE
 
@@ -104,9 +111,9 @@ proRemote.MACROS = {
 -- Timer proxy config (use EXACT working ProPresenter URLs)
 ------------------------------------------------------------
 
-proRemote.PROPRESENTER_TIMER_START = "http://localhost:49232/v1/timer/Service%20Countdown/start"
-proRemote.PROPRESENTER_TIMER_STOP  = "http://localhost:49232/v1/timer/Service%20Countdown/stop"
-proRemote.PROPRESENTER_TIMER_RESET = "http://localhost:49232/v1/timer/Service%20Countdown/reset"
+proRemote.PROPRESENTER_TIMER_START = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/start"
+proRemote.PROPRESENTER_TIMER_STOP  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/stop"
+proRemote.PROPRESENTER_TIMER_RESET = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/reset"
 proRemote.TIMER_STOP_RESET_DELAY_SEC = 0.5
 
 ------------------------------------------------------------
@@ -177,6 +184,60 @@ end
 local function toBoolish(v)
   v = tostring(v or ""):lower()
   return (v == "1" or v == "true" or v == "yes" or v == "on")
+end
+
+------------------------------------------------------------
+-- Audio Helpers
+------------------------------------------------------------
+
+local function fetchAudioPlaylistTracks(playlistName)
+  playlistName = trim(playlistName)
+  if playlistName == "" then return {} end
+
+  -- Check cache
+  local cached = proRemote._audioCache[playlistName]
+  if cached and (nowSec() - cached.storedAt) < proRemote.AUDIO_CACHE_TTL then
+    return cached.tracks
+  end
+
+  local url = string.format("%s/%s", proRemote.PROPRESENTER_AUDIO_BASE, hs.http.encodeForQuery(playlistName))
+  local ok, status, body = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if not ok or status ~= 200 or not body then return {} end
+
+  local data = decodeJson(body)
+  local tracks = {}
+  if data and type(data.items) == "table" then
+    for _, item in ipairs(data.items) do
+      if item.id and item.id.name then
+        table.insert(tracks, item.id.name)
+      end
+    end
+  end
+
+  proRemote._audioCache[playlistName] = {
+    tracks = tracks,
+    storedAt = nowSec()
+  }
+  return tracks
+end
+
+local function triggerAudioTrack(playlist, track)
+  local url = string.format(
+    "%s/%s/%s/trigger",
+    proRemote.PROPRESENTER_AUDIO_BASE,
+    hs.http.encodeForQuery(playlist),
+    hs.http.encodeForQuery(track)
+  )
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function clearAudioLayer()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_AUDIO, {}, function() end)
+  return true
 end
 
 ------------------------------------------------------------
@@ -725,7 +786,7 @@ end
 
 local function proTriggerPresentationUUID(uuid)
   if type(uuid) ~= "string" or uuid == "" then return false end
-  local url = string.format("http://localhost:49232/v1/presentation/%s/trigger", uuid)
+  local url = string.format("http://localhost:%s/v1/presentation/%s/trigger", proRemote.PRO_PORT, uuid)
   hs.http.asyncGet(url, {}, function() end)
   return true
 end
@@ -754,7 +815,8 @@ local function proTriggerMacroByName(macroName)
   if macroName == "" then return false end
 
   local url = string.format(
-    "http://localhost:49232/v1/macro/%s/trigger",
+    "http://localhost:%s/v1/macro/%s/trigger",
+    proRemote.PRO_PORT,
     hs.http.encodeForQuery(macroName)
   )
 
@@ -795,8 +857,10 @@ proRemote._bridge = proRemote._bridge or { task=nil, running=false }
 
 local function bridgeHealth()
   if not proRemote.OBS_BRIDGE_ENABLED then return false end
-  local status = hs.http.get(proRemote.OBS_BRIDGE_BASE .. "/health", { ["accept"]="application/json" })
-  return status == 200
+  local ok, status = pcall(function()
+    return hs.http.get(proRemote.OBS_BRIDGE_BASE .. "/health", { ["accept"]="application/json" })
+  end)
+  return ok and status == 200
 end
 
 local function bridgeKillTask()
@@ -948,6 +1012,31 @@ local function handleHttpPath(method, rawPath, body)
     if not idx then return "Bad index", 400, "text/plain" end
     triggerFocusedSlide(idx)
     return "OK\n", 200, "text/plain"
+
+  ----------------------------------------------------------
+  -- Audio endpoints
+  ----------------------------------------------------------
+  elseif p == "/audio/playlists" then
+    return jsonResponse({ items = proRemote.AUDIO_PLAYLISTS }), 200, "application/json"
+
+  elseif p == "/audio/tracks" then
+    local name = params["playlist"]
+    if not name then return "Missing playlist name", 400, "text/plain" end
+    local tracks = fetchAudioPlaylistTracks(name)
+    return jsonResponse({ items = tracks }), 200, "application/json"
+
+  elseif p == "/audio/trigger" then
+    if method ~= "POST" then return "Method Not Allowed", 405, "text/plain" end
+    local obj = decodeJson(body or "")
+    if not obj or not obj.playlist or not obj.track then
+      return jsonResponse({ ok=false, error="missing_params" }), 400, "application/json"
+    end
+    triggerAudioTrack(obj.playlist, obj.track)
+    return jsonResponse({ ok=true }), 200, "application/json"
+
+  elseif p == "/audio/clear" then
+    clearAudioLayer()
+    return jsonResponse({ ok=true }), 200, "application/json"
 
   ----------------------------------------------------------
   -- Timer proxy endpoints
