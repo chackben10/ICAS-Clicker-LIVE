@@ -28,7 +28,6 @@
       --settings-text: #111;
       --ok: #00c853;
       
-      /* The Master Scale Variable */
       --btn-scale: 1; 
       --grid-gap-base: 10px;
     }
@@ -97,13 +96,7 @@
 
     .desc { color: var(--status-grey); font-size: 0.98rem; line-height: 1.35; margin-bottom: 12px; }
 
-    /* Zoom applied to Grid Gap */
-    .grid { 
-      display: grid; 
-      grid-template-columns: 1fr; 
-      gap: calc(var(--grid-gap-base) * var(--btn-scale)); 
-      margin-top: 12px; 
-    }
+    .grid { display: grid; grid-template-columns: 1fr; gap: calc(var(--grid-gap-base) * var(--btn-scale)); margin-top: 12px; }
     @media (min-width: 700px) { .grid { grid-template-columns: 1fr 1fr; } }
 
     .preset-card { width: 100%; display: flex; flex-direction: column; height: 100%; }
@@ -113,31 +106,13 @@
       color: var(--btn-text); cursor: pointer; position: relative; transition: all 0.15s ease;
     }
 
-    /* Zoom applied to Padding & Radius */
-    .preset-main { 
-      padding: calc(14px * var(--btn-scale)); 
-      border-radius: calc(12px * var(--btn-scale)); 
-      flex: 1 1 auto; 
-      display: flex; 
-      flex-direction: column; 
-    }
-    
+    .preset-main { padding: calc(14px * var(--btn-scale)); border-radius: calc(12px * var(--btn-scale)); flex: 1 1 auto; display: flex; flex-direction: column; }
     .preset-card.has-addon .preset-main { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-width: 0; }
-    
-    .preset-addon { 
-      padding: calc(14px * var(--btn-scale)); 
-      border-radius: calc(12px * var(--btn-scale)); 
-      border-top-left-radius: 0; 
-      border-top-right-radius: 0; 
-      text-align: center; 
-      font-size: calc(1.05rem * var(--btn-scale)); 
-      font-weight: 900; 
-    }
+    .preset-addon { padding: calc(14px * var(--btn-scale)); border-radius: calc(12px * var(--btn-scale)); border-top-left-radius: 0; border-top-right-radius: 0; text-align: center; font-size: calc(1.05rem * var(--btn-scale)); font-weight: 900; }
 
     .preset-main:hover, .preset-addon:hover { background: var(--btn-invert-bg); color: var(--btn-invert-text); box-shadow: var(--btn-hover-shadow); }
     .preset-main:active, .preset-addon:active { transform: translateY(1px) scale(0.995); box-shadow: var(--btn-active-shadow); }
 
-    /* Zoom applied to Titles and Subtext */
     .preset-title { font-size: calc(1.15rem * var(--btn-scale)); font-weight: 900; margin-bottom: calc(6px * var(--btn-scale)); line-height: 1.15; }
     .preset-sub { color: var(--status-grey); font-size: calc(0.95rem * var(--btn-scale)); line-height: 1.25; }
 
@@ -153,15 +128,19 @@
     .danger-fill { background: var(--danger); color: #ffffff; }
     .danger-fill:hover { background: var(--danger-invert-bg); color: var(--danger-invert-text); }
 
-    /* Modal Styles */
+    /* Modals */
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 999; padding: 18px; }
-    .modal-card { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); box-shadow: 0 20px 40px var(--modal-shadow); }
+    .modal-card { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); box-shadow: 0 20px 40px var(--modal-shadow); color: var(--settings-text); }
     
-    .segment { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
-    .segment button { flex: 1; padding: 12px; background: transparent; border: none; color: var(--settings-text); font-weight: 900; cursor: pointer; }
-    .segment button.active { background: var(--title-color); color: white; }
+    .settings-section { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-top: 12px; }
+    .settings-label { font-weight: 900; margin-bottom: 6px; }
+    .settings-muted { color: var(--status-grey); font-size: 0.92rem; line-height: 1.35; }
 
-    .audio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .segment { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+    .segment button { flex: 1; padding: 10px; background: transparent; border: none; color: var(--settings-text); font-weight: 900; cursor: pointer; transition: 0.1s; }
+    .segment button.active { background: var(--danger); color: white; }
+
+    .audio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; margin-top: 15px; }
     .audio-btn { padding: 15px 5px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--btn-bg); color: var(--btn-text); font-weight: 900; font-size: 1.1rem; text-align: center; cursor: pointer; }
     .audio-btn:active { transform: scale(0.95); background: var(--btn-invert-bg); color: var(--btn-invert-text); }
 
@@ -187,50 +166,14 @@
 
     <div class="grid">
       <div class="preset-card"><button class="preset-main" id="btnStreamBeginning"><div class="preset-title">Stream Beginning</div><div class="preset-sub">Sets Starting Announcements and Stream Start scene.</div></button></div>
-      
-      <div class="preset-card has-addon">
-        <button class="preset-main" id="btnCamera"><div class="preset-title">Camera</div><div class="preset-sub">Sets PTZ Camera on both systems.</div></button>
-        <button class="preset-addon danger-fill" id="btnCameraSafeClear">Camera + Safely Clear Slide</button>
-      </div>
-
-      <div class="preset-card has-addon">
-        <button class="preset-main" id="btnServiceLogo">
-          <div class="preset-title">Service Logo</div>
-          <div class="preset-sub" id="serviceLogoDesc">Sets logo and Audience Camera.</div>
-          <div class="select-wrap"><select id="serviceLogoSelect" class="select"></select></div>
-        </button>
-        <button class="preset-addon danger-fill" id="btnServiceLogoSafeClear">Logo + Safely Clear Slide</button>
-      </div>
-
+      <div class="preset-card has-addon"><button class="preset-main" id="btnCamera"><div class="preset-title">Camera</div><div class="preset-sub">Sets PTZ Camera on both systems.</div></button><button class="preset-addon danger-fill" id="btnCameraSafeClear">Camera + Safely Clear Slide</button></div>
+      <div class="preset-card has-addon"><button class="preset-main" id="btnServiceLogo"><div class="preset-title">Service Logo</div><div class="preset-sub" id="serviceLogoDesc">Sets logo and Audience Camera.</div><div class="select-wrap"><select id="serviceLogoSelect" class="select"></select></div></button><button class="preset-addon danger-fill" id="btnServiceLogoSafeClear">Logo + Safely Clear Slide</button></div>
       <div class="preset-card"><button class="preset-main" id="btnShowSlides"><div class="preset-title">Show Slides</div><div class="preset-sub">Clears Announcements and sets ProPresenter Input.</div></button></div>
-
-      <div class="preset-card">
-        <button class="preset-main" id="btnTestimonies">
-          <div class="preset-title">Testimonies</div>
-          <div class="preset-sub" id="testimoniesDesc">Sets logo and Testimonies scene.</div>
-          <div class="select-wrap"><select id="testimoniesLogoSelect" class="select"></select></div>
-        </button>
-      </div>
-
+      <div class="preset-card"><button class="preset-main" id="btnTestimonies"><div class="preset-title">Testimonies</div><div class="preset-sub" id="testimoniesDesc">Sets logo and Testimonies scene.</div><div class="select-wrap"><select id="testimoniesLogoSelect" class="select"></select></div></button></div>
       <div class="preset-card"><button class="preset-main" id="btnEndingStream"><div class="preset-title">Ending Stream</div><div class="preset-sub">Sets Ending Announcements and Thanks Screen.</div></button></div>
-
-      <div class="preset-card">
-        <button class="preset-main" id="btnSetMacro">
-          <div class="preset-title">Set Macro</div>
-          <div class="preset-sub" id="macroDesc">Triggers Look Macro.</div>
-          <div class="select-wrap"><select id="macroSelect" class="select"></select></div>
-        </button>
-      </div>
-
+      <div class="preset-card"><button class="preset-main" id="btnSetMacro"><div class="preset-title">Set Macro</div><div class="preset-sub" id="macroDesc">Triggers Look Macro.</div><div class="select-wrap"><select id="macroSelect" class="select"></select></div></button></div>
       <div class="preset-card"><button class="preset-main danger-fill" id="btnSafelyClearSlide"><div class="preset-title">Safely Clear Slide</div><div class="preset-sub">Clear ProPresenter without affecting OBS stream.</div></button></div>
-
-      <div class="preset-card">
-        <button class="preset-main" id="btnAudioControl">
-          <div class="preset-title">Control Background Pads Audio</div>
-          <div class="preset-sub">Open pad controller to play ambient drones in various keys.</div>
-        </button>
-      </div>
-
+      <div class="preset-card"><button class="preset-main" id="btnAudioControl"><div class="preset-title">Control Background Pads Audio</div><div class="preset-sub">Open pad controller to play ambient drones.</div></button></div>
       <div class="preset-card"><button class="preset-main" id="btnNSCSetup"><div class="preset-title">NSC setup</div><div class="preset-sub">Display iMac screen on all in-house TVs.</div></button></div>
     </div>
   </div>
@@ -248,13 +191,36 @@
   <div id="settingsOverlay" class="overlay">
     <div class="modal-card">
       <div class="panel-title">Settings</div>
-      <div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div>
-      <div style="margin-top:10px;"><span id="lastAction">Last action: —</span></div>
       
-      <div style="margin-top:20px; font-weight: 800; color: var(--status-grey);">Button & Text Zoom</div>
-      <input type="range" id="btnTextSizeSlider" min="50" max="150" step="5" style="width:100%; margin-top:10px;">
-      
-      <button class="settings-close-btn" id="refreshLogosBtn" style="margin-top:20px;">Force Refresh Lists</button>
+      <div class="settings-section">
+        <div class="settings-label">Backend Status</div>
+        <div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div>
+        <div style="margin-top:10px; font-size: 0.9rem;"><span id="lastAction">Last action: —</span></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Zoom & Scale</div>
+        <input type="range" id="btnTextSizeSlider" min="50" max="150" step="5" style="width:100%;">
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Display Theme</div>
+        <div class="segment" id="themeSegment">
+          <button data-mode="light">Light</button>
+          <button data-mode="dark">Dark</button>
+          <button data-mode="system">System</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Show Description</div>
+        <label style="display:flex; align-items:center; cursor:pointer;">
+          <input id="showDescToggle" type="checkbox" style="width:20px; height:20px; margin-right:10px;">
+          <span style="font-weight:900;">Show Presets Header</span>
+        </label>
+      </div>
+
+      <button class="settings-close-btn" id="refreshLogosBtn" style="margin-top:20px;">Refresh Data</button>
       <button id="settingsCloseButton" class="settings-close-btn">Close</button>
     </div>
   </div>
@@ -278,22 +244,40 @@
       const TESTIMONIES_LOGO_KEY = "icas-testimonies-logo-uuid";
       const MACRO_NAME_KEY = "icas-macro-name";
       const ZOOM_KEY = "icas-panel-zoom";
+      const THEME_KEY = "icas-theme-mode";
+      const SHOW_DESC_KEY = "icas-show-desc";
 
-      // ====== ZOOM LOGIC ======
-      const zoomSlider = document.getElementById("btnTextSizeSlider");
-
-      function applyZoom(val) {
-        const scale = val / 100;
-        document.documentElement.style.setProperty("--btn-scale", scale);
-        localStorage.setItem(ZOOM_KEY, val);
+      // ====== THEME LOGIC ======
+      function applyTheme(mode) {
+        localStorage.setItem(THEME_KEY, mode);
+        document.querySelectorAll("#themeSegment button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+        
+        const isDark = (mode === "dark") || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.body.classList.toggle("dark", isDark);
       }
 
+      document.querySelectorAll("#themeSegment button").forEach(btn => {
+        btn.onclick = () => applyTheme(btn.dataset.mode);
+      });
+
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        if (localStorage.getItem(THEME_KEY) === "system") applyTheme("system");
+      });
+
+      // ====== ZOOM & DESC LOGIC ======
+      const zoomSlider = document.getElementById("btnTextSizeSlider");
+      const descToggle = document.getElementById("showDescToggle");
+
+      function applyZoom(val) {
+        document.documentElement.style.setProperty("--btn-scale", val / 100);
+        localStorage.setItem(ZOOM_KEY, val);
+      }
       zoomSlider.oninput = (e) => applyZoom(e.target.value);
 
-      // Initialize Zoom
-      const savedZoom = localStorage.getItem(ZOOM_KEY) || 100;
-      zoomSlider.value = savedZoom;
-      applyZoom(savedZoom);
+      descToggle.onchange = (e) => {
+        document.getElementById("presetsHeader").style.display = e.target.checked ? "block" : "none";
+        localStorage.setItem(SHOW_DESC_KEY, e.target.checked ? "1" : "0");
+      };
 
       // ====== TAP HANDLER ======
       function attachTapHandler(el, handler) {
@@ -341,7 +325,6 @@
       async function refreshData() {
         const ok = await testBackend();
         if (!ok) return;
-
         try {
           const res = await fetch(API.logos);
           const data = await res.json();
@@ -353,7 +336,6 @@
             else localStorage.setItem(key, sel.value);
           });
         } catch {}
-
         try {
           const res = await fetch(API.macros);
           const data = await res.json();
@@ -362,31 +344,17 @@
           sel.innerHTML = data.items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
           if (prev) sel.value = prev;
         } catch {}
-
         syncDescriptions();
       }
 
-      async function loadAudioPlaylists() {
-        try {
-          const res = await fetch(API.audioPlaylists);
-          const data = await res.json();
-          const container = document.getElementById("audioPlaylistSegment");
-          container.innerHTML = data.items.map((name, i) => `<button class="${i===0?'active':''}" onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active');window.loadTracks('${name}')">${name}</button>`).join("");
-          if (data.items[0]) window.loadTracks(data.items[0]);
-        } catch {}
-      }
-
-      // ====== AUDIO NAME CLEANING LOGIC ======
+      // ====== AUDIO NAME CLEANING ======
       window.loadTracks = async (name) => {
         try {
           const res = await fetch(`${API.audioTracks}?playlist=${encodeURIComponent(name)}`);
           const data = await res.json();
           document.getElementById("audioGrid").innerHTML = data.items.map(t => {
-            // Rule 1: Remove extension
-            // Rule 2: Remove (Major), (minor), (nuetral), (neutral) - case insensitive
             let clean = t.replace(/\.[^/.]+$/, "");
             clean = clean.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "").trim();
-            
             return `<div class="audio-btn" onclick="window.triggerAudio('${name}','${t}')">${clean}</div>`;
           }).join("");
         } catch {}
@@ -408,17 +376,12 @@
         } catch { setLastAction(`Failed: ${name}`); }
       }
 
+      // Event handlers
       attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
       attachTapHandler(document.getElementById("btnCamera"), () => runPreset("camera"));
-      attachTapHandler(document.getElementById("btnCameraSafeClear"), () => {
-          const u = API.preset + "?safeclear=true";
-          fetch(u, { method: "POST", body: JSON.stringify({ preset: "camera" }), headers: {"Content-Type": "application/json"}});
-      });
+      attachTapHandler(document.getElementById("btnCameraSafeClear"), () => fetch(API.preset + "?safeclear=true", { method: "POST", body: JSON.stringify({ preset: "camera" }), headers: {"Content-Type": "application/json"}}));
       attachTapHandler(document.getElementById("btnServiceLogo"), () => runPreset("service_logo"));
-      attachTapHandler(document.getElementById("btnServiceLogoSafeClear"), () => {
-          const u = API.preset + "?safeclear=true";
-          fetch(u, { method: "POST", body: JSON.stringify({ preset: "service_logo", service_logo_uuid: localStorage.getItem(SERVICE_LOGO_KEY) }), headers: {"Content-Type": "application/json"}});
-      });
+      attachTapHandler(document.getElementById("btnServiceLogoSafeClear"), () => fetch(API.preset + "?safeclear=true", { method: "POST", body: JSON.stringify({ preset: "service_logo", service_logo_uuid: localStorage.getItem(SERVICE_LOGO_KEY) }), headers: {"Content-Type": "application/json"}}));
       attachTapHandler(document.getElementById("btnShowSlides"), () => runPreset("show_slides"));
       attachTapHandler(document.getElementById("btnTestimonies"), () => runPreset("testimonies"));
       attachTapHandler(document.getElementById("btnEndingStream"), () => runPreset("ending_stream"));
@@ -429,16 +392,32 @@
         await fetch(API.macro, { method: "POST", body: JSON.stringify({ name }), headers: {"Content-Type": "application/json"}});
       });
 
-      document.getElementById("btnAudioControl").onclick = () => { document.getElementById("audioOverlay").style.display = "flex"; loadAudioPlaylists(); };
+      document.getElementById("btnAudioControl").onclick = () => { 
+        document.getElementById("audioOverlay").style.display = "flex"; 
+        fetch(API.audioPlaylists).then(r => r.json()).then(data => {
+          document.getElementById("audioPlaylistSegment").innerHTML = data.items.map((name, i) => `<button class="${i===0?'active':''}" onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active');window.loadTracks('${name}')">${name}</button>`).join("");
+          if (data.items[0]) window.loadTracks(data.items[0]);
+        });
+      };
+      
       document.getElementById("audioCloseButton").onclick = () => document.getElementById("audioOverlay").style.display = "none";
       document.getElementById("btnClearAudio").onclick = () => fetch(API.audioClear, { method: "POST" });
-      
       document.getElementById("settingsButton").onclick = () => document.getElementById("settingsOverlay").style.display = "flex";
       document.getElementById("settingsCloseButton").onclick = () => document.getElementById("settingsOverlay").style.display = "none";
+      document.getElementById("refreshLogosBtn").onclick = () => refreshData();
 
       document.getElementById("serviceLogoSelect").onchange = (e) => { localStorage.setItem(SERVICE_LOGO_KEY, e.target.value); syncDescriptions(); };
       document.getElementById("testimoniesLogoSelect").onchange = (e) => { localStorage.setItem(TESTIMONIES_LOGO_KEY, e.target.value); syncDescriptions(); };
       document.getElementById("macroSelect").onchange = (e) => { localStorage.setItem(MACRO_NAME_KEY, e.target.value); syncDescriptions(); };
+
+      // Initialize Settings
+      applyTheme(localStorage.getItem(THEME_KEY) || "system");
+      applyZoom(localStorage.getItem(ZOOM_KEY) || 100);
+      zoomSlider.value = localStorage.getItem(ZOOM_KEY) || 100;
+      
+      const showD = localStorage.getItem(SHOW_DESC_KEY) !== "0";
+      descToggle.checked = showD;
+      document.getElementById("presetsHeader").style.display = showD ? "block" : "none";
 
       refreshData();
       setInterval(refreshData, 10000);
