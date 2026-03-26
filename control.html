@@ -27,7 +27,9 @@
       --modal-shadow: rgba(0,0,0,0.25);
       --settings-text: #111;
       --ok: #00c853;
-      --btn-scale: 1;
+      
+      /* The Master Scale Variable */
+      --btn-scale: 1; 
       --grid-gap-base: 10px;
     }
 
@@ -71,7 +73,7 @@
       touch-action: manipulation;
     }
 
-    .wrapper { width: 100%; max-width: 680px; padding: 16px; }
+    .wrapper { width: 100%; max-width: 800px; padding: 16px; }
 
     .top-row {
       display: flex;
@@ -95,33 +97,63 @@
 
     .desc { color: var(--status-grey); font-size: 0.98rem; line-height: 1.35; margin-bottom: 12px; }
 
-    .grid { display: grid; grid-template-columns: 1fr; gap: calc(var(--grid-gap-base) * var(--btn-scale)); margin-top: 12px; }
+    /* Zoom applied to Grid Gap */
+    .grid { 
+      display: grid; 
+      grid-template-columns: 1fr; 
+      gap: calc(var(--grid-gap-base) * var(--btn-scale)); 
+      margin-top: 12px; 
+    }
     @media (min-width: 700px) { .grid { grid-template-columns: 1fr 1fr; } }
 
     .preset-card { width: 100%; display: flex; flex-direction: column; height: 100%; }
+    
     .preset-main, .preset-addon {
       width: 100%; text-align: left; border: 1px solid var(--btn-border); background: var(--btn-bg);
       color: var(--btn-text); cursor: pointer; position: relative; transition: all 0.15s ease;
     }
 
-    .preset-main { padding: calc(14px * var(--btn-scale)); border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px); flex: 1 1 auto; display: flex; flex-direction: column; }
+    /* Zoom applied to Padding & Radius */
+    .preset-main { 
+      padding: calc(14px * var(--btn-scale)); 
+      border-radius: calc(12px * var(--btn-scale)); 
+      flex: 1 1 auto; 
+      display: flex; 
+      flex-direction: column; 
+    }
+    
     .preset-card.has-addon .preset-main { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-width: 0; }
-    .preset-addon { padding: calc(14px * var(--btn-scale)); border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px); border-top-left-radius: 0; border-top-right-radius: 0; text-align: center; font-size: calc(1.05rem * var(--btn-scale)); font-weight: 900; }
+    
+    .preset-addon { 
+      padding: calc(14px * var(--btn-scale)); 
+      border-radius: calc(12px * var(--btn-scale)); 
+      border-top-left-radius: 0; 
+      border-top-right-radius: 0; 
+      text-align: center; 
+      font-size: calc(1.05rem * var(--btn-scale)); 
+      font-weight: 900; 
+    }
 
     .preset-main:hover, .preset-addon:hover { background: var(--btn-invert-bg); color: var(--btn-invert-text); box-shadow: var(--btn-hover-shadow); }
     .preset-main:active, .preset-addon:active { transform: translateY(1px) scale(0.995); box-shadow: var(--btn-active-shadow); }
 
+    /* Zoom applied to Titles and Subtext */
     .preset-title { font-size: calc(1.15rem * var(--btn-scale)); font-weight: 900; margin-bottom: calc(6px * var(--btn-scale)); line-height: 1.15; }
     .preset-sub { color: var(--status-grey); font-size: calc(0.95rem * var(--btn-scale)); line-height: 1.25; }
 
-    .select-wrap { position: relative; width: 100%; margin-top: 10px; }
-    .select { width: 100%; border: 1px solid var(--border-color); background: color-mix(in srgb, var(--bg) 92%, transparent); color: var(--card-text); border-radius: 10px; padding: 10px; font-weight: 800; -webkit-appearance: none; appearance: none; }
+    .select-wrap { position: relative; width: 100%; margin-top: calc(10px * var(--btn-scale)); }
+    .select { 
+      width: 100%; border: 1px solid var(--border-color); background: color-mix(in srgb, var(--bg) 92%, transparent); 
+      color: var(--card-text); border-radius: calc(10px * var(--btn-scale)); 
+      padding: calc(10px * var(--btn-scale)); font-weight: 800; font-size: calc(1rem * var(--btn-scale));
+      -webkit-appearance: none; appearance: none; 
+    }
     .select-wrap::after { content: "▾"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; font-weight: 900; }
 
     .danger-fill { background: var(--danger); color: #ffffff; }
     .danger-fill:hover { background: var(--danger-invert-bg); color: var(--danger-invert-text); }
 
-    /* Audio Modal Styles */
+    /* Modal Styles */
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 999; padding: 18px; }
     .modal-card { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); box-shadow: 0 20px 40px var(--modal-shadow); }
     
@@ -218,8 +250,11 @@
       <div class="panel-title">Settings</div>
       <div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div>
       <div style="margin-top:10px;"><span id="lastAction">Last action: —</span></div>
-      <button class="settings-close-btn" id="refreshLogosBtn">Refresh Lists</button>
-      <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%; margin-top:20px;">
+      
+      <div style="margin-top:20px; font-weight: 800; color: var(--status-grey);">Button & Text Zoom</div>
+      <input type="range" id="btnTextSizeSlider" min="50" max="150" step="5" style="width:100%; margin-top:10px;">
+      
+      <button class="settings-close-btn" id="refreshLogosBtn" style="margin-top:20px;">Force Refresh Lists</button>
       <button id="settingsCloseButton" class="settings-close-btn">Close</button>
     </div>
   </div>
@@ -239,12 +274,28 @@
         audioClear: `${DEFAULT_API_BASE}/audio/clear`
       };
 
-      // Persistence Keys
       const SERVICE_LOGO_KEY = "icas-service-logo-uuid";
       const TESTIMONIES_LOGO_KEY = "icas-testimonies-logo-uuid";
       const MACRO_NAME_KEY = "icas-macro-name";
+      const ZOOM_KEY = "icas-panel-zoom";
 
-      // Re-inserting the robust tap handler from your original code
+      // ====== ZOOM LOGIC ======
+      const zoomSlider = document.getElementById("btnTextSizeSlider");
+
+      function applyZoom(val) {
+        const scale = val / 100;
+        document.documentElement.style.setProperty("--btn-scale", scale);
+        localStorage.setItem(ZOOM_KEY, val);
+      }
+
+      zoomSlider.oninput = (e) => applyZoom(e.target.value);
+
+      // Initialize Zoom
+      const savedZoom = localStorage.getItem(ZOOM_KEY) || 100;
+      zoomSlider.value = savedZoom;
+      applyZoom(savedZoom);
+
+      // ====== TAP HANDLER ======
       function attachTapHandler(el, handler) {
         if (!el) return;
         let startX = 0, startY = 0, moved = false, activePointerId = null;
@@ -268,7 +319,6 @@
 
       function setLastAction(text) { document.getElementById("lastAction").textContent = `Last action: ${text}`; }
 
-      // UI Sync
       function syncDescriptions() {
         const sName = document.getElementById("serviceLogoSelect").selectedOptions[0]?.text || "—";
         const tName = document.getElementById("testimoniesLogoSelect").selectedOptions[0]?.text || "—";
@@ -288,12 +338,10 @@
         } catch { return false; }
       }
 
-      // Logic for Logos, Macros, and Audio
       async function refreshData() {
         const ok = await testBackend();
         if (!ok) return;
 
-        // Logos
         try {
           const res = await fetch(API.logos);
           const data = await res.json();
@@ -306,7 +354,6 @@
           });
         } catch {}
 
-        // Macros
         try {
           const res = await fetch(API.macros);
           const data = await res.json();
@@ -329,11 +376,19 @@
         } catch {}
       }
 
+      // ====== AUDIO NAME CLEANING LOGIC ======
       window.loadTracks = async (name) => {
         try {
           const res = await fetch(`${API.audioTracks}?playlist=${encodeURIComponent(name)}`);
           const data = await res.json();
-          document.getElementById("audioGrid").innerHTML = data.items.map(t => `<div class="audio-btn" onclick="window.triggerAudio('${name}','${t}')">${t.replace(/\.[^/.]+$/, "")}</div>`).join("");
+          document.getElementById("audioGrid").innerHTML = data.items.map(t => {
+            // Rule 1: Remove extension
+            // Rule 2: Remove (Major), (minor), (nuetral), (neutral) - case insensitive
+            let clean = t.replace(/\.[^/.]+$/, "");
+            clean = clean.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "").trim();
+            
+            return `<div class="audio-btn" onclick="window.triggerAudio('${name}','${t}')">${clean}</div>`;
+          }).join("");
         } catch {}
       };
 
@@ -353,7 +408,6 @@
         } catch { setLastAction(`Failed: ${name}`); }
       }
 
-      // Event listeners
       attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
       attachTapHandler(document.getElementById("btnCamera"), () => runPreset("camera"));
       attachTapHandler(document.getElementById("btnCameraSafeClear"), () => {
@@ -386,7 +440,6 @@
       document.getElementById("testimoniesLogoSelect").onchange = (e) => { localStorage.setItem(TESTIMONIES_LOGO_KEY, e.target.value); syncDescriptions(); };
       document.getElementById("macroSelect").onchange = (e) => { localStorage.setItem(MACRO_NAME_KEY, e.target.value); syncDescriptions(); };
 
-      // Initialize
       refreshData();
       setInterval(refreshData, 10000);
     })();
