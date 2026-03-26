@@ -27,7 +27,6 @@
       --modal-shadow: rgba(0,0,0,0.25);
       --settings-text: #111;
       --ok: #00c853;
-      
       --btn-scale: 1; 
       --grid-gap-base: 10px;
     }
@@ -128,13 +127,11 @@
     .danger-fill { background: var(--danger); color: #ffffff; }
     .danger-fill:hover { background: var(--danger-invert-bg); color: var(--danger-invert-text); }
 
-    /* Modals */
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 999; padding: 18px; }
     .modal-card { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); box-shadow: 0 20px 40px var(--modal-shadow); color: var(--settings-text); }
     
     .settings-section { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-top: 12px; }
     .settings-label { font-weight: 900; margin-bottom: 6px; }
-    .settings-muted { color: var(--status-grey); font-size: 0.92rem; line-height: 1.35; }
 
     .segment { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; margin-top: 8px; }
     .segment button { flex: 1; padding: 10px; background: transparent; border: none; color: var(--settings-text); font-weight: 900; cursor: pointer; transition: 0.1s; }
@@ -191,35 +188,10 @@
   <div id="settingsOverlay" class="overlay">
     <div class="modal-card">
       <div class="panel-title">Settings</div>
-      
-      <div class="settings-section">
-        <div class="settings-label">Backend Status</div>
-        <div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div>
-        <div style="margin-top:10px; font-size: 0.9rem;"><span id="lastAction">Last action: —</span></div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-label">Zoom & Scale</div>
-        <input type="range" id="btnTextSizeSlider" min="50" max="150" step="5" style="width:100%;">
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-label">Display Theme</div>
-        <div class="segment" id="themeSegment">
-          <button data-mode="light">Light</button>
-          <button data-mode="dark">Dark</button>
-          <button data-mode="system">System</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-label">Show Description</div>
-        <label style="display:flex; align-items:center; cursor:pointer;">
-          <input id="showDescToggle" type="checkbox" style="width:20px; height:20px; margin-right:10px;">
-          <span style="font-weight:900;">Show Presets Header</span>
-        </label>
-      </div>
-
+      <div class="settings-section"><div class="settings-label">Backend Status</div><div class="pill"><span id="backendDot" class="status-dot"></span><span id="backendStatus">Checking…</span></div></div>
+      <div class="settings-section"><div class="settings-label">Zoom & Scale</div><input type="range" id="btnTextSizeSlider" min="50" max="150" step="5" style="width:100%;"></div>
+      <div class="settings-section"><div class="settings-label">Display Theme</div><div class="segment" id="themeSegment"><button data-mode="light">Light</button><button data-mode="dark">Dark</button><button data-mode="system">System</button></div></div>
+      <div class="settings-section"><div class="settings-label">Show Description</div><label style="display:flex; align-items:center; cursor:pointer;"><input id="showDescToggle" type="checkbox" style="width:20px; height:20px; margin-right:10px;"><span style="font-weight:900;">Show Presets Header</span></label></div>
       <button class="settings-close-btn" id="refreshLogosBtn" style="margin-top:20px;">Refresh Data</button>
       <button id="settingsCloseButton" class="settings-close-btn">Close</button>
     </div>
@@ -247,39 +219,26 @@
       const THEME_KEY = "icas-theme-mode";
       const SHOW_DESC_KEY = "icas-show-desc";
 
-      // ====== THEME LOGIC ======
       function applyTheme(mode) {
         localStorage.setItem(THEME_KEY, mode);
         document.querySelectorAll("#themeSegment button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-        
         const isDark = (mode === "dark") || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.body.classList.toggle("dark", isDark);
       }
-
-      document.querySelectorAll("#themeSegment button").forEach(btn => {
-        btn.onclick = () => applyTheme(btn.dataset.mode);
-      });
-
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-        if (localStorage.getItem(THEME_KEY) === "system") applyTheme("system");
-      });
-
-      // ====== ZOOM & DESC LOGIC ======
-      const zoomSlider = document.getElementById("btnTextSizeSlider");
-      const descToggle = document.getElementById("showDescToggle");
 
       function applyZoom(val) {
         document.documentElement.style.setProperty("--btn-scale", val / 100);
         localStorage.setItem(ZOOM_KEY, val);
       }
-      zoomSlider.oninput = (e) => applyZoom(e.target.value);
 
-      descToggle.onchange = (e) => {
-        document.getElementById("presetsHeader").style.display = e.target.checked ? "block" : "none";
-        localStorage.setItem(SHOW_DESC_KEY, e.target.checked ? "1" : "0");
-      };
+      // Shield for dropdowns to stop bubbling to the button
+      function stopPropagation(el) {
+        if (!el) return;
+        ["click", "pointerdown", "pointerup", "mousedown", "touchstart"].forEach(evt => {
+          el.addEventListener(evt, (e) => e.stopPropagation());
+        });
+      }
 
-      // ====== TAP HANDLER ======
       function attachTapHandler(el, handler) {
         if (!el) return;
         let startX = 0, startY = 0, moved = false, activePointerId = null;
@@ -301,8 +260,6 @@
         });
       }
 
-      function setLastAction(text) { document.getElementById("lastAction").textContent = `Last action: ${text}`; }
-
       function syncDescriptions() {
         const sName = document.getElementById("serviceLogoSelect").selectedOptions[0]?.text || "—";
         const tName = document.getElementById("testimoniesLogoSelect").selectedOptions[0]?.text || "—";
@@ -312,27 +269,14 @@
         document.getElementById("macroDesc").innerHTML = `Triggers ProPresenter Macro: <b>${mName}</b>.`;
       }
 
-      async function testBackend() {
-        try {
-          const res = await fetch(API.health);
-          const ok = res.ok;
-          document.getElementById("backendDot").classList.toggle("ok", ok);
-          document.getElementById("backendStatus").textContent = ok ? "Connected ✔" : "Offline";
-          return ok;
-        } catch { return false; }
-      }
-
       async function refreshData() {
-        const ok = await testBackend();
-        if (!ok) return;
         try {
           const res = await fetch(API.logos);
           const data = await res.json();
           [document.getElementById("serviceLogoSelect"), document.getElementById("testimoniesLogoSelect")].forEach((sel, i) => {
             const key = i === 0 ? SERVICE_LOGO_KEY : TESTIMONIES_LOGO_KEY;
-            const prev = localStorage.getItem(key);
             sel.innerHTML = data.items.map(it => `<option value="${it.uuid}">${it.name}</option>`).join("");
-            if (prev) sel.value = prev;
+            if (localStorage.getItem(key)) sel.value = localStorage.getItem(key);
             else localStorage.setItem(key, sel.value);
           });
         } catch {}
@@ -340,41 +284,36 @@
           const res = await fetch(API.macros);
           const data = await res.json();
           const sel = document.getElementById("macroSelect");
-          const prev = localStorage.getItem(MACRO_NAME_KEY);
           sel.innerHTML = data.items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
-          if (prev) sel.value = prev;
+          if (localStorage.getItem(MACRO_NAME_KEY)) sel.value = localStorage.getItem(MACRO_NAME_KEY);
         } catch {}
         syncDescriptions();
       }
 
-      // ====== AUDIO NAME CLEANING ======
       window.loadTracks = async (name) => {
         try {
           const res = await fetch(`${API.audioTracks}?playlist=${encodeURIComponent(name)}`);
           const data = await res.json();
           document.getElementById("audioGrid").innerHTML = data.items.map(t => {
-            let clean = t.replace(/\.[^/.]+$/, "");
-            clean = clean.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "").trim();
+            let clean = t.replace(/\.[^/.]+$/, "").replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "").trim();
             return `<div class="audio-btn" onclick="window.triggerAudio('${name}','${t}')">${clean}</div>`;
           }).join("");
         } catch {}
       };
 
-      window.triggerAudio = async (playlist, track) => {
-        setLastAction(`Playing Pad: ${track}`);
-        await fetch(API.audioTrigger, { method: "POST", body: JSON.stringify({ playlist, track }), headers: {"Content-Type": "application/json"}});
-      };
+      window.triggerAudio = async (p, t) => fetch(API.audioTrigger, { method: "POST", body: JSON.stringify({ playlist:p, track:t }), headers: {"Content-Type": "application/json"}});
 
       async function runPreset(name, extra = {}) {
-        setLastAction(`Running: ${name}`);
         const payload = { preset: name, ...extra };
         if (name === "service_logo") payload.service_logo_uuid = localStorage.getItem(SERVICE_LOGO_KEY);
         if (name === "testimonies") payload.service_logo_uuid = localStorage.getItem(TESTIMONIES_LOGO_KEY);
-        try {
-          await fetch(API.preset, { method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"}});
-          setLastAction(`Done: ${name}`);
-        } catch { setLastAction(`Failed: ${name}`); }
+        try { await fetch(API.preset, { method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"}}); } catch {}
       }
+
+      // Initialize dropdown shields
+      stopPropagation(document.getElementById("serviceLogoSelect"));
+      stopPropagation(document.getElementById("testimoniesLogoSelect"));
+      stopPropagation(document.getElementById("macroSelect"));
 
       // Event handlers
       attachTapHandler(document.getElementById("btnStreamBeginning"), () => runPreset("stream_beginning"));
@@ -387,9 +326,9 @@
       attachTapHandler(document.getElementById("btnEndingStream"), () => runPreset("ending_stream"));
       attachTapHandler(document.getElementById("btnSafelyClearSlide"), () => runPreset("safely_clear_slide"));
       attachTapHandler(document.getElementById("btnNSCSetup"), () => runPreset("nsc_setup"));
-      attachTapHandler(document.getElementById("btnSetMacro"), async () => {
+      attachTapHandler(document.getElementById("btnSetMacro"), () => {
         const name = localStorage.getItem(MACRO_NAME_KEY);
-        await fetch(API.macro, { method: "POST", body: JSON.stringify({ name }), headers: {"Content-Type": "application/json"}});
+        fetch(API.macro, { method: "POST", body: JSON.stringify({ name }), headers: {"Content-Type": "application/json"}});
       });
 
       document.getElementById("btnAudioControl").onclick = () => { 
@@ -401,7 +340,6 @@
       };
       
       document.getElementById("audioCloseButton").onclick = () => document.getElementById("audioOverlay").style.display = "none";
-      document.getElementById("btnClearAudio").onclick = () => fetch(API.audioClear, { method: "POST" });
       document.getElementById("settingsButton").onclick = () => document.getElementById("settingsOverlay").style.display = "flex";
       document.getElementById("settingsCloseButton").onclick = () => document.getElementById("settingsOverlay").style.display = "none";
       document.getElementById("refreshLogosBtn").onclick = () => refreshData();
@@ -410,13 +348,12 @@
       document.getElementById("testimoniesLogoSelect").onchange = (e) => { localStorage.setItem(TESTIMONIES_LOGO_KEY, e.target.value); syncDescriptions(); };
       document.getElementById("macroSelect").onchange = (e) => { localStorage.setItem(MACRO_NAME_KEY, e.target.value); syncDescriptions(); };
 
-      // Initialize Settings
       applyTheme(localStorage.getItem(THEME_KEY) || "system");
       applyZoom(localStorage.getItem(ZOOM_KEY) || 100);
-      zoomSlider.value = localStorage.getItem(ZOOM_KEY) || 100;
+      document.getElementById("btnTextSizeSlider").value = localStorage.getItem(ZOOM_KEY) || 100;
       
       const showD = localStorage.getItem(SHOW_DESC_KEY) !== "0";
-      descToggle.checked = showD;
+      document.getElementById("showDescToggle").checked = showD;
       document.getElementById("presetsHeader").style.display = showD ? "block" : "none";
 
       refreshData();
