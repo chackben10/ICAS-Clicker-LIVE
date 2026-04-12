@@ -706,7 +706,8 @@
             g.slides?.forEach(s => slides.push({
               groupName: g.name || "",
               text: s.text || "",
-              notes: s.notes || ""
+              notes: s.notes || "",
+              enabled: s.enabled !== false
             }))
           );
         }
@@ -742,6 +743,10 @@
           const item = document.createElement("button");
           item.className = "slide-item";
           item.type = "button";
+
+          if (!slide.enabled) {
+            item.style.display = "none";
+          }
 
           if (!focused && i === indexValue) {
             item.classList.add("current");
