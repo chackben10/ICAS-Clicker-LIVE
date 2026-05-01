@@ -60,10 +60,9 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            border: 8px solid #555; /* Outer metallic rim */
+            border: 8px solid #555; 
         }
 
-        /* The center hub */
         #wheel-wrapper::after {
             content: '';
             position: absolute;
@@ -78,7 +77,6 @@
             box-shadow: inset 0 3px 5px rgba(0,0,0,0.5);
         }
 
-        /* The Ticker/Flapper */
         .flapper {
             position: absolute;
             top: -20px;
@@ -152,7 +150,6 @@
             background: rgba(255,255,255,0.1);
         }
 
-        /* Modal Styles */
         #modal-overlay {
             position: absolute;
             top: 0;
@@ -260,8 +257,8 @@
 
         <div id="modal-overlay">
             <div class="modal-card">
-                <div id="modal-english">Winner</div>
-                <div id="modal-malayalam">à´µà´¿à´à´¯à´¿</div>
+                <div id="modal-english">Loading...</div>
+                <div id="modal-malayalam">à´²àµà´¡àµ à´àµà´¯àµà´¯àµà´¨àµà´¨àµ...</div>
                 <div class="modal-buttons">
                     <button class="btn-close" id="btn-close">Close</button>
                     <button class="btn-remove" id="btn-remove">Remove & Close</button>
@@ -272,29 +269,30 @@
 
     <script>
         // --- 1. Data & State Management ---
-        const defaultItems = [
-            { id: "item_1", english: "VIP Seating", malayalam: "à´µà´¿à´à´ªà´¿ à´¸àµà´±àµà´±à´¿à´à´àµ" },
-            { id: "item_2", english: "Free Coffee", malayalam: "à´¸àµà´à´¨àµà´¯ à´àµà´«à´¿" },
-            { id: "item_3", english: "Sing a Chorus", malayalam: "à´à´°àµ à´à´¾à´¨à´ à´ªà´¾à´àµà´" },
-            { id: "item_4", english: "Gift Card", malayalam: "à´à´¿à´«àµà´±àµà´±àµ à´à´¾àµ¼à´¡àµ" },
-            { id: "item_5", english: "Answer Trivia", malayalam: "à´àµà´¦àµà´¯à´¤àµà´¤à´¿à´¨àµ à´à´¤àµà´¤à´°à´ à´¨àµ½à´àµà´" },
-            { id: "item_6", english: "Front Row", malayalam: "à´®àµàµ» à´¨à´¿à´°" },
-            { id: "item_7", english: "Book Prize", malayalam: "à´ªàµà´¸àµà´¤à´ à´¸à´®àµà´®à´¾à´¨à´" },
-            { id: "item_8", english: "Special Prayer", malayalam: "à´ªàµà´°à´¤àµà´¯àµà´ à´ªàµà´°à´¾àµ¼à´¤àµà´¥à´¨" }
-        ];
-
         let wheelItems = [];
         
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
             if (saved) {
                 wheelItems = JSON.parse(saved);
+                drawWheel();
             } else {
-                wheelItems = [...defaultItems];
-                saveData();
-            }
-            if(wheelItems.length === 0) {
-                wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
+                // Fetch external JSON for first load
+                fetch('wheel_data.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        wheelItems = data;
+                        if(wheelItems.length === 0) {
+                            wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
+                        }
+                        saveData();
+                        drawWheel();
+                    })
+                    .catch(error => {
+                        console.error("Error loading wheel_data.json:", error);
+                        wheelItems = [{ id: "error", english: "Fetch Error (Check CORS/Live Server)", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
+                        drawWheel();
+                    });
             }
         }
 
@@ -309,24 +307,25 @@
         const centerY = canvas.height / 2;
         const radius = canvas.width / 2;
 
-        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; // Gold, Dark Grey, Light Grey
-        const textColors = ["#111111", "#FFFFFF", "#111111"]; // Corresponding text colors
+        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; 
+        const textColors = ["#111111", "#FFFFFF", "#111111"]; 
         
-        let currentRotation = 0; // In radians
+        let currentRotation = 0; 
 
         function drawWheel() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const numSlices = wheelItems.length;
+            if (numSlices === 0) return;
+            
             const sliceAngle = (2 * Math.PI) / numSlices;
 
             for (let i = 0; i < numSlices; i++) {
                 const startAngle = currentRotation + (i * sliceAngle);
                 const endAngle = startAngle + sliceAngle;
 
-                // Color Logic with Edge Case protection
                 let colorIndex = i % palette.length;
                 if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
-                    colorIndex = 1; // Force dark grey if last slice hits gold and touches first slice
+                    colorIndex = 1; 
                 }
 
                 ctx.beginPath();
@@ -335,7 +334,6 @@
                 ctx.fillStyle = palette[colorIndex];
                 ctx.fill();
 
-                // Draw Text
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(startAngle + sliceAngle / 2);
@@ -343,14 +341,11 @@
                 ctx.textBaseline = "middle";
                 ctx.fillStyle = textColors[colorIndex];
                 
-                // Scale text down if there are many slices
                 let fontSize = numSlices > 8 ? 32 : 42;
                 ctx.font = `bold ${fontSize}px Inter`;
                 
-                // Add English Text
                 ctx.fillText(wheelItems[i].english, radius - 40, -15);
                 
-                // Add Malayalam Text
                 ctx.font = `bold ${fontSize * 0.75}px 'Noto Sans Malayalam'`;
                 ctx.fillText(wheelItems[i].malayalam, radius - 40, 20);
                 
@@ -359,7 +354,6 @@
         }
 
         // --- 3. Audio & Physics ---
-        // Synthesized clean tick sound (no external files needed)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playTick() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -389,15 +383,13 @@
         const spinBtn = document.getElementById('spin-btn');
 
         function spin() {
-            if (isSpinning || wheelItems.length === 0 || wheelItems[0].id === 'empty') return;
+            if (isSpinning || wheelItems.length === 0 || wheelItems[0].id === 'error') return;
             
-            // Resume audio context on first user interaction
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             isSpinning = true;
             spinBtn.disabled = true;
             
-            // Random initial velocity (between 0.4 and 0.7 radians per frame)
             velocity = 0.4 + Math.random() * 0.3; 
             
             lastTickSlice = -1;
@@ -405,10 +397,8 @@
         }
 
         function animate() {
-            // Apply friction (deceleration)
-            velocity *= 0.992; // Adjust for longer/shorter spins
+            velocity *= 0.992; 
 
-            // Stop condition
             if (velocity < 0.002) {
                 velocity = 0;
                 isSpinning = false;
@@ -420,17 +410,13 @@
 
             currentRotation += velocity;
             
-            // Normalize rotation so it doesn't grow infinitely
             if (currentRotation >= 2 * Math.PI) {
                 currentRotation %= 2 * Math.PI;
             }
 
-            // Calculate which slice is currently at the top (under the flapper)
-            // The flapper is at 270 degrees (or -PI/2) mathematically on the canvas
             const numSlices = wheelItems.length;
             const sliceAngle = (2 * Math.PI) / numSlices;
             
-            // Calculate angle relative to the top (-PI/2)
             let topAngle = (3 * Math.PI / 2) - currentRotation;
             if (topAngle < 0) topAngle += 2 * Math.PI;
             
@@ -440,7 +426,6 @@
                 playTick();
                 lastTickSlice = currentSliceIndex;
                 
-                // Visual flapper tick
                 flapper.classList.add('tick');
                 setTimeout(() => flapper.classList.remove('tick'), 50);
             }
@@ -462,7 +447,6 @@
             currentWinnerIndex = Math.floor(topAngle / sliceAngle);
             const winner = wheelItems[currentWinnerIndex];
 
-            // Fire Confetti
             confetti({
                 particleCount: 150,
                 spread: 100,
@@ -471,7 +455,6 @@
                 zIndex: 200
             });
 
-            // Show Modal
             setTimeout(() => {
                 document.getElementById('modal-english').innerText = winner.english;
                 document.getElementById('modal-malayalam').innerText = winner.malayalam;
@@ -479,7 +462,6 @@
             }, 500);
         }
 
-        // Modal Button Handlers
         document.getElementById('btn-close').addEventListener('click', () => {
             document.getElementById('modal-overlay').classList.remove('active');
         });
@@ -493,11 +475,10 @@
             document.getElementById('modal-overlay').classList.remove('active');
         });
 
-        // Event Listeners
         spinBtn.addEventListener('click', spin);
 
         document.getElementById('refresh-btn').addEventListener('click', () => {
-            if(confirm("Are you sure you want to reset the wheel? This will bring back all removed items.")) {
+            if(confirm("Are you sure you want to reset the wheel? This will re-fetch from the JSON and bring back all items.")) {
                 localStorage.removeItem('churchWheelData');
                 location.reload();
             }
@@ -505,7 +486,6 @@
 
         // Boot up
         initData();
-        drawWheel();
 
     </script>
 </body>
