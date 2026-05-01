@@ -1,0 +1,42 @@
+[
+  {
+    "id": "item_1",
+    "english": "VIP Seating",
+    "malayalam": "വിഐപി സീറ്റിംഗ്"
+  },
+  {
+    "id": "item_2",
+    "english": "Free Coffee",
+    "malayalam": "സൗജന്യ കോഫി"
+  },
+  {
+    "id": "item_3",
+    "english": "Sing a Chorus",
+    "malayalam": "ഒരു ഗാനം പാടുക"
+  },
+  {
+    "id": "item_4",
+    "english": "Gift Card",
+    "malayalam": "ഗിഫ്റ്റ് കാർഡ്"
+  },
+  {
+    "id": "item_5",
+    "english": "Answer Trivia",
+    "malayalam": "ചോദ്യത്തിന് ഉത്തരം നൽകുക"
+  },
+  {
+    "id": "item_6",
+    "english": "Front Row",
+    "malayalam": "മുൻ നിര"
+  },
+  {
+    "id": "item_7",
+    "english": "Book Prize",
+    "malayalam": "പുസ്തക സമ്മാനം"
+  },
+  {
+    "id": "item_8",
+    "english": "Special Prayer",
+    "malayalam": "പ്രത്യേക പ്രാർത്ഥന"
+  }
+]
