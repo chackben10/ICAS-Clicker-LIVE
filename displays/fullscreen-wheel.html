@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Prize Wheel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+Malayalam:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-light: #1a1a1a;
+            --gold: #D4AF37;
+            --dark-grey: #333333;
+            --light-grey: #E0E0E0;
+            --accent-blue: #00A8FF;
+            --text-dark: #111111;
+            --text-light: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle, var(--bg-light) 0%, var(--bg-dark) 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            color: var(--text-light);
+        }
+
+        #app-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            max-width: 1920px;
+            justify-content: center;
+        }
+
+        #wheel-wrapper {
+            position: relative;
+            width: 70vh;
+            height: 70vh;
+            max-width: 800px;
+            max-height: 800px;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.8));
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #555; /* Outer metallic rim */
+        }
+
+        /* The center hub */
+        #wheel-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8%;
+            height: 8%;
+            background: #555;
+            border-radius: 50%;
+            border: 4px solid var(--bg-dark);
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.5);
+        }
+
+        /* The Ticker/Flapper */
+        .flapper {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 45px solid var(--accent-blue);
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+            transform-origin: top center;
+            transition: transform 0.05s ease;
+        }
+
+        .flapper.tick {
+            transform: translateX(-50%) rotate(15deg);
+        }
+
+        #spin-btn {
+            margin-top: 40px;
+            padding: 15px 60px;
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background-color: var(--accent-blue);
+            color: var(--text-light);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 168, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #spin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(0, 168, 255, 0.4);
+        }
+
+        #spin-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 5px 10px rgba(0, 168, 255, 0.3);
+        }
+
+        #spin-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        #refresh-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.4);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        #refresh-btn:hover {
+            color: var(--text-light);
+            border-color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* Modal Styles */
+        #modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 100;
+        }
+
+        #modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background: #1e1e1e;
+            border: 2px solid var(--gold);
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            max-width: 600px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        #modal-english {
+            font-size: 48px;
+            font-weight: 900;
+            color: var(--gold);
+            margin-bottom: 10px;
+        }
+
+        #modal-malayalam {
+            font-family: 'Noto Sans Malayalam', sans-serif;
+            font-size: 32px;
+            color: var(--text-light);
+            margin-bottom: 40px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .btn-close {
+            background: transparent;
+            border: 2px solid #555;
+            color: #aaa;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-close:hover {
+            border-color: #888;
+            color: #fff;
+        }
+
+        .btn-remove {
+            background: var(--accent-blue);
+            border: none;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 168, 255, 0.3);
+            transition: all 0.2s;
+        }
+
+        .btn-remove:hover {
+            background: #0088cc;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="wheel-wrapper">
+            <div class="flapper" id="flapper"></div>
+            <canvas id="wheel" width="1000" height="1000"></canvas>
+        </div>
+        
+        <button id="spin-btn">SPIN</button>
+        <button id="refresh-btn">Reset & Reload</button>
+
+        <div id="modal-overlay">
+            <div class="modal-card">
+                <div id="modal-english">Winner</div>
+                <div id="modal-malayalam">à´µà´¿à´à´¯à´¿</div>
+                <div class="modal-buttons">
+                    <button class="btn-close" id="btn-close">Close</button>
+                    <button class="btn-remove" id="btn-remove">Remove & Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Data & State Management ---
+        const defaultItems = [
+            { id: "item_1", english: "VIP Seating", malayalam: "à´µà´¿à´à´ªà´¿ à´¸àµà´±àµà´±à´¿à´à´àµ" },
+            { id: "item_2", english: "Free Coffee", malayalam: "à´¸àµà´à´¨àµà´¯ à´àµà´«à´¿" },
+            { id: "item_3", english: "Sing a Chorus", malayalam: "à´à´°àµ à´à´¾à´¨à´ à´ªà´¾à´àµà´" },
+            { id: "item_4", english: "Gift Card", malayalam: "à´à´¿à´«àµà´±àµà´±àµ à´à´¾àµ¼à´¡àµ" },
+            { id: "item_5", english: "Answer Trivia", malayalam: "à´àµà´¦àµà´¯à´¤àµà´¤à´¿à´¨àµ à´à´¤àµà´¤à´°à´ à´¨àµ½à´àµà´" },
+            { id: "item_6", english: "Front Row", malayalam: "à´®àµàµ» à´¨à´¿à´°" },
+            { id: "item_7", english: "Book Prize", malayalam: "à´ªàµà´¸àµà´¤à´ à´¸à´®àµà´®à´¾à´¨à´" },
+            { id: "item_8", english: "Special Prayer", malayalam: "à´ªàµà´°à´¤àµà´¯àµà´ à´ªàµà´°à´¾àµ¼à´¤àµà´¥à´¨" }
+        ];
+
+        let wheelItems = [];
+        
+        function initData() {
+            const saved = localStorage.getItem('churchWheelData');
+            if (saved) {
+                wheelItems = JSON.parse(saved);
+            } else {
+                wheelItems = [...defaultItems];
+                saveData();
+            }
+            if(wheelItems.length === 0) {
+                wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
+        }
+
+        // --- 2. Canvas & Visuals ---
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = canvas.width / 2;
+
+        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; // Gold, Dark Grey, Light Grey
+        const textColors = ["#111111", "#FFFFFF", "#111111"]; // Corresponding text colors
+        
+        let currentRotation = 0; // In radians
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+
+            for (let i = 0; i < numSlices; i++) {
+                const startAngle = currentRotation + (i * sliceAngle);
+                const endAngle = startAngle + sliceAngle;
+
+                // Color Logic with Edge Case protection
+                let colorIndex = i % palette.length;
+                if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
+                    colorIndex = 1; // Force dark grey if last slice hits gold and touches first slice
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.fillStyle = palette[colorIndex];
+                ctx.fill();
+
+                // Draw Text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = textColors[colorIndex];
+                
+                // Scale text down if there are many slices
+                let fontSize = numSlices > 8 ? 32 : 42;
+                ctx.font = `bold ${fontSize}px Inter`;
+                
+                // Add English Text
+                ctx.fillText(wheelItems[i].english, radius - 40, -15);
+                
+                // Add Malayalam Text
+                ctx.font = `bold ${fontSize * 0.75}px 'Noto Sans Malayalam'`;
+                ctx.fillText(wheelItems[i].malayalam, radius - 40, 20);
+                
+                ctx.restore();
+            }
+        }
+
+        // --- 3. Audio & Physics ---
+        // Synthesized clean tick sound (no external files needed)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTick() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.03);
+        }
+
+        let isSpinning = false;
+        let velocity = 0;
+        let lastTickSlice = -1;
+        let animationFrame;
+
+        const flapper = document.getElementById('flapper');
+        const spinBtn = document.getElementById('spin-btn');
+
+        function spin() {
+            if (isSpinning || wheelItems.length === 0 || wheelItems[0].id === 'empty') return;
+            
+            // Resume audio context on first user interaction
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            
+            // Random initial velocity (between 0.4 and 0.7 radians per frame)
+            velocity = 0.4 + Math.random() * 0.3; 
+            
+            lastTickSlice = -1;
+            animate();
+        }
+
+        function animate() {
+            // Apply friction (deceleration)
+            velocity *= 0.992; // Adjust for longer/shorter spins
+
+            // Stop condition
+            if (velocity < 0.002) {
+                velocity = 0;
+                isSpinning = false;
+                spinBtn.disabled = false;
+                cancelAnimationFrame(animationFrame);
+                resolveWinner();
+                return;
+            }
+
+            currentRotation += velocity;
+            
+            // Normalize rotation so it doesn't grow infinitely
+            if (currentRotation >= 2 * Math.PI) {
+                currentRotation %= 2 * Math.PI;
+            }
+
+            // Calculate which slice is currently at the top (under the flapper)
+            // The flapper is at 270 degrees (or -PI/2) mathematically on the canvas
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            
+            // Calculate angle relative to the top (-PI/2)
+            let topAngle = (3 * Math.PI / 2) - currentRotation;
+            if (topAngle < 0) topAngle += 2 * Math.PI;
+            
+            const currentSliceIndex = Math.floor(topAngle / sliceAngle);
+
+            if (currentSliceIndex !== lastTickSlice) {
+                playTick();
+                lastTickSlice = currentSliceIndex;
+                
+                // Visual flapper tick
+                flapper.classList.add('tick');
+                setTimeout(() => flapper.classList.remove('tick'), 50);
+            }
+
+            drawWheel();
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        // --- 4. Celebration & Modal Logic ---
+        let currentWinnerIndex = -1;
+
+        function resolveWinner() {
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            
+            let topAngle = (3 * Math.PI / 2) - currentRotation;
+            if (topAngle < 0) topAngle += 2 * Math.PI;
+            
+            currentWinnerIndex = Math.floor(topAngle / sliceAngle);
+            const winner = wheelItems[currentWinnerIndex];
+
+            // Fire Confetti
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.6 },
+                colors: ['#D4AF37', '#E0E0E0', '#00A8FF'],
+                zIndex: 200
+            });
+
+            // Show Modal
+            setTimeout(() => {
+                document.getElementById('modal-english').innerText = winner.english;
+                document.getElementById('modal-malayalam').innerText = winner.malayalam;
+                document.getElementById('modal-overlay').classList.add('active');
+            }, 500);
+        }
+
+        // Modal Button Handlers
+        document.getElementById('btn-close').addEventListener('click', () => {
+            document.getElementById('modal-overlay').classList.remove('active');
+        });
+
+        document.getElementById('btn-remove').addEventListener('click', () => {
+            if (currentWinnerIndex !== -1) {
+                wheelItems.splice(currentWinnerIndex, 1);
+                saveData();
+                drawWheel();
+            }
+            document.getElementById('modal-overlay').classList.remove('active');
+        });
+
+        // Event Listeners
+        spinBtn.addEventListener('click', spin);
+
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            if(confirm("Are you sure you want to reset the wheel? This will bring back all removed items.")) {
+                localStorage.removeItem('churchWheelData');
+                location.reload();
+            }
+        });
+
+        // Boot up
+        initData();
+        drawWheel();
+
+    </script>
+</body>
+</html>
