@@ -63,7 +63,8 @@
             filter: drop-shadow(0 2vmin 4vmin rgba(0,0,0,0.8));
         }
 
-        canvas {
+        /* FIXED: Changed from 'canvas' to '#wheel' to prevent styling the confetti canvas */
+        #wheel {
             width: 100%;
             height: 100%;
             border-radius: 50%;
@@ -284,34 +285,31 @@
     </div>
 
     <script>
-        // --- 1. Data & State Management ---
         let wheelItems = [];
         
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
-            
-            // If data exists in storage AND it has items, use it. Otherwise, force a fetch.
-            if (saved && JSON.parse(saved).length > 0 && JSON.parse(saved)[0].id !== "error") {
+            if (saved) {
                 wheelItems = JSON.parse(saved);
                 drawWheel();
             } else {
-                fetch('wheel_data.json')
+                fetch('wheel-data.json')
                     .then(response => {
                         if (!response.ok) {
-                            throw new Error('Network response was not ok: ' + response.statusText);
+                            throw new Error('Network response was not ok');
                         }
                         return response.json();
                     })
                     .then(data => {
                         wheelItems = data;
-                        if(!wheelItems || wheelItems.length === 0) {
+                        if(wheelItems.length === 0) {
                             wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
                         }
                         saveData();
                         drawWheel();
                     })
                     .catch(error => {
-                        console.error("Error loading wheel_data.json:", error);
+                        console.error("Error loading wheel-data.json:", error);
                         wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
                         drawWheel();
                     });
@@ -322,7 +320,6 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
-        // --- 2. Canvas & Visuals ---
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const centerX = canvas.width / 2;
@@ -335,7 +332,6 @@
         let currentRotation = 0; 
 
         function wrapText(context, text, x, y, maxWidth, lineHeight) {
-            if (!text) return; // safeguard
             const words = text.split(' ');
             let line = '';
             const lines = [];
@@ -399,7 +395,6 @@
             }
         }
 
-        // --- 3. Audio & Physics ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playTick() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -480,7 +475,6 @@
             animationFrame = requestAnimationFrame(animate);
         }
 
-        // --- 4. Celebration & Modal Logic ---
         let currentWinnerIndex = -1;
 
         function resolveWinner() {
@@ -530,7 +524,6 @@
             }
         });
 
-        // Boot up
         initData();
 
     </script>
