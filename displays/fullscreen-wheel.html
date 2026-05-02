@@ -39,7 +39,7 @@
         #app-container {
             position: relative;
             display: flex;
-            flex-direction: column; /* Default: Portrait, Wheel on top, button below */
+            flex-direction: column; 
             align-items: center;
             width: 100vw;
             height: 100vh;
@@ -47,7 +47,6 @@
             gap: 6vmin;
         }
 
-        /* Landscape Orientation: Wheel center, button to the right */
         @media (orientation: landscape) {
             #app-container {
                 flex-direction: row;
@@ -57,7 +56,6 @@
 
         #wheel-wrapper {
             position: relative;
-            /* vmin ensures it always fits perfectly inside the shortest screen dimension */
             width: 80vmin; 
             height: 80vmin;
             max-width: 800px;
@@ -86,7 +84,6 @@
             box-shadow: inset 0 0.3vmin 0.5vmin rgba(0,0,0,0.5);
         }
 
-        /* Responsive flapper */
         .flapper {
             position: absolute;
             top: -3vmin;
@@ -103,7 +100,6 @@
             transition: transform 0.05s ease;
         }
 
-        /* Flapper flips the opposite way now to match the wheel's spin direction */
         .flapper.tick {
             transform: translateX(-50%) rotate(-15deg);
         }
@@ -293,28 +289,29 @@
         
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
-            if (saved) {
+            
+            // If data exists in storage AND it has items, use it. Otherwise, force a fetch.
+            if (saved && JSON.parse(saved).length > 0 && JSON.parse(saved)[0].id !== "error") {
                 wheelItems = JSON.parse(saved);
                 drawWheel();
             } else {
-                // Now fetching the hyphenated file name exactly as you have it
                 fetch('wheel_data.json')
                     .then(response => {
                         if (!response.ok) {
-                            throw new Error('Network response was not ok');
+                            throw new Error('Network response was not ok: ' + response.statusText);
                         }
                         return response.json();
                     })
                     .then(data => {
                         wheelItems = data;
-                        if(wheelItems.length === 0) {
+                        if(!wheelItems || wheelItems.length === 0) {
                             wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
                         }
                         saveData();
                         drawWheel();
                     })
                     .catch(error => {
-                        console.error("Error loading wheel-data.json:", error);
+                        console.error("Error loading wheel_data.json:", error);
                         wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
                         drawWheel();
                     });
@@ -337,8 +334,8 @@
         
         let currentRotation = 0; 
 
-        // Helper function to wrap text inside canvas
         function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            if (!text) return; // safeguard
             const words = text.split(' ');
             let line = '';
             const lines = [];
@@ -356,7 +353,6 @@
             }
             lines.push(line);
 
-            // Calculate vertical centering
             const totalHeight = lines.length * lineHeight;
             const startY = y - (totalHeight / 2) + (lineHeight / 2);
 
@@ -468,7 +464,9 @@
             const sliceAngle = (2 * Math.PI) / numSlices;
             
             let topAngle = (3 * Math.PI / 2) - currentRotation;
-            if (top(topAngle, sliceAngle));
+            if (topAngle < 0) topAngle += 2 * Math.PI;
+            
+            const currentSliceIndex = Math.floor(topAngle / sliceAngle);
 
             if (currentSliceIndex !== lastTickSlice) {
                 playTick();
@@ -480,10 +478,6 @@
 
             drawWheel();
             animationFrame = requestAnimationFrame(animate);
-        }
-        
-        function top(topAngle, sliceAngle) {
-            return Math.floor(topAngle / sliceAngle);
         }
 
         // --- 4. Celebration & Modal Logic ---
