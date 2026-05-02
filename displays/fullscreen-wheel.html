@@ -63,7 +63,6 @@
             filter: drop-shadow(0 2vmin 4vmin rgba(0,0,0,0.8));
         }
 
-        /* FIXED: Changed from 'canvas' to '#wheel' to prevent styling the confetti canvas */
         #wheel {
             width: 100%;
             height: 100%;
@@ -85,6 +84,10 @@
             box-shadow: inset 0 0.3vmin 0.5vmin rgba(0,0,0,0.5);
         }
 
+        /* * The flapper no longer uses CSS transitions for rotation.
+         * It will be driven frame-by-frame by the physics loop to model 
+         * accurate bending stiffness.
+         */
         .flapper {
             position: absolute;
             top: -3vmin;
@@ -98,11 +101,6 @@
             z-index: 10;
             filter: drop-shadow(0 0.4vmin 0.6vmin rgba(0,0,0,0.5));
             transform-origin: top center;
-            transition: transform 0.05s ease;
-        }
-
-        .flapper.tick {
-            transform: translateX(-50%) rotate(-15deg);
         }
 
         .controls {
@@ -295,16 +293,12 @@
             } else {
                 fetch('wheel-data.json')
                     .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
+                        if (!response.ok) throw new Error('Network response was not ok');
                         return response.json();
                     })
                     .then(data => {
                         wheelItems = data;
-                        if(wheelItems.length === 0) {
-                            wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
-                        }
+                        if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
                         saveData();
                         drawWheel();
                     })
@@ -395,17 +389,19 @@
             }
         }
 
+        // --- Kinematic Audio Context ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playTick() {
+        function playTick(speedRatio) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             
             oscillator.type = 'triangle';
-            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+            // Slower hits produce a slightly lower pitched, quieter sound
+            oscillator.frequency.setValueAtTime(400 + (200 * speedRatio), audioCtx.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
             
-            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1 + (0.2 * speedRatio), audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
             
             oscillator.connect(gainNode);
@@ -415,60 +411,90 @@
             oscillator.stop(audioCtx.currentTime + 0.03);
         }
 
+        // --- Physics Engine Variables ---
         let isSpinning = false;
         let velocity = 0;
         let lastTickSlice = -1;
         let animationFrame;
+        let flapperAngle = 0;
 
         const flapper = document.getElementById('flapper');
         const spinBtn = document.getElementById('spin-btn');
 
         function spin() {
             if (isSpinning || wheelItems.length === 0 || wheelItems[0].id === 'error') return;
-            
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             isSpinning = true;
             spinBtn.disabled = true;
             
             velocity = 0.4 + Math.random() * 0.3; 
-            
             lastTickSlice = -1;
             animate();
         }
 
         function animate() {
-            velocity *= 0.992; 
+            // 1. Aerodynamic / Bearing Friction (Baseline deceleration)
+            velocity *= 0.993; 
 
-            if (velocity < 0.002) {
+            // 2. Map rotation to exact slice constraints
+            let topAngle = (3 * Math.PI / 2) - currentRotation;
+            while (topAngle < 0) topAngle += 2 * Math.PI;
+            while (topAngle >= 2 * Math.PI) topAngle -= 2 * Math.PI;
+
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            const currentSliceIndex = Math.floor(topAngle / sliceAngle);
+
+            // 3. Collision Detection & Force Analysis
+            // Calculate how close the approaching peg (slice boundary) is to the flapper
+            let distanceToPeg = topAngle - (currentSliceIndex * sliceAngle);
+            const engagementZone = 0.08; // Radians where the peg physically bends the flapper
+
+            if (distanceToPeg < engagementZone) {
+                // The peg is pushing the flapper. Calculate deflection (0.0 to 1.0)
+                let deflection = 1 - (distanceToPeg / engagementZone);
+                flapperAngle = -40 * deflection; // Bend up to -40 degrees
+
+                // The flapper acts as a leaf spring. Bending it requires energy.
+                // Apply a counter-torque to the wheel based on the bending stiffness.
+                let springForce = 0.0007 * deflection;
+                velocity -= springForce;
+            } else {
+                // The flapper is clear of the peg. Dampen it back to center.
+                flapperAngle *= 0.5; 
+            }
+
+            // 4. Tick and Snap-back Logic
+            if (currentSliceIndex !== lastTickSlice) {
+                if (lastTickSlice !== -1 && distanceToPeg > engagementZone) {
+                    // The peg just cleared the flapper! 
+                    // Calculate a speed ratio (0 to 1) for realistic audio dynamics
+                    let speedRatio = Math.min(1, velocity / 0.1);
+                    playTick(speedRatio);
+                    
+                    // Spring bounce forward as it releases potential energy
+                    flapperAngle = 20; 
+                }
+                lastTickSlice = currentSliceIndex;
+            }
+
+            // 5. Apply Kinematics
+            currentRotation += velocity;
+            if (currentRotation >= 2 * Math.PI) currentRotation %= 2 * Math.PI;
+
+            // Apply direct transform for zero-latency rendering
+            flapper.style.transform = `translateX(-50%) rotate(${flapperAngle}deg)`;
+
+            // 6. Rest State & The "Trap"
+            // If the spring force drained all kinetic energy, the wheel is physically trapped by the peg.
+            if (velocity <= 0) {
                 velocity = 0;
                 isSpinning = false;
                 spinBtn.disabled = false;
                 cancelAnimationFrame(animationFrame);
                 resolveWinner();
-                return;
-            }
-
-            currentRotation += velocity;
-            
-            if (currentRotation >= 2 * Math.PI) {
-                currentRotation %= 2 * Math.PI;
-            }
-
-            const numSlices = wheelItems.length;
-            const sliceAngle = (2 * Math.PI) / numSlices;
-            
-            let topAngle = (3 * Math.PI / 2) - currentRotation;
-            if (topAngle < 0) topAngle += 2 * Math.PI;
-            
-            const currentSliceIndex = Math.floor(topAngle / sliceAngle);
-
-            if (currentSliceIndex !== lastTickSlice) {
-                playTick();
-                lastTickSlice = currentSliceIndex;
-                
-                flapper.classList.add('tick');
-                setTimeout(() => flapper.classList.remove('tick'), 50);
+                return; // Halt the physics loop
             }
 
             drawWheel();
