@@ -279,12 +279,16 @@
     </div>
 
     <script>
+        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; 
+        const textColors = ["#111111", "#FFFFFF", "#111111"]; 
+
         let wheelItems = [];
         
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
             if (saved) {
                 wheelItems = JSON.parse(saved);
+                updateTextCanvases();
                 drawWheel();
             } else {
                 fetch('wheel_data.json')
@@ -296,11 +300,13 @@
                         wheelItems = data;
                         if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
                         saveData();
+                        updateTextCanvases();
                         drawWheel();
                     })
                     .catch(error => {
                         console.error("Error loading wheel_data.json:", error);
                         wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
+                        updateTextCanvases();
                         drawWheel();
                     });
             }
@@ -310,87 +316,71 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
+        // --- NEW: Raster Offscreen Perspective Engine ---
+        function updateTextCanvases() {
+            const numSlices = wheelItems.length;
+            for (let i = 0; i < numSlices; i++) {
+                let colorIndex = i % palette.length;
+                if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
+                    colorIndex = 1; 
+                }
+                let textColor = textColors[colorIndex];
+                wheelItems[i].textCanvas = createTextCanvas(wheelItems[i].english, textColor, numSlices);
+            }
+        }
+
+        function createTextCanvas(text, color, numSlices) {
+            const c = document.createElement('canvas');
+            // Use a large offscreen canvas for high-res crisp text
+            c.width = 1200; 
+            c.height = 600;
+            const ctx = c.getContext('2d');
+            
+            let fontSize = numSlices > 12 ? 70 : 90;
+            if (text.length > 50) fontSize *= 0.8; 
+            
+            ctx.fillStyle = color;
+            ctx.textAlign = 'right'; // Align to the wide outer rim
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold ${fontSize}px Inter`;
+            
+            const words = text.split(' ');
+            let line = '';
+            const lines = [];
+            const maxWidth = 1000; // Keep text from hitting the absolute left edge
+            
+            for (let i = 0; i < words.length; i++) {
+                let testLine = line + words[i] + ' ';
+                let metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && i > 0) {
+                    lines.push(line.trim());
+                    line = words[i] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line.trim());
+            
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+            let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
+            
+            // Draw lines aligned to the right side (outer edge of wheel)
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], 1150, startY + (i * lineHeight));
+            }
+            
+            return c;
+        }
+
+
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const radius = canvas.width / 2;
-
-        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; 
-        const textColors = ["#111111", "#FFFFFF", "#111111"]; 
         
         let currentRotation = 0; 
-
-        // --- NEW: Perspective Skewing Text Rendering ---
-        // This function dynamically scales text based on its X position from the center
-        // simulating a perspective "skew" that tapers towards the hub.
-        function drawSkewedText(context, text, sliceRadius, sliceAngle, fontSize) {
-            context.font = `bold ${fontSize}px Inter`;
-            
-            const words = text.split(' ');
-            let lines = [];
-            let currentLine = words[0];
-
-            // 1. Word Wrap Calculation
-            // We use a fixed aggressive width constraint to force tight blocks
-            for (let i = 1; i < words.length; i++) {
-                let testLine = currentLine + " " + words[i];
-                if (context.measureText(testLine).width > (sliceRadius * 0.6)) {
-                    lines.push(currentLine);
-                    currentLine = words[i];
-                } else {
-                    currentLine = testLine;
-                }
-            }
-            lines.push(currentLine);
-
-            // 2. Draw each character individually with dynamic scaling
-            const totalLinesHeight = lines.length * (fontSize * 1.2);
-            let startY = -(totalLinesHeight / 2) + (fontSize / 2);
-
-            for (let l = 0; l < lines.length; l++) {
-                let line = lines[l];
-                let lineWidth = context.measureText(line).width;
-                
-                // Position the block of text on the right side of the slice
-                // leaving padding for the outer rim (80px) and center hub (150px)
-                let startX = sliceRadius - 80 - lineWidth; 
-                if (startX < 150) startX = 150; // hard constraint so it doesn't hit the hub
-                
-                let cursorX = startX;
-                let currentY = startY + (l * (fontSize * 1.2));
-
-                for (let i = 0; i < line.length; i++) {
-                    let char = line[i];
-                    let charWidth = context.measureText(char).width;
-                    
-                    // The core skew logic: 
-                    // Calculate a scale factor based on how far the character is from the center (cursorX).
-                    // Characters closer to the center (smaller X) get scaled down.
-                    // Characters closer to the edge (larger X) remain closer to scale 1.0.
-                    let scaleFactor = (cursorX / sliceRadius) * 1.5; 
-                    
-                    // Clamp the scale so it doesn't get completely illegible near the hub
-                    if (scaleFactor < 0.4) scaleFactor = 0.4;
-                    if (scaleFactor > 1.1) scaleFactor = 1.1;
-
-                    context.save();
-                    context.translate(cursorX + (charWidth / 2), currentY);
-                    
-                    // Apply the scale transformation vertically and horizontally
-                    context.scale(scaleFactor, scaleFactor);
-                    
-                    // Draw the character
-                    context.fillText(char, 0, 0);
-                    context.restore();
-
-                    // Advance the cursor by the standard unscaled character width 
-                    // to maintain correct spacing between letters
-                    cursorX += charWidth;
-                }
-            }
-        }
-
 
         function drawWheel() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -414,22 +404,41 @@
                 ctx.fillStyle = palette[colorIndex];
                 ctx.fill();
 
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(startAngle + sliceAngle / 2);
-                
-                // Align left so our custom drawing function can control exact placement
-                ctx.textAlign = "center"; 
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = textColors[colorIndex];
-                
-                // Base font size is larger now because the skew function will scale it down naturally
-                let baseFontSize = numSlices > 12 ? 32 : 46; 
-                
-                // Call the new skew rendering function
-                drawSkewedText(ctx, wheelItems[i].english, radius, sliceAngle, baseFontSize);
-                
-                ctx.restore();
+                // Draw the Perspective Rasterized Text
+                if (wheelItems[i].textCanvas) {
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(startAngle + sliceAngle / 2);
+
+                    const img = wheelItems[i].textCanvas;
+                    const innerRadius = 80;  // Gap near the hub
+                    const outerRadius = radius - 20; // Gap near the rim
+                    const drawWidth = outerRadius - innerRadius;
+                    
+                    // Draw image in 3px vertical strips to create the perspective wedge
+                    const stripWidth = 3; 
+                    const sourceStripWidth = (stripWidth / drawWidth) * img.width;
+                    
+                    // Cap the max stretch angle to prevent insane stretching if there are only 2 items left
+                    let safeAngle = Math.min(sliceAngle / 2, Math.PI / 6); 
+
+                    for (let dx = 0; dx < drawWidth; dx += stripWidth) {
+                        let actualX = innerRadius + dx;
+                        
+                        // Calculate maximum height allowed inside the slice wedge at this X coordinate
+                        let maxHalfHeight = actualX * Math.tan(safeAngle);
+                        let wedgeHeight = maxHalfHeight * 2 * 0.85; // 85% padding so it doesn't touch the lines
+                        
+                        let sourceX = (dx / drawWidth) * img.width;
+                        
+                        ctx.drawImage(
+                            img, 
+                            sourceX, 0, sourceStripWidth, img.height, 
+                            actualX, -wedgeHeight / 2, stripWidth + 0.5, wedgeHeight 
+                        );
+                    }
+                    ctx.restore();
+                }
             }
         }
 
@@ -559,6 +568,7 @@
             if (currentWinnerIndex !== -1) {
                 wheelItems.splice(currentWinnerIndex, 1);
                 saveData();
+                updateTextCanvases(); // Re-render colors/sizes if items change
                 drawWheel();
             }
             document.getElementById('modal-overlay').classList.remove('active');
