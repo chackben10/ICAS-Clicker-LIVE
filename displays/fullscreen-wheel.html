@@ -291,7 +291,7 @@
                 wheelItems = JSON.parse(saved);
                 drawWheel();
             } else {
-                fetch('wheel-data.json')
+                fetch('wheel_data.json')
                     .then(response => {
                         if (!response.ok) throw new Error('Network response was not ok');
                         return response.json();
@@ -303,7 +303,7 @@
                         drawWheel();
                     })
                     .catch(error => {
-                        console.error("Error loading wheel-data.json:", error);
+                        console.error("Error loading wheel_data.json:", error);
                         wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
                         drawWheel();
                     });
