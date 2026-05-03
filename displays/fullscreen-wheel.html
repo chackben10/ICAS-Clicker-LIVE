@@ -284,6 +284,13 @@
 
         let wheelItems = [];
         
+        // Hardcode constraints for our math engine
+        const WHEEL_RADIUS = 500;
+        const OUTER_RADIUS = WHEEL_RADIUS - 15;
+        // User requested 75% down the slice max
+        const DRAW_WIDTH = OUTER_RADIUS * 0.75; 
+        const INNER_RADIUS = OUTER_RADIUS - DRAW_WIDTH;
+
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
             if (saved) {
@@ -316,34 +323,51 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
+        // Calculates the mathematically perfect aspect ratio for the source canvas
+        // to guarantee ZERO horizontal stretching when mapped to the wedge.
         function updateTextCanvases() {
             const numSlices = wheelItems.length;
+            if (numSlices === 0) return;
+            
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            const safeAngle = (sliceAngle / 2) * 0.85; // 85% of half-angle for padding
+            
+            // The magic formula connecting logarithmic depth to wedge height
+            const idealRatio = Math.log(OUTER_RADIUS / INNER_RADIUS) / (2 * Math.tan(safeAngle));
+
             for (let i = 0; i < numSlices; i++) {
                 let colorIndex = i % palette.length;
                 if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
                     colorIndex = 1; 
                 }
                 let textColor = textColors[colorIndex];
-                wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, numSlices);
+                wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, idealRatio);
             }
         }
 
-        function createTextCanvas(text, color, numSlices) {
+        function createTextCanvas(text, color, idealRatio) {
             const c = document.createElement('canvas');
-            c.width = 2400; 
-            c.height = 800;
+            const targetHeight = 800;
+            // Force the source canvas to match the exact aspect ratio of the logarithmic wedge
+            const targetWidth = targetHeight * idealRatio;
+            
+            c.width = targetWidth; 
+            c.height = targetHeight;
             const ctx = c.getContext('2d');
             
             ctx.fillStyle = color;
             ctx.textAlign = 'right'; 
             ctx.textBaseline = 'middle';
             
-            let fontSize = 160; 
+            let fontSize = 200; 
             let lines = [];
-            let actualWidth = 0;
-            const maxWidth = 2200; 
             
-            while (fontSize > 20) {
+            // Give a 5% margin so text never touches the exact boundary of the slice
+            const maxWidth = targetWidth * 0.95; 
+            const maxHeight = targetHeight * 0.95; 
+            
+            // Loop to dynamically find the largest font size that fits the box
+            while (fontSize > 10) {
                 ctx.font = `bold ${fontSize}px Inter`;
                 const words = text.split(' ');
                 let line = '';
@@ -360,7 +384,7 @@
                 }
                 lines.push(line.trim());
                 
-                actualWidth = 0;
+                let actualWidth = 0;
                 for (let i = 0; i < lines.length; i++) {
                     let w = ctx.measureText(lines[i]).width;
                     if (w > actualWidth) actualWidth = w;
@@ -368,21 +392,24 @@
                 
                 let totalHeight = lines.length * (fontSize * 1.15);
                 
-                if (actualWidth <= maxWidth && totalHeight <= 750) {
+                // If it fits inside the aspect-ratio-locked box, we lock the font size
+                if (actualWidth <= maxWidth && totalHeight <= maxHeight) {
                     break;
                 }
-                fontSize -= 5;
+                fontSize -= 4;
             }
             
             const lineHeight = fontSize * 1.15;
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
             
+            const rightPadding = targetWidth * 0.02; // Small gap from the outer rim
+            
             for (let i = 0; i < lines.length; i++) {
-                ctx.fillText(lines[i], 2350, startY + (i * lineHeight));
+                ctx.fillText(lines[i], targetWidth - rightPadding, startY + (i * lineHeight));
             }
             
-            return { canvas: c, textWidth: actualWidth };
+            return { canvas: c, width: targetWidth, height: targetHeight };
         }
 
 
@@ -390,7 +417,6 @@
         const ctx = canvas.getContext('2d');
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const radius = canvas.width / 2;
         
         let currentRotation = 0; 
 
@@ -400,6 +426,7 @@
             if (numSlices === 0) return;
             
             const sliceAngle = (2 * Math.PI) / numSlices;
+            const safeAngle = (sliceAngle / 2) * 0.85;
 
             for (let i = 0; i < numSlices; i++) {
                 const startAngle = currentRotation + (i * sliceAngle);
@@ -412,7 +439,7 @@
 
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.arc(centerX, centerY, WHEEL_RADIUS, startAngle, endAngle);
                 ctx.fillStyle = palette[colorIndex];
                 ctx.fill();
 
@@ -423,41 +450,26 @@
 
                     const textData = wheelItems[i].textData;
                     const img = textData.canvas;
-                    const actualTextWidth = textData.textWidth;
+                    const W_s = textData.width;
                     
-                    const outerRadius = radius - 15; 
-                    const drawWidth = radius * 0.85; 
-                    const innerRadius = outerRadius - drawWidth; 
-                    
-                    const padding = 100; 
-                    const sourceWidth = actualTextWidth + padding;
-                    const sourceStartX = 2350 - actualTextWidth - (padding / 2);
-                    
-                    let safeAngle = Math.min(sliceAngle / 2, Math.PI / 5); 
-
-                    // --- NEW: Logarithmic Mapping for Aspect Ratio Preservation ---
-                    // By using a logarithmic curve instead of linear fractions, we compress
-                    // the horizontal pixels proportionally to how the vertical pixels are compressed.
-                    const logInner = Math.log(innerRadius);
-                    const logOuter = Math.log(outerRadius);
+                    const logInner = Math.log(INNER_RADIUS);
+                    const logOuter = Math.log(OUTER_RADIUS);
                     const logDiff = logOuter - logInner;
                     
-                    // Reduced strip width to 2 for a smoother render curve
-                    const stripWidth = 2;
+                    const stripWidth = 1.5; // Fine resolution for perfectly smooth scaling
 
-                    for (let dx = 0; dx < drawWidth; dx += stripWidth) {
-                        let actualX = innerRadius + dx;
-                        let nextActualX = Math.min(actualX + stripWidth, outerRadius);
+                    // Mathematical projection of the locked-aspect-ratio source canvas
+                    for (let dx = 0; dx < DRAW_WIDTH; dx += stripWidth) {
+                        let actualX = INNER_RADIUS + dx;
+                        let nextActualX = Math.min(actualX + stripWidth, OUTER_RADIUS);
                         
-                        let maxHalfHeight = actualX * Math.tan(safeAngle);
-                        let wedgeHeight = maxHalfHeight * 2 * 0.80; 
+                        let wedgeHeight = 2 * actualX * Math.tan(safeAngle); 
                         
-                        // Calculate non-linear source mapping
                         let t1 = (Math.log(actualX) - logInner) / logDiff;
                         let t2 = (Math.log(nextActualX) - logInner) / logDiff;
                         
-                        let sourceX = sourceStartX + (t1 * sourceWidth);
-                        let sWidth = (t2 - t1) * sourceWidth;
+                        let sourceX = t1 * W_s;
+                        let sWidth = (t2 - t1) * W_s;
                         
                         if (sourceX < 0) sourceX = 0;
                         if (sWidth <= 0) sWidth = 0.1;
