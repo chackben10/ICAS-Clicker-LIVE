@@ -8,6 +8,11 @@ proRemote = proRemote or {}
 -- CONFIG
 ------------------------------------------------------------
 
+-- Automation features
+proRemote.autoShowSlidesEnabled = false
+proRemote._last_slide_index = nil
+proRemote._last_presentation_uuid = nil
+
 -- Bible look enforcement
 proRemote.check_for_bible = true
 proRemote.BIBLE_CHECK_INTERVAL_SEC = 0.75
@@ -29,7 +34,7 @@ proRemote.BIBLE_LOOK_NAME           = "Bible"
 proRemote.BIBLE_MACRO_TRIGGER_URL   = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/macro/69293C79-69BB-4061-86E1-76F627CB3085/trigger"
 
 -- Audio Config
-proRemote.AUDIO_PLAYLISTS = { "Major", "Minor", "Neutral" }
+proRemote.AUDIO_PLAYLISTS = { "Major Pads", "Minor Pads", "Neutral Pads" }
 proRemote.PROPRESENTER_AUDIO_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/audio/playlist"
 proRemote.PROPRESENTER_CLEAR_AUDIO = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/audio"
 proRemote._audioCache = {} 
@@ -63,7 +68,7 @@ proRemote.OBS_BRIDGE_SCRIPT  = "/Users/icas/obs-bridge/server.mjs"
 proRemote.OBS_BRIDGE_WORKDIR = "/Users/icas/obs-bridge"
 
 -- OBS transitions
-proRemote.OBS_DEFAULT_TRANSITION_NAME  = "Cut"
+proRemote.OBS_DEFAULT_TRANSITION_NAME  = "Fade"
 proRemote.OBS_SPECIAL_TRANSITION_NAME  = "Old Film Logo"
 proRemote.OBS_FALLBACK_TRANSITION_NAME = "Fade"
 proRemote.OBS_FALLBACK_TRANSITION_MS   = 500
@@ -75,6 +80,8 @@ proRemote.OBS_SPECIAL_TRANSITION_SCENES = {
   ["Stream Pause"]  = true,
   ["Thanks Screen"] = true,
 }
+
+proRemote._current_obs_scene = nil
 
 -- Preset ProPresenter presentations (UUID triggers)
 proRemote.PRESET_STARTING_ANNOUNCEMENTS_UUID = "C62E6449-3FD6-42C1-BDF4-CABCA5F8E491"
@@ -91,6 +98,7 @@ proRemote.SERVICE_LOGOS = {
   { name = "Basic Service Logo",     uuid = "4ED2B2D8-EFE7-4875-BE88-186756A5E57E" },
   { name = "Communion Service Logo", uuid = "82668B6D-5B98-4640-94E3-C69173FA4183" },
   { name = "Youth Meeting Logo",     uuid = "4B871221-EC8A-47A3-86F2-3E2D27311303" },
+  { name = "Anniversary Logo",       uuid = "666C8562-E4DA-4B81-AB5E-5D0AF2595351" },
 }
 
 ------------------------------------------------------------
@@ -105,6 +113,7 @@ proRemote.MACROS = {
   { name = "[Aud] English Songs Macro" },
   { name = "Presentation Macro" },
   { name = "Presentation Streamer Macro" },
+  { name = "Presentation Picture-in-Picture Macro" },
 }
 
 ------------------------------------------------------------
@@ -241,6 +250,123 @@ local function clearAudioLayer()
 end
 
 ------------------------------------------------------------
+-- OBS Bridge start/watch + Set Scene Helpers (Moved up for scope)
+------------------------------------------------------------
+
+proRemote._bridge = proRemote._bridge or { task=nil, running=false }
+
+local function bridgeHealth()
+  if not proRemote.OBS_BRIDGE_ENABLED then return false end
+  local ok, status = pcall(function()
+    return hs.http.get(proRemote.OBS_BRIDGE_BASE .. "/health", { ["accept"]="application/json" })
+  end)
+  return ok and status == 200
+end
+
+local function bridgeKillTask()
+  if proRemote._bridge.task then
+    pcall(function() proRemote._bridge.task:terminate() end)
+    proRemote._bridge.task = nil
+  end
+end
+
+local function bridgeStart()
+  if not proRemote.OBS_BRIDGE_ENABLED then return end
+  if bridgeHealth() then
+    proRemote._bridge.running = true
+    return
+  end
+
+  bridgeKillTask()
+
+  local function streamFn(task, stdOut, stdErr)
+    return true
+  end
+
+  local function exitFn(task, exitCode, stdOut, stdErr)
+    proRemote._bridge.running = false
+    hs.timer.doAfter(1.0, function() bridgeStart() end)
+    return true
+  end
+
+  local t = hs.task.new(proRemote.NODE_PATH, exitFn, streamFn, { proRemote.OBS_BRIDGE_SCRIPT })
+  if not t then return end
+
+  if proRemote.OBS_BRIDGE_WORKDIR and proRemote.OBS_BRIDGE_WORKDIR ~= "" then
+    pcall(function() t:setWorkingDirectory(proRemote.OBS_BRIDGE_WORKDIR) end)
+  end
+
+  proRemote._bridge.task = t
+  t:start()
+
+  hs.timer.doAfter(0.8, function()
+    proRemote._bridge.running = bridgeHealth()
+  end)
+end
+
+local function bridgeWatchdogStart()
+  if proRemote.bridgeWatchdog then proRemote.bridgeWatchdog:stop() end
+  proRemote.bridgeWatchdog = hs.timer.doEvery(4.0, function()
+    if not bridgeHealth() then
+      proRemote._bridge.running = false
+      bridgeStart()
+    else
+      proRemote._bridge.running = true
+    end
+  end)
+end
+
+local function bridgeTrySetScene(sceneName, transitionName, durationMs)
+  if not proRemote.OBS_BRIDGE_ENABLED then return false end
+  if type(sceneName) ~= "string" or sceneName == "" then return false end
+
+  transitionName = tostring(transitionName or "")
+  durationMs = tonumber(durationMs)
+
+  local url = string.format(
+    "%s/scene/set?name=%s&transition=%s&duration=%s",
+    proRemote.OBS_BRIDGE_BASE,
+    hs.http.encodeForQuery(sceneName),
+    hs.http.encodeForQuery(transitionName),
+    hs.http.encodeForQuery(durationMs and tostring(durationMs) or "")
+  )
+
+  local ok, status = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if ok and status == 200 then
+    proRemote._current_obs_scene = sceneName
+    return true
+  end
+  return false
+end
+
+local function obsSetSceneWithTransitionPolicy(sceneName)
+  local isDestSpecial = proRemote.OBS_SPECIAL_TRANSITION_SCENES[sceneName] == true
+  local isSourceSpecial = false
+  
+  if proRemote._current_obs_scene and proRemote.OBS_SPECIAL_TRANSITION_SCENES[proRemote._current_obs_scene] then
+    isSourceSpecial = true
+  end
+
+  local isSpecial = isDestSpecial or isSourceSpecial
+
+  if not isSpecial then
+    bridgeTrySetScene(sceneName, proRemote.OBS_DEFAULT_TRANSITION_NAME, nil)
+    return
+  end
+
+  local okOld = bridgeTrySetScene(sceneName, proRemote.OBS_SPECIAL_TRANSITION_NAME, nil)
+  if okOld then return end
+
+  local okFade = bridgeTrySetScene(sceneName, proRemote.OBS_FALLBACK_TRANSITION_NAME, proRemote.OBS_FALLBACK_TRANSITION_MS)
+  if okFade then return end
+
+  bridgeTrySetScene(sceneName, proRemote.OBS_DEFAULT_TRANSITION_NAME, nil)
+end
+
+------------------------------------------------------------
 -- Timer actions (proxy to ProPresenter)
 ------------------------------------------------------------
 
@@ -282,7 +408,33 @@ local function currentMode()
 end
 
 ------------------------------------------------------------
--- Bible enforcement
+-- ProPresenter one-shot actions for control panel
+------------------------------------------------------------
+
+local function proTriggerPresentationUUID(uuid)
+  if type(uuid) ~= "string" or uuid == "" then return false end
+  local url = string.format("http://localhost:%s/v1/presentation/%s/trigger", proRemote.PRO_PORT, uuid)
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function proTriggerPresentationUUIDAfter(uuid, delaySec)
+  delaySec = tonumber(delaySec) or 0
+  if delaySec <= 0 then
+    return proTriggerPresentationUUID(uuid)
+  end
+  hs.timer.doAfter(delaySec, function()
+    proTriggerPresentationUUID(uuid)
+  end)
+  return true
+end
+
+local function proClearAnnouncementsLayer()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS, {}, function() end)
+end
+
+------------------------------------------------------------
+-- Slide tracking & Bible enforcement
 ------------------------------------------------------------
 
 local function activePresentationHasSingleGroupWithColon()
@@ -333,10 +485,40 @@ local function enforceBibleLookIfNeeded()
   end
 end
 
+local function pollSlideChanges()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_SLIDE_INDEX, { ["accept"]="application/json" })
+  end)
+  if not ok or status ~= 200 or not body or body == "" then return end
+
+  local data = decodeJson(body)
+  if not data or not data.presentation_index then return end
+
+  local newIdx = data.presentation_index.index
+  local newUuid = data.presentation_index.presentation_id and data.presentation_index.presentation_id.uuid
+
+  if proRemote._last_slide_index == nil and proRemote._last_presentation_uuid == nil then
+    proRemote._last_slide_index = newIdx
+    proRemote._last_presentation_uuid = newUuid
+    return
+  end
+
+  if newIdx ~= proRemote._last_slide_index or newUuid ~= proRemote._last_presentation_uuid then
+    proRemote._last_slide_index = newIdx
+    proRemote._last_presentation_uuid = newUuid
+
+    if proRemote.autoShowSlidesEnabled then
+      proClearAnnouncementsLayer()
+      obsSetSceneWithTransitionPolicy("ProPresenter Input")
+    end
+  end
+end
+
 local function startBibleTimer()
   if proRemote.bibleTimer then proRemote.bibleTimer:stop() end
   proRemote.bibleTimer = hs.timer.doEvery(proRemote.BIBLE_CHECK_INTERVAL_SEC, function()
     pcall(enforceBibleLookIfNeeded)
+    pcall(pollSlideChanges)
   end)
 end
 
@@ -781,32 +963,6 @@ local function fetchThumbnail(uuid, index)
 end
 
 ------------------------------------------------------------
--- ProPresenter one-shot actions for control panel
-------------------------------------------------------------
-
-local function proTriggerPresentationUUID(uuid)
-  if type(uuid) ~= "string" or uuid == "" then return false end
-  local url = string.format("http://localhost:%s/v1/presentation/%s/trigger", proRemote.PRO_PORT, uuid)
-  hs.http.asyncGet(url, {}, function() end)
-  return true
-end
-
-local function proTriggerPresentationUUIDAfter(uuid, delaySec)
-  delaySec = tonumber(delaySec) or 0
-  if delaySec <= 0 then
-    return proTriggerPresentationUUID(uuid)
-  end
-  hs.timer.doAfter(delaySec, function()
-    proTriggerPresentationUUID(uuid)
-  end)
-  return true
-end
-
-local function proClearAnnouncementsLayer()
-  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS, {}, function() end)
-end
-
-------------------------------------------------------------
 -- ProPresenter macros (name-based trigger)
 ------------------------------------------------------------
 
@@ -847,112 +1003,6 @@ local function macroNameAllowed(name)
     end
   end
   return false
-end
-
-------------------------------------------------------------
--- OBS Bridge start/watch
-------------------------------------------------------------
-
-proRemote._bridge = proRemote._bridge or { task=nil, running=false }
-
-local function bridgeHealth()
-  if not proRemote.OBS_BRIDGE_ENABLED then return false end
-  local ok, status = pcall(function()
-    return hs.http.get(proRemote.OBS_BRIDGE_BASE .. "/health", { ["accept"]="application/json" })
-  end)
-  return ok and status == 200
-end
-
-local function bridgeKillTask()
-  if proRemote._bridge.task then
-    pcall(function() proRemote._bridge.task:terminate() end)
-    proRemote._bridge.task = nil
-  end
-end
-
-local function bridgeStart()
-  if not proRemote.OBS_BRIDGE_ENABLED then return end
-  if bridgeHealth() then
-    proRemote._bridge.running = true
-    return
-  end
-
-  bridgeKillTask()
-
-  local function streamFn(task, stdOut, stdErr)
-    return true
-  end
-
-  local function exitFn(task, exitCode, stdOut, stdErr)
-    proRemote._bridge.running = false
-    hs.timer.doAfter(1.0, function() bridgeStart() end)
-    return true
-  end
-
-  local t = hs.task.new(proRemote.NODE_PATH, exitFn, streamFn, { proRemote.OBS_BRIDGE_SCRIPT })
-  if not t then return end
-
-  if proRemote.OBS_BRIDGE_WORKDIR and proRemote.OBS_BRIDGE_WORKDIR ~= "" then
-    pcall(function() t:setWorkingDirectory(proRemote.OBS_BRIDGE_WORKDIR) end)
-  end
-
-  proRemote._bridge.task = t
-  t:start()
-
-  hs.timer.doAfter(0.8, function()
-    proRemote._bridge.running = bridgeHealth()
-  end)
-end
-
-local function bridgeWatchdogStart()
-  if proRemote.bridgeWatchdog then proRemote.bridgeWatchdog:stop() end
-  proRemote.bridgeWatchdog = hs.timer.doEvery(4.0, function()
-    if not bridgeHealth() then
-      proRemote._bridge.running = false
-      bridgeStart()
-    else
-      proRemote._bridge.running = true
-    end
-  end)
-end
-
-local function bridgeTrySetScene(sceneName, transitionName, durationMs)
-  if not proRemote.OBS_BRIDGE_ENABLED then return false end
-  if type(sceneName) ~= "string" or sceneName == "" then return false end
-
-  transitionName = tostring(transitionName or "")
-  durationMs = tonumber(durationMs)
-
-  local url = string.format(
-    "%s/scene/set?name=%s&transition=%s&duration=%s",
-    proRemote.OBS_BRIDGE_BASE,
-    hs.http.encodeForQuery(sceneName),
-    hs.http.encodeForQuery(transitionName),
-    hs.http.encodeForQuery(durationMs and tostring(durationMs) or "")
-  )
-
-  local ok, status = pcall(function()
-    return hs.http.get(url, { ["accept"]="application/json" })
-  end)
-
-  return ok and status == 200
-end
-
-local function obsSetSceneWithTransitionPolicy(sceneName)
-  local isSpecial = proRemote.OBS_SPECIAL_TRANSITION_SCENES[sceneName] == true
-
-  if not isSpecial then
-    bridgeTrySetScene(sceneName, proRemote.OBS_DEFAULT_TRANSITION_NAME, nil)
-    return
-  end
-
-  local okOld = bridgeTrySetScene(sceneName, proRemote.OBS_SPECIAL_TRANSITION_NAME, nil)
-  if okOld then return end
-
-  local okFade = bridgeTrySetScene(sceneName, proRemote.OBS_FALLBACK_TRANSITION_NAME, proRemote.OBS_FALLBACK_TRANSITION_MS)
-  if okFade then return end
-
-  bridgeTrySetScene(sceneName, proRemote.OBS_DEFAULT_TRANSITION_NAME, nil)
 end
 
 ------------------------------------------------------------
@@ -1012,6 +1062,24 @@ local function handleHttpPath(method, rawPath, body)
     if not idx then return "Bad index", 400, "text/plain" end
     triggerFocusedSlide(idx)
     return "OK\n", 200, "text/plain"
+
+  ----------------------------------------------------------
+  -- Automation toggles
+  ----------------------------------------------------------
+  elseif p == "/auto-show" then
+    if method == "GET" then
+      return jsonResponse({ enabled = proRemote.autoShowSlidesEnabled }), 200, "application/json"
+    elseif method == "POST" then
+      local obj = decodeJson(body or "")
+      if type(obj) == "table" and type(obj.enabled) == "boolean" then
+        proRemote.autoShowSlidesEnabled = obj.enabled
+        return jsonResponse({ enabled = proRemote.autoShowSlidesEnabled }), 200, "application/json"
+      else
+        return jsonResponse({ ok=false, error="bad_json" }), 400, "application/json"
+      end
+    else
+      return "Method Not Allowed", 405, "text/plain"
+    end
 
   ----------------------------------------------------------
   -- Audio endpoints
