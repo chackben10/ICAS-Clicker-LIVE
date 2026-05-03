@@ -330,7 +330,6 @@
 
         function createTextCanvas(text, color, numSlices) {
             const c = document.createElement('canvas');
-            // Create a massive canvas to ensure crispness and allow for long wrapped text
             c.width = 2400; 
             c.height = 800;
             const ctx = c.getContext('2d');
@@ -342,9 +341,8 @@
             let fontSize = 160; 
             let lines = [];
             let actualWidth = 0;
-            const maxWidth = 2200; // Force wrapping before it hits the edges
+            const maxWidth = 2200; 
             
-            // Loop to dynamically find the largest font size that fits our boundaries
             while (fontSize > 20) {
                 ctx.font = `bold ${fontSize}px Inter`;
                 const words = text.split(' ');
@@ -362,7 +360,6 @@
                 }
                 lines.push(line.trim());
                 
-                // Measure the actual width of the longest line in this configuration
                 actualWidth = 0;
                 for (let i = 0; i < lines.length; i++) {
                     let w = ctx.measureText(lines[i]).width;
@@ -371,7 +368,6 @@
                 
                 let totalHeight = lines.length * (fontSize * 1.15);
                 
-                // If the block fits perfectly inside our width and height constraints, we use it.
                 if (actualWidth <= maxWidth && totalHeight <= 750) {
                     break;
                 }
@@ -382,12 +378,10 @@
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
             
-            // Draw the lines right-aligned near the edge of the 2400px canvas
             for (let i = 0; i < lines.length; i++) {
                 ctx.fillText(lines[i], 2350, startY + (i * lineHeight));
             }
             
-            // Return both the canvas AND the exact width the text took up
             return { canvas: c, textWidth: actualWidth };
         }
 
@@ -431,34 +425,47 @@
                     const img = textData.canvas;
                     const actualTextWidth = textData.textWidth;
                     
-                    // We map the text to exactly 85% of the radius so it's massive
-                    const outerRadius = radius - 15; // Stop just before the rim
+                    const outerRadius = radius - 15; 
                     const drawWidth = radius * 0.85; 
                     const innerRadius = outerRadius - drawWidth; 
                     
-                    // Crop the source image to EXACTLY the text bounding box + padding
-                    const padding = 100; // 50px on each side
+                    const padding = 100; 
                     const sourceWidth = actualTextWidth + padding;
                     const sourceStartX = 2350 - actualTextWidth - (padding / 2);
                     
-                    const stripWidth = 3;
-                    const sourceStripWidth = (stripWidth / drawWidth) * sourceWidth;
-                    
                     let safeAngle = Math.min(sliceAngle / 2, Math.PI / 5); 
+
+                    // --- NEW: Logarithmic Mapping for Aspect Ratio Preservation ---
+                    // By using a logarithmic curve instead of linear fractions, we compress
+                    // the horizontal pixels proportionally to how the vertical pixels are compressed.
+                    const logInner = Math.log(innerRadius);
+                    const logOuter = Math.log(outerRadius);
+                    const logDiff = logOuter - logInner;
+                    
+                    // Reduced strip width to 2 for a smoother render curve
+                    const stripWidth = 2;
 
                     for (let dx = 0; dx < drawWidth; dx += stripWidth) {
                         let actualX = innerRadius + dx;
+                        let nextActualX = Math.min(actualX + stripWidth, outerRadius);
                         
                         let maxHalfHeight = actualX * Math.tan(safeAngle);
-                        let wedgeHeight = maxHalfHeight * 2 * 0.80; // 80% vertical safe zone
+                        let wedgeHeight = maxHalfHeight * 2 * 0.80; 
                         
-                        let sourceX = sourceStartX + ((dx / drawWidth) * sourceWidth);
+                        // Calculate non-linear source mapping
+                        let t1 = (Math.log(actualX) - logInner) / logDiff;
+                        let t2 = (Math.log(nextActualX) - logInner) / logDiff;
+                        
+                        let sourceX = sourceStartX + (t1 * sourceWidth);
+                        let sWidth = (t2 - t1) * sourceWidth;
+                        
                         if (sourceX < 0) sourceX = 0;
+                        if (sWidth <= 0) sWidth = 0.1;
                         
                         ctx.drawImage(
                             img, 
-                            sourceX, 0, sourceStripWidth, img.height, 
-                            actualX, -wedgeHeight / 2, stripWidth + 0.5, wedgeHeight 
+                            sourceX, 0, sWidth, img.height, 
+                            actualX, -wedgeHeight / 2, (nextActualX - actualX) + 0.5, wedgeHeight 
                         );
                     }
                     ctx.restore();
