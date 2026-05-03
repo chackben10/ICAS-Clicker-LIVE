@@ -84,10 +84,6 @@
             box-shadow: inset 0 0.3vmin 0.5vmin rgba(0,0,0,0.5);
         }
 
-        /* * The flapper no longer uses CSS transitions for rotation.
-         * It will be driven frame-by-frame by the physics loop to model 
-         * accurate bending stiffness.
-         */
         .flapper {
             position: absolute;
             top: -3vmin;
@@ -325,31 +321,76 @@
         
         let currentRotation = 0; 
 
-        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+        // --- NEW: Perspective Skewing Text Rendering ---
+        // This function dynamically scales text based on its X position from the center
+        // simulating a perspective "skew" that tapers towards the hub.
+        function drawSkewedText(context, text, sliceRadius, sliceAngle, fontSize) {
+            context.font = `bold ${fontSize}px Inter`;
+            
             const words = text.split(' ');
-            let line = '';
-            const lines = [];
+            let lines = [];
+            let currentLine = words[0];
 
-            for (let i = 0; i < words.length; i++) {
-                const testLine = line + words[i] + ' ';
-                const metrics = context.measureText(testLine);
-                const testWidth = metrics.width;
-                if (testWidth > maxWidth && i > 0) {
-                    lines.push(line);
-                    line = words[i] + ' ';
+            // 1. Word Wrap Calculation
+            // We use a fixed aggressive width constraint to force tight blocks
+            for (let i = 1; i < words.length; i++) {
+                let testLine = currentLine + " " + words[i];
+                if (context.measureText(testLine).width > (sliceRadius * 0.6)) {
+                    lines.push(currentLine);
+                    currentLine = words[i];
                 } else {
-                    line = testLine;
+                    currentLine = testLine;
                 }
             }
-            lines.push(line);
+            lines.push(currentLine);
 
-            const totalHeight = lines.length * lineHeight;
-            const startY = y - (totalHeight / 2) + (lineHeight / 2);
+            // 2. Draw each character individually with dynamic scaling
+            const totalLinesHeight = lines.length * (fontSize * 1.2);
+            let startY = -(totalLinesHeight / 2) + (fontSize / 2);
 
-            for (let i = 0; i < lines.length; i++) {
-                context.fillText(lines[i].trim(), x, startY + (i * lineHeight));
+            for (let l = 0; l < lines.length; l++) {
+                let line = lines[l];
+                let lineWidth = context.measureText(line).width;
+                
+                // Position the block of text on the right side of the slice
+                // leaving padding for the outer rim (80px) and center hub (150px)
+                let startX = sliceRadius - 80 - lineWidth; 
+                if (startX < 150) startX = 150; // hard constraint so it doesn't hit the hub
+                
+                let cursorX = startX;
+                let currentY = startY + (l * (fontSize * 1.2));
+
+                for (let i = 0; i < line.length; i++) {
+                    let char = line[i];
+                    let charWidth = context.measureText(char).width;
+                    
+                    // The core skew logic: 
+                    // Calculate a scale factor based on how far the character is from the center (cursorX).
+                    // Characters closer to the center (smaller X) get scaled down.
+                    // Characters closer to the edge (larger X) remain closer to scale 1.0.
+                    let scaleFactor = (cursorX / sliceRadius) * 1.5; 
+                    
+                    // Clamp the scale so it doesn't get completely illegible near the hub
+                    if (scaleFactor < 0.4) scaleFactor = 0.4;
+                    if (scaleFactor > 1.1) scaleFactor = 1.1;
+
+                    context.save();
+                    context.translate(cursorX + (charWidth / 2), currentY);
+                    
+                    // Apply the scale transformation vertically and horizontally
+                    context.scale(scaleFactor, scaleFactor);
+                    
+                    // Draw the character
+                    context.fillText(char, 0, 0);
+                    context.restore();
+
+                    // Advance the cursor by the standard unscaled character width 
+                    // to maintain correct spacing between letters
+                    cursorX += charWidth;
+                }
             }
         }
+
 
         function drawWheel() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -376,20 +417,22 @@
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(startAngle + sliceAngle / 2);
-                ctx.textAlign = "right";
+                
+                // Align left so our custom drawing function can control exact placement
+                ctx.textAlign = "center"; 
                 ctx.textBaseline = "middle";
                 ctx.fillStyle = textColors[colorIndex];
                 
-                let fontSize = numSlices > 8 ? 22 : 28;
-                ctx.font = `bold ${fontSize}px Inter`;
+                // Base font size is larger now because the skew function will scale it down naturally
+                let baseFontSize = numSlices > 12 ? 32 : 46; 
                 
-                wrapText(ctx, wheelItems[i].english, radius - 40, 0, radius - 120, fontSize * 1.3);
+                // Call the new skew rendering function
+                drawSkewedText(ctx, wheelItems[i].english, radius, sliceAngle, baseFontSize);
                 
                 ctx.restore();
             }
         }
 
-        // --- Kinematic Audio Context ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playTick(speedRatio) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -397,7 +440,6 @@
             const gainNode = audioCtx.createGain();
             
             oscillator.type = 'triangle';
-            // Slower hits produce a slightly lower pitched, quieter sound
             oscillator.frequency.setValueAtTime(400 + (200 * speedRatio), audioCtx.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
             
@@ -411,7 +453,6 @@
             oscillator.stop(audioCtx.currentTime + 0.03);
         }
 
-        // --- Physics Engine Variables ---
         let isSpinning = false;
         let velocity = 0;
         let lastTickSlice = -1;
@@ -434,10 +475,8 @@
         }
 
         function animate() {
-            // 1. Aerodynamic / Bearing Friction (Baseline deceleration)
             velocity *= 0.993; 
 
-            // 2. Map rotation to exact slice constraints
             let topAngle = (3 * Math.PI / 2) - currentRotation;
             while (topAngle < 0) topAngle += 2 * Math.PI;
             while (topAngle >= 2 * Math.PI) topAngle -= 2 * Math.PI;
@@ -446,55 +485,39 @@
             const sliceAngle = (2 * Math.PI) / numSlices;
             const currentSliceIndex = Math.floor(topAngle / sliceAngle);
 
-            // 3. Collision Detection & Force Analysis
-            // Calculate how close the approaching peg (slice boundary) is to the flapper
             let distanceToPeg = topAngle - (currentSliceIndex * sliceAngle);
-            const engagementZone = 0.08; // Radians where the peg physically bends the flapper
+            const engagementZone = 0.08; 
 
             if (distanceToPeg < engagementZone) {
-                // The peg is pushing the flapper. Calculate deflection (0.0 to 1.0)
                 let deflection = 1 - (distanceToPeg / engagementZone);
-                flapperAngle = -40 * deflection; // Bend up to -40 degrees
-
-                // The flapper acts as a leaf spring. Bending it requires energy.
-                // Apply a counter-torque to the wheel based on the bending stiffness.
+                flapperAngle = -40 * deflection; 
                 let springForce = 0.0007 * deflection;
                 velocity -= springForce;
             } else {
-                // The flapper is clear of the peg. Dampen it back to center.
                 flapperAngle *= 0.5; 
             }
 
-            // 4. Tick and Snap-back Logic
             if (currentSliceIndex !== lastTickSlice) {
                 if (lastTickSlice !== -1 && distanceToPeg > engagementZone) {
-                    // The peg just cleared the flapper! 
-                    // Calculate a speed ratio (0 to 1) for realistic audio dynamics
                     let speedRatio = Math.min(1, velocity / 0.1);
                     playTick(speedRatio);
-                    
-                    // Spring bounce forward as it releases potential energy
                     flapperAngle = 20; 
                 }
                 lastTickSlice = currentSliceIndex;
             }
 
-            // 5. Apply Kinematics
             currentRotation += velocity;
             if (currentRotation >= 2 * Math.PI) currentRotation %= 2 * Math.PI;
 
-            // Apply direct transform for zero-latency rendering
             flapper.style.transform = `translateX(-50%) rotate(${flapperAngle}deg)`;
 
-            // 6. Rest State & The "Trap"
-            // If the spring force drained all kinetic energy, the wheel is physically trapped by the peg.
             if (velocity <= 0) {
                 velocity = 0;
                 isSpinning = false;
                 spinBtn.disabled = false;
                 cancelAnimationFrame(animationFrame);
                 resolveWinner();
-                return; // Halt the physics loop
+                return; 
             }
 
             drawWheel();
