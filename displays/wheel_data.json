@@ -1,42 +1,97 @@
 [
   {
     "id": "item_1",
-    "english": "Sing your favorite song",
-    "malayalam": "നിങ്ങളുടെ പ്രിയപ്പെട്ട പാട്ട് പാടൂ"
+    "english": "Answer this trivia question: Name 5 of the 12 disciples",
+    "malayalam": "ചോദ്യത്തിന് ഉത്തരം നൽകുക: 12 ശിഷ്യന്മാരിൽ 5 പേരുടെ പേരുകൾ പറയുക"
   },
   {
     "id": "item_2",
-    "english": "Tell us your favorite story about ICAS",
-    "malayalam": "ICAS നെ കുറിച്ചുള്ള നിങ്ങളുടെ പ്രിയപ്പെട്ട കഥ ഞങ്ങളോട് പറയൂ"
+    "english": "Give someone at church recognition for the unrecognized work they do",
+    "malayalam": "പള്ളിയിൽ ശ്രദ്ധിക്കപ്പെടാതെ സേവനം ചെയ്യുന്ന ഒരാളെ അഭിനന്ദിക്കുക"
   },
   {
     "id": "item_3",
-    "english": "Sing a Chorus",
-    "malayalam": "ഒരു ഗാനം പാടുക"
+    "english": "Sing your favorite Christian Song",
+    "malayalam": "നിങ്ങളുടെ പ്രിയപ്പെട്ട ക്രിസ്തീയ ഗാനം പാടുക"
   },
   {
     "id": "item_4",
-    "english": "Gift Card",
-    "malayalam": "ഗിഫ്റ്റ് കാർഡ്"
+    "english": "Share your favorite memory of ICAS",
+    "malayalam": "ഐസിഎഎസ് (ICAS)-ലെ നിങ്ങളുടെ പ്രിയപ്പെട്ട ഓർമ്മ പങ്കിടുക"
   },
   {
     "id": "item_5",
-    "english": "Answer Trivia",
-    "malayalam": "ചോദ്യത്തിന് ഉത്തരം നൽകുക"
+    "english": "Describe a biblical figure without using their name and let the audience guess who it is",
+    "malayalam": "പേര് പറയാതെ ഒരു ബൈബിൾ കഥാപാത്രത്തെ വിവരിക്കുക, സദസ്സ് അത് ആരാണെന്ന് ഊഹിക്കട്ടെ"
   },
   {
     "id": "item_6",
-    "english": "Front Row",
-    "malayalam": "മുൻ നിര"
+    "english": "$25 Visa Gift Card",
+    "malayalam": "25 ഡോളർ വിസ ഗിഫ്റ്റ് കാർഡ്"
   },
   {
     "id": "item_7",
-    "english": "Book Prize",
-    "malayalam": "പുസ്തക സമ്മാനം"
+    "english": "What has been your favorite message you heard recently",
+    "malayalam": "ഈയടുത്ത് നിങ്ങൾ കേട്ടതിൽ വെച്ച് ഏറ്റവും പ്രിയപ്പെട്ട സന്ദേശം ഏതാണ്?"
   },
   {
     "id": "item_8",
-    "english": "Special Prayer",
-    "malayalam": "പ്രത്യേക പ്രാർത്ഥന"
+    "english": "Name one thing our church can do better",
+    "malayalam": "നമ്മുടെ പള്ളിക്ക് കൂടുതൽ നന്നായി ചെയ്യാൻ കഴിയുന്ന ഒരു കാര്യം പറയുക"
+  },
+  {
+    "id": "item_9",
+    "english": "Act out David uses stones to defeat Goliath without using words",
+    "malayalam": "ദാവീദ് ഗോലിയാത്തിനെ കല്ലുകൾ ഉപയോഗിച്ച് തോൽപ്പിക്കുന്നത് വാക്കുകൾ ഉപയോഗിക്കാതെ അഭിനയിച്ചു കാണിക്കുക"
+  },
+  {
+    "id": "item_10",
+    "english": "What is one ministry you would want our church to do",
+    "malayalam": "നമ്മുടെ പള്ളി ചെയ്യണമെന്ന് നിങ്ങൾ ആഗ്രഹിക്കുന്ന ഒരു ശുശ്രൂഷ ഏതാണ്?"
+  },
+  {
+    "id": "item_11",
+    "english": "High five 10 people at church right now",
+    "malayalam": "ഇപ്പോൾ പള്ളിയിലുള്ള 10 പേർക്ക് ഹൈ-ഫൈവ് നൽകുക"
+  },
+  {
+    "id": "item_12",
+    "english": "Share which book of the Bible you are currently reading",
+    "malayalam": "നിങ്ങൾ ഇപ്പോൾ വായിക്കുന്ന ബൈബിൾ പുസ്തകം ഏതാണെന്ന് പറയുക"
+  },
+  {
+    "id": "item_13",
+    "english": "Answer this trivia question: What year did ICAS begin?",
+    "malayalam": "ചോദ്യത്തിന് ഉത്തരം നൽകുക: ഐസിഎഎസ് (ICAS) ആരംഭിച്ച വർഷം ഏത്?"
+  },
+  {
+    "id": "item_14",
+    "english": "Give a compliment to someone at church",
+    "malayalam": "പള്ളിയിലെ ഒരാളെ അഭിനന്ദിക്കുക"
+  },
+  {
+    "id": "item_15",
+    "english": "What is something you want to be better at this year?",
+    "malayalam": "ഈ വർഷം നിങ്ങൾ കൂടുതൽ മെച്ചപ്പെടുത്താൻ ആഗ്രഹിക്കുന്ന ഒരു കാര്യം എന്താണ്?"
+  },
+  {
+    "id": "item_16",
+    "english": "Answer this trivia question: Name the two dreams the Pharaoh asked Joseph to interpret?",
+    "malayalam": "ചോദ്യത്തിന് ഉത്തരം നൽകുക: വ്യാഖ്യാനിക്കാൻ ഫറവോൻ ജോസഫിനോട് ആവശ്യപ്പെട്ട രണ്ട് സ്വപ്നങ്ങൾ ഏതൊക്കെ?"
+  },
+  {
+    "id": "item_17",
+    "english": "Pray for the church for the next year",
+    "malayalam": "അടുത്ത വർഷത്തേക്ക് പള്ളിക്ക് വേണ്ടി പ്രാർത്ഥിക്കുക"
+  },
+  {
+    "id": "item_18",
+    "english": "What is your favorite Bible verse",
+    "malayalam": "നിങ്ങളുടെ പ്രിയപ്പെട്ട ബൈബിൾ വാക്യം ഏതാണ്?"
+  },
+  {
+    "id": "item_19",
+    "english": "Share your favorite memory of ICAS recently",
+    "malayalam": "ഈയടുത്ത് നടന്ന ഐസിഎഎസ് (ICAS)-ലെ നിങ്ങളുടെ പ്രിയപ്പെട്ട ഓർമ്മ പങ്കിടുക"
   }
 ]
