@@ -284,26 +284,23 @@
 
         let wheelItems = [];
         
-        // Mathematical constants for perfectly proportioned text wrapping
         const WHEEL_RADIUS = 500;
         const OUTER_RADIUS = WHEEL_RADIUS - 15;
         const DRAW_WIDTH = OUTER_RADIUS * 0.75; 
         const INNER_RADIUS = OUTER_RADIUS - DRAW_WIDTH;
 
-        // --- NEW: Caching System for High Performance ---
-        // Instead of calculating math 60 times a second, we draw the complex wheel once onto this hidden canvas
         const wheelCache = document.createElement('canvas');
         wheelCache.width = 1000;
         wheelCache.height = 1000;
-        const cacheCtx = wheelCache.getContext('2d', { alpha: false }); // Optimize for no transparency
+        const cacheCtx = wheelCache.getContext('2d', { alpha: false });
 
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
             if (saved) {
                 wheelItems = JSON.parse(saved);
                 updateTextCanvases();
-                renderWheelToCache(); // Pre-render the complex graphic
-                drawWheel(); // Paint cache to screen
+                renderWheelToCache(); 
+                drawWheel(); 
             } else {
                 fetch('wheel_data.json')
                     .then(response => {
@@ -413,7 +410,6 @@
             return { canvas: c, width: targetWidth, height: targetHeight };
         }
 
-        // --- THE HEAVY LIFTER: Runs ONLY when the wheel updates, not during spins ---
         function renderWheelToCache() {
             cacheCtx.clearRect(0, 0, wheelCache.width, wheelCache.height);
             const numSlices = wheelItems.length;
@@ -424,7 +420,6 @@
             const sliceAngle = (2 * Math.PI) / numSlices;
             const safeAngle = (sliceAngle / 2) * 0.85;
 
-            // Notice: We don't add currentRotation here. The cache is drawn at standard 0 degrees.
             for (let i = 0; i < numSlices; i++) {
                 const startAngle = i * sliceAngle;
                 const endAngle = startAngle + sliceAngle;
@@ -481,8 +476,6 @@
             }
         }
 
-
-        // --- THE LIGHTWEIGHT RENDERER: Runs 60 times a second ---
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const centerX = canvas.width / 2;
@@ -491,7 +484,6 @@
         let currentRotation = 0; 
 
         function drawWheel() {
-            // Simply clear the screen, spin the canvas, and stamp the pre-rendered image
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(centerX, centerY);
@@ -501,25 +493,48 @@
         }
 
 
-        // --- Audio & Physics Engine (Runs purely on mathematical constraints) ---
+        // --- Upgraded Dynamic Audio Engine ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 1. Add a Master Compressor
+        // When many sounds play rapidly, their amplitudes sum together causing digital clipping (distortion/cutting out).
+        // This compressor safely squashes peaks before they hit the speakers.
+        const masterCompressor = audioCtx.createDynamicsCompressor();
+        masterCompressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+        masterCompressor.knee.setValueAtTime(30, audioCtx.currentTime);
+        masterCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+        masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+        masterCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+        masterCompressor.connect(audioCtx.destination);
+
         function playTick(speedRatio) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             
+            // speedRatio is 1 at max speed, 0 at completely stopped.
+            // Inverting it (1 - speedRatio) allows us to create dynamic drama!
+            const inverseSpeed = 1 - speedRatio; 
+
+            // Fast spins = very short clicks (10ms). Slow spins = ringing thuds (50ms).
+            const duration = 0.01 + (0.04 * inverseSpeed); 
+            
+            // Fast spins = quiet (0.05). Slow spins = loud (0.35).
+            const volume = 0.05 + (0.30 * inverseSpeed);
+
             oscillator.type = 'triangle';
             oscillator.frequency.setValueAtTime(400 + (200 * speedRatio), audioCtx.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+            oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
             
-            gainNode.gain.setValueAtTime(0.1 + (0.2 * speedRatio), audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            // Connect to compressor instead of directly to destination
+            gainNode.connect(masterCompressor); 
             
             oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.03);
+            oscillator.stop(audioCtx.currentTime + duration);
         }
 
         let isSpinning = false;
@@ -589,7 +604,7 @@
                 return; 
             }
 
-            drawWheel(); // This is now a lightning-fast single image stamp
+            drawWheel();
             animationFrame = requestAnimationFrame(animate);
         }
 
@@ -629,7 +644,7 @@
                 wheelItems.splice(currentWinnerIndex, 1);
                 saveData();
                 updateTextCanvases(); 
-                renderWheelToCache(); // Re-render the cache because a slice was removed
+                renderWheelToCache(); 
                 drawWheel();
             }
             document.getElementById('modal-overlay').classList.remove('active');
