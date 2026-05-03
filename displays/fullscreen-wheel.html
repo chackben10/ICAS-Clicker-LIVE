@@ -284,19 +284,26 @@
 
         let wheelItems = [];
         
-        // Hardcode constraints for our math engine
+        // Mathematical constants for perfectly proportioned text wrapping
         const WHEEL_RADIUS = 500;
         const OUTER_RADIUS = WHEEL_RADIUS - 15;
-        // User requested 75% down the slice max
         const DRAW_WIDTH = OUTER_RADIUS * 0.75; 
         const INNER_RADIUS = OUTER_RADIUS - DRAW_WIDTH;
+
+        // --- NEW: Caching System for High Performance ---
+        // Instead of calculating math 60 times a second, we draw the complex wheel once onto this hidden canvas
+        const wheelCache = document.createElement('canvas');
+        wheelCache.width = 1000;
+        wheelCache.height = 1000;
+        const cacheCtx = wheelCache.getContext('2d', { alpha: false }); // Optimize for no transparency
 
         function initData() {
             const saved = localStorage.getItem('churchWheelData');
             if (saved) {
                 wheelItems = JSON.parse(saved);
                 updateTextCanvases();
-                drawWheel();
+                renderWheelToCache(); // Pre-render the complex graphic
+                drawWheel(); // Paint cache to screen
             } else {
                 fetch('wheel_data.json')
                     .then(response => {
@@ -308,12 +315,14 @@
                         if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
                         saveData();
                         updateTextCanvases();
+                        renderWheelToCache(); 
                         drawWheel();
                     })
                     .catch(error => {
                         console.error("Error loading wheel_data.json:", error);
                         wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
                         updateTextCanvases();
+                        renderWheelToCache(); 
                         drawWheel();
                     });
             }
@@ -323,16 +332,12 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
-        // Calculates the mathematically perfect aspect ratio for the source canvas
-        // to guarantee ZERO horizontal stretching when mapped to the wedge.
         function updateTextCanvases() {
             const numSlices = wheelItems.length;
             if (numSlices === 0) return;
             
             const sliceAngle = (2 * Math.PI) / numSlices;
-            const safeAngle = (sliceAngle / 2) * 0.85; // 85% of half-angle for padding
-            
-            // The magic formula connecting logarithmic depth to wedge height
+            const safeAngle = (sliceAngle / 2) * 0.85; 
             const idealRatio = Math.log(OUTER_RADIUS / INNER_RADIUS) / (2 * Math.tan(safeAngle));
 
             for (let i = 0; i < numSlices; i++) {
@@ -348,7 +353,6 @@
         function createTextCanvas(text, color, idealRatio) {
             const c = document.createElement('canvas');
             const targetHeight = 800;
-            // Force the source canvas to match the exact aspect ratio of the logarithmic wedge
             const targetWidth = targetHeight * idealRatio;
             
             c.width = targetWidth; 
@@ -362,11 +366,9 @@
             let fontSize = 200; 
             let lines = [];
             
-            // Give a 5% margin so text never touches the exact boundary of the slice
             const maxWidth = targetWidth * 0.95; 
             const maxHeight = targetHeight * 0.95; 
             
-            // Loop to dynamically find the largest font size that fits the box
             while (fontSize > 10) {
                 ctx.font = `bold ${fontSize}px Inter`;
                 const words = text.split(' ');
@@ -392,7 +394,6 @@
                 
                 let totalHeight = lines.length * (fontSize * 1.15);
                 
-                // If it fits inside the aspect-ratio-locked box, we lock the font size
                 if (actualWidth <= maxWidth && totalHeight <= maxHeight) {
                     break;
                 }
@@ -403,7 +404,7 @@
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
             
-            const rightPadding = targetWidth * 0.02; // Small gap from the outer rim
+            const rightPadding = targetWidth * 0.02; 
             
             for (let i = 0; i < lines.length; i++) {
                 ctx.fillText(lines[i], targetWidth - rightPadding, startY + (i * lineHeight));
@@ -412,24 +413,20 @@
             return { canvas: c, width: targetWidth, height: targetHeight };
         }
 
-
-        const canvas = document.getElementById('wheel');
-        const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        
-        let currentRotation = 0; 
-
-        function drawWheel() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // --- THE HEAVY LIFTER: Runs ONLY when the wheel updates, not during spins ---
+        function renderWheelToCache() {
+            cacheCtx.clearRect(0, 0, wheelCache.width, wheelCache.height);
             const numSlices = wheelItems.length;
             if (numSlices === 0) return;
             
+            const cX = wheelCache.width / 2;
+            const cY = wheelCache.height / 2;
             const sliceAngle = (2 * Math.PI) / numSlices;
             const safeAngle = (sliceAngle / 2) * 0.85;
 
+            // Notice: We don't add currentRotation here. The cache is drawn at standard 0 degrees.
             for (let i = 0; i < numSlices; i++) {
-                const startAngle = currentRotation + (i * sliceAngle);
+                const startAngle = i * sliceAngle;
                 const endAngle = startAngle + sliceAngle;
 
                 let colorIndex = i % palette.length;
@@ -437,16 +434,16 @@
                     colorIndex = 1; 
                 }
 
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, WHEEL_RADIUS, startAngle, endAngle);
-                ctx.fillStyle = palette[colorIndex];
-                ctx.fill();
+                cacheCtx.beginPath();
+                cacheCtx.moveTo(cX, cY);
+                cacheCtx.arc(cX, cY, WHEEL_RADIUS, startAngle, endAngle);
+                cacheCtx.fillStyle = palette[colorIndex];
+                cacheCtx.fill();
 
                 if (wheelItems[i].textData) {
-                    ctx.save();
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate(startAngle + sliceAngle / 2);
+                    cacheCtx.save();
+                    cacheCtx.translate(cX, cY);
+                    cacheCtx.rotate(startAngle + sliceAngle / 2);
 
                     const textData = wheelItems[i].textData;
                     const img = textData.canvas;
@@ -456,9 +453,8 @@
                     const logOuter = Math.log(OUTER_RADIUS);
                     const logDiff = logOuter - logInner;
                     
-                    const stripWidth = 1.5; // Fine resolution for perfectly smooth scaling
+                    const stripWidth = 1.5; 
 
-                    // Mathematical projection of the locked-aspect-ratio source canvas
                     for (let dx = 0; dx < DRAW_WIDTH; dx += stripWidth) {
                         let actualX = INNER_RADIUS + dx;
                         let nextActualX = Math.min(actualX + stripWidth, OUTER_RADIUS);
@@ -474,17 +470,38 @@
                         if (sourceX < 0) sourceX = 0;
                         if (sWidth <= 0) sWidth = 0.1;
                         
-                        ctx.drawImage(
+                        cacheCtx.drawImage(
                             img, 
                             sourceX, 0, sWidth, img.height, 
                             actualX, -wedgeHeight / 2, (nextActualX - actualX) + 0.5, wedgeHeight 
                         );
                     }
-                    ctx.restore();
+                    cacheCtx.restore();
                 }
             }
         }
 
+
+        // --- THE LIGHTWEIGHT RENDERER: Runs 60 times a second ---
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        let currentRotation = 0; 
+
+        function drawWheel() {
+            // Simply clear the screen, spin the canvas, and stamp the pre-rendered image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentRotation);
+            ctx.drawImage(wheelCache, -centerX, -centerY);
+            ctx.restore();
+        }
+
+
+        // --- Audio & Physics Engine (Runs purely on mathematical constraints) ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playTick(speedRatio) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -572,7 +589,7 @@
                 return; 
             }
 
-            drawWheel();
+            drawWheel(); // This is now a lightning-fast single image stamp
             animationFrame = requestAnimationFrame(animate);
         }
 
@@ -612,6 +629,7 @@
                 wheelItems.splice(currentWinnerIndex, 1);
                 saveData();
                 updateTextCanvases(); 
+                renderWheelToCache(); // Re-render the cache because a slice was removed
                 drawWheel();
             }
             document.getElementById('modal-overlay').classList.remove('active');
