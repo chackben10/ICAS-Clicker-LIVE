@@ -648,7 +648,13 @@ transform: translateY(1px) scale(0.995);
 <div class="wrapper">
 <div class="top-row">
 <div class="page-title">ICAS Media Control Panel</div>
+<div style="display: flex; gap: 8px; align-items: center;">
+<label class="top-btn" style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+<input type="checkbox" id="autoShowToggle" style="margin:0; transform: scale(1.1); accent-color: var(--danger);">
+<span>Auto Show Slides</span>
+</label>
 <button class="top-btn" id="settingsButton">Settings</button>
+</div>
 </div>
 
 <div class="presets-header" id="presetsHeader">
@@ -872,7 +878,8 @@ preset: `${base}/preset`,
 audioPlaylists: `${base}/audio/playlists`,
 audioTracks: `${base}/audio/tracks`,
 audioTrigger: `${base}/audio/trigger`,
-audioClear: `${base}/audio/clear`
+audioClear: `${base}/audio/clear`,
+autoShow: `${base}/auto-show`
 };
 }
 
@@ -985,6 +992,9 @@ const audioCloseButton = document.getElementById("audioCloseButton");
 
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
 
+// Auto Show Toggle
+const autoShowToggle = document.getElementById("autoShowToggle");
+
 // Prevent select taps from triggering the main button
 function stopBtnClickWhenSelecting(selectEl) {
 if (!selectEl) return;
@@ -1017,6 +1027,7 @@ refreshLogosBtn.disabled = !enabled;
 testBackendBtn.disabled = false;
 serviceLogoSelect.disabled = !enabled;
 testimoniesLogoSelect.disabled = !enabled;
+if (autoShowToggle) autoShowToggle.disabled = !enabled;
 }
 
 function escapeHtml(s) {
@@ -1168,6 +1179,42 @@ macroSelect.disabled = true;
 } finally {
 syncDescriptions();
 }
+}
+
+async function fetchAutoShowState() {
+try {
+const { autoShow } = endpoints();
+const res = await fetch(autoShow, { cache: "no-cache" });
+if (res.ok) {
+const data = await res.json();
+if (typeof data.enabled === "boolean") {
+autoShowToggle.checked = data.enabled;
+}
+}
+} catch (err) {
+console.warn("Failed to fetch auto show state");
+}
+}
+
+async function setAutoShowState(enabled) {
+try {
+const { autoShow } = endpoints();
+const res = await fetch(autoShow, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ enabled })
+});
+if (!res.ok) throw new Error("Failed response");
+} catch (err) {
+console.error("Failed to set auto show state", err);
+autoShowToggle.checked = !enabled; // revert if failed
+}
+}
+
+if (autoShowToggle) {
+autoShowToggle.addEventListener("change", () => {
+setAutoShowState(autoShowToggle.checked);
+});
 }
 
 serviceLogoSelect.addEventListener("change", () => {
@@ -1473,17 +1520,19 @@ setButtonsEnabled(false);
 setBackendStatus(false, "Backend: Checking…");
 setLastAction("—");
 syncDescriptions();
+
 // Create a reusable refresh function
 const fullRefresh = async () => {
 const ok = await testBackend();
 if (ok) {
 await refreshServiceLogos();
 await refreshMacros();
+await fetchAutoShowState();
 }
 };
 // Run it once on startup
 await fullRefresh();
-// Run it every 10 seconds to keep all computers active
+// Run it every 10 seconds to keep all computers active and synchronized
 setInterval(fullRefresh, 10000);
 }
 
