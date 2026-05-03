@@ -286,8 +286,6 @@
         
         const WHEEL_RADIUS = 500;
         const OUTER_RADIUS = WHEEL_RADIUS - 15;
-        const DRAW_WIDTH = OUTER_RADIUS * 0.75; 
-        const INNER_RADIUS = OUTER_RADIUS - DRAW_WIDTH;
 
         const wheelCache = document.createElement('canvas');
         wheelCache.width = 1000;
@@ -329,13 +327,23 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
+        // --- FIXED: Math correction for bleeding corners ---
         function updateTextCanvases() {
             const numSlices = wheelItems.length;
             if (numSlices === 0) return;
             
             const sliceAngle = (2 * Math.PI) / numSlices;
-            const safeAngle = (sliceAngle / 2) * 0.85; 
-            const idealRatio = Math.log(OUTER_RADIUS / INNER_RADIUS) / (2 * Math.tan(safeAngle));
+            
+            // Limit the maximum angle to prevent distortion when there are very few slices.
+            // Text won't try to wrap across a huge 180-degree half-circle.
+            const safeAngle = Math.min((sliceAngle / 2) * 0.80, Math.PI / 7); 
+            
+            // Calculate EXACTLY how far right we can draw the text trapezoid 
+            // before its corners break outside the circular boundary of the wheel.
+            const actualOuterX = OUTER_RADIUS * Math.cos(safeAngle);
+            const innerX = 120; // Fixed distance to keep text off the center hub
+            
+            const idealRatio = Math.log(actualOuterX / innerX) / (2 * Math.tan(safeAngle));
 
             for (let i = 0; i < numSlices; i++) {
                 let colorIndex = i % palette.length;
@@ -343,7 +351,11 @@
                     colorIndex = 1; 
                 }
                 let textColor = textColors[colorIndex];
+                
                 wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, idealRatio);
+                
+                // Store the calculated geometric bounds for the cache renderer to use
+                wheelItems[i].drawBounds = { innerX: innerX, outerX: actualOuterX, safeAngle: safeAngle };
             }
         }
 
@@ -418,7 +430,6 @@
             const cX = wheelCache.width / 2;
             const cY = wheelCache.height / 2;
             const sliceAngle = (2 * Math.PI) / numSlices;
-            const safeAngle = (sliceAngle / 2) * 0.85;
 
             for (let i = 0; i < numSlices; i++) {
                 const startAngle = i * sliceAngle;
@@ -435,26 +446,28 @@
                 cacheCtx.fillStyle = palette[colorIndex];
                 cacheCtx.fill();
 
-                if (wheelItems[i].textData) {
+                if (wheelItems[i].textData && wheelItems[i].drawBounds) {
                     cacheCtx.save();
                     cacheCtx.translate(cX, cY);
                     cacheCtx.rotate(startAngle + sliceAngle / 2);
 
                     const textData = wheelItems[i].textData;
+                    const bounds = wheelItems[i].drawBounds;
                     const img = textData.canvas;
                     const W_s = textData.width;
                     
-                    const logInner = Math.log(INNER_RADIUS);
-                    const logOuter = Math.log(OUTER_RADIUS);
+                    const logInner = Math.log(bounds.innerX);
+                    const logOuter = Math.log(bounds.outerX);
                     const logDiff = logOuter - logInner;
                     
+                    const drawWidth = bounds.outerX - bounds.innerX;
                     const stripWidth = 1.5; 
 
-                    for (let dx = 0; dx < DRAW_WIDTH; dx += stripWidth) {
-                        let actualX = INNER_RADIUS + dx;
-                        let nextActualX = Math.min(actualX + stripWidth, OUTER_RADIUS);
+                    for (let dx = 0; dx < drawWidth; dx += stripWidth) {
+                        let actualX = bounds.innerX + dx;
+                        let nextActualX = Math.min(actualX + stripWidth, bounds.outerX);
                         
-                        let wedgeHeight = 2 * actualX * Math.tan(safeAngle); 
+                        let wedgeHeight = 2 * actualX * Math.tan(bounds.safeAngle); 
                         
                         let t1 = (Math.log(actualX) - logInner) / logDiff;
                         let t2 = (Math.log(nextActualX) - logInner) / logDiff;
@@ -548,7 +561,6 @@
         }
 
         function animate() {
-            // Apply aerodynamic friction
             velocity *= 0.993; 
 
             let topAngle = (3 * Math.PI / 2) - currentRotation;
@@ -586,9 +598,6 @@
 
             flapper.style.transform = `translateX(-50%) rotate(${flapperAngle}deg)`;
 
-            // --- FIXED BUG HERE ---
-            // If the wheel loses all momentum without touching a peg, it forces a hard stop
-            // to prevent infinite asymptotic decay running the loop forever.
             if (velocity < 0.0005) {
                 velocity = 0;
                 isSpinning = false;
