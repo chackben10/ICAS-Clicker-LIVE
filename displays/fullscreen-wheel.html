@@ -509,11 +509,7 @@
             
             const inverseSpeed = 1 - speedRatio; 
 
-            // Smoothed out the audio duration scaling
             const duration = 0.015 + (0.035 * inverseSpeed); 
-            
-            // Re-tuned the volume floor. Now it starts at a much more audible 15% 
-            // and gracefully peaks at 30% as it slows down.
             const volume = 0.15 + (0.15 * inverseSpeed);
 
             oscillator.type = 'triangle';
@@ -552,6 +548,7 @@
         }
 
         function animate() {
+            // Apply aerodynamic friction
             velocity *= 0.993; 
 
             let topAngle = (3 * Math.PI / 2) - currentRotation;
@@ -576,8 +573,6 @@
 
             if (currentSliceIndex !== lastTickSlice) {
                 if (lastTickSlice !== -1 && distanceToPeg > engagementZone) {
-                    // NEW CALCULATION: Fixed the curve so it gradually shifts over the entire spin
-                    // rather than staying pegged at "max speed" for too long.
                     let speedRatio = Math.min(1, Math.max(0, velocity / 0.5));
                     
                     playTick(speedRatio);
@@ -591,7 +586,10 @@
 
             flapper.style.transform = `translateX(-50%) rotate(${flapperAngle}deg)`;
 
-            if (velocity <= 0) {
+            // --- FIXED BUG HERE ---
+            // If the wheel loses all momentum without touching a peg, it forces a hard stop
+            // to prevent infinite asymptotic decay running the loop forever.
+            if (velocity < 0.0005) {
                 velocity = 0;
                 isSpinning = false;
                 spinBtn.disabled = false;
