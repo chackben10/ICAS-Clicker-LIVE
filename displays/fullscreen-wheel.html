@@ -316,7 +316,6 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
-        // --- NEW: Raster Offscreen Perspective Engine ---
         function updateTextCanvases() {
             const numSlices = wheelItems.length;
             for (let i = 0; i < numSlices; i++) {
@@ -325,52 +324,71 @@
                     colorIndex = 1; 
                 }
                 let textColor = textColors[colorIndex];
-                wheelItems[i].textCanvas = createTextCanvas(wheelItems[i].english, textColor, numSlices);
+                wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, numSlices);
             }
         }
 
         function createTextCanvas(text, color, numSlices) {
             const c = document.createElement('canvas');
-            // Use a large offscreen canvas for high-res crisp text
-            c.width = 1200; 
-            c.height = 600;
+            // Create a massive canvas to ensure crispness and allow for long wrapped text
+            c.width = 2400; 
+            c.height = 800;
             const ctx = c.getContext('2d');
             
-            let fontSize = numSlices > 12 ? 70 : 90;
-            if (text.length > 50) fontSize *= 0.8; 
-            
             ctx.fillStyle = color;
-            ctx.textAlign = 'right'; // Align to the wide outer rim
+            ctx.textAlign = 'right'; 
             ctx.textBaseline = 'middle';
-            ctx.font = `bold ${fontSize}px Inter`;
             
-            const words = text.split(' ');
-            let line = '';
-            const lines = [];
-            const maxWidth = 1000; // Keep text from hitting the absolute left edge
+            let fontSize = 160; 
+            let lines = [];
+            let actualWidth = 0;
+            const maxWidth = 2200; // Force wrapping before it hits the edges
             
-            for (let i = 0; i < words.length; i++) {
-                let testLine = line + words[i] + ' ';
-                let metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && i > 0) {
-                    lines.push(line.trim());
-                    line = words[i] + ' ';
-                } else {
-                    line = testLine;
+            // Loop to dynamically find the largest font size that fits our boundaries
+            while (fontSize > 20) {
+                ctx.font = `bold ${fontSize}px Inter`;
+                const words = text.split(' ');
+                let line = '';
+                lines = [];
+                
+                for (let i = 0; i < words.length; i++) {
+                    let testLine = line + words[i] + ' ';
+                    if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                        lines.push(line.trim());
+                        line = words[i] + ' ';
+                    } else {
+                        line = testLine;
+                    }
                 }
+                lines.push(line.trim());
+                
+                // Measure the actual width of the longest line in this configuration
+                actualWidth = 0;
+                for (let i = 0; i < lines.length; i++) {
+                    let w = ctx.measureText(lines[i]).width;
+                    if (w > actualWidth) actualWidth = w;
+                }
+                
+                let totalHeight = lines.length * (fontSize * 1.15);
+                
+                // If the block fits perfectly inside our width and height constraints, we use it.
+                if (actualWidth <= maxWidth && totalHeight <= 750) {
+                    break;
+                }
+                fontSize -= 5;
             }
-            lines.push(line.trim());
             
-            const lineHeight = fontSize * 1.2;
+            const lineHeight = fontSize * 1.15;
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
             
-            // Draw lines aligned to the right side (outer edge of wheel)
+            // Draw the lines right-aligned near the edge of the 2400px canvas
             for (let i = 0; i < lines.length; i++) {
-                ctx.fillText(lines[i], 1150, startY + (i * lineHeight));
+                ctx.fillText(lines[i], 2350, startY + (i * lineHeight));
             }
             
-            return c;
+            // Return both the canvas AND the exact width the text took up
+            return { canvas: c, textWidth: actualWidth };
         }
 
 
@@ -404,32 +422,38 @@
                 ctx.fillStyle = palette[colorIndex];
                 ctx.fill();
 
-                // Draw the Perspective Rasterized Text
-                if (wheelItems[i].textCanvas) {
+                if (wheelItems[i].textData) {
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(startAngle + sliceAngle / 2);
 
-                    const img = wheelItems[i].textCanvas;
-                    const innerRadius = 80;  // Gap near the hub
-                    const outerRadius = radius - 20; // Gap near the rim
-                    const drawWidth = outerRadius - innerRadius;
+                    const textData = wheelItems[i].textData;
+                    const img = textData.canvas;
+                    const actualTextWidth = textData.textWidth;
                     
-                    // Draw image in 3px vertical strips to create the perspective wedge
-                    const stripWidth = 3; 
-                    const sourceStripWidth = (stripWidth / drawWidth) * img.width;
+                    // We map the text to exactly 85% of the radius so it's massive
+                    const outerRadius = radius - 15; // Stop just before the rim
+                    const drawWidth = radius * 0.85; 
+                    const innerRadius = outerRadius - drawWidth; 
                     
-                    // Cap the max stretch angle to prevent insane stretching if there are only 2 items left
-                    let safeAngle = Math.min(sliceAngle / 2, Math.PI / 6); 
+                    // Crop the source image to EXACTLY the text bounding box + padding
+                    const padding = 100; // 50px on each side
+                    const sourceWidth = actualTextWidth + padding;
+                    const sourceStartX = 2350 - actualTextWidth - (padding / 2);
+                    
+                    const stripWidth = 3;
+                    const sourceStripWidth = (stripWidth / drawWidth) * sourceWidth;
+                    
+                    let safeAngle = Math.min(sliceAngle / 2, Math.PI / 5); 
 
                     for (let dx = 0; dx < drawWidth; dx += stripWidth) {
                         let actualX = innerRadius + dx;
                         
-                        // Calculate maximum height allowed inside the slice wedge at this X coordinate
                         let maxHalfHeight = actualX * Math.tan(safeAngle);
-                        let wedgeHeight = maxHalfHeight * 2 * 0.85; // 85% padding so it doesn't touch the lines
+                        let wedgeHeight = maxHalfHeight * 2 * 0.80; // 80% vertical safe zone
                         
-                        let sourceX = (dx / drawWidth) * img.width;
+                        let sourceX = sourceStartX + ((dx / drawWidth) * sourceWidth);
+                        if (sourceX < 0) sourceX = 0;
                         
                         ctx.drawImage(
                             img, 
@@ -568,7 +592,7 @@
             if (currentWinnerIndex !== -1) {
                 wheelItems.splice(currentWinnerIndex, 1);
                 saveData();
-                updateTextCanvases(); // Re-render colors/sizes if items change
+                updateTextCanvases(); 
                 drawWheel();
             }
             document.getElementById('modal-overlay').classList.remove('active');
