@@ -138,7 +138,6 @@
             transform: none;
         }
 
-        /* NEW: Discrete Utility Button Styles */
         .utility-buttons {
             position: absolute;
             bottom: 30px;
@@ -196,15 +195,16 @@
             pointer-events: auto;
         }
 
+        /* CHANGED: Made the modal card significantly larger */
         .modal-card {
             background: #1e1e1e;
-            border: 2px solid var(--gold);
-            padding: 5vmin;
-            border-radius: 20px;
+            border: 3px solid var(--gold);
+            padding: 8vmin;
+            border-radius: 24px;
             text-align: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            max-width: 800px;
-            width: 90%;
+            box-shadow: 0 35px 70px rgba(0,0,0,0.6);
+            max-width: 1200px;
+            width: 95%;
             transform: scale(0.9);
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
@@ -213,19 +213,21 @@
             transform: scale(1);
         }
 
+        /* CHANGED: Increased font size for English text */
         #modal-english {
-            font-size: max(28px, 4vmin);
+            font-size: max(42px, 6vmin);
             font-weight: 900;
             color: var(--gold);
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             line-height: 1.2;
         }
 
+        /* CHANGED: Increased font size for Malayalam text */
         #modal-malayalam {
             font-family: 'Noto Sans Malayalam', sans-serif;
-            font-size: max(20px, 3vmin);
+            font-size: max(30px, 4.5vmin);
             color: var(--text-light);
-            margin-bottom: 40px;
+            margin-bottom: 50px;
             line-height: 1.4;
         }
 
@@ -235,10 +237,11 @@
             gap: 20px;
         }
 
+        /* CHANGED: Increased button padding and text size to match the bigger modal */
         .btn-close, .btn-remove {
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
+            padding: 16px 32px;
+            border-radius: 10px;
+            font-size: 20px;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -280,21 +283,17 @@
             <button id="spin-btn">SPIN</button>
         </div>
         
-        <!-- NEW: Grouped Utility Buttons with SVGs -->
         <div class="utility-buttons">
             <button class="utility-btn" id="fullscreen-btn" title="Toggle Fullscreen">
-                <!-- Maximize Icon -->
                 <svg id="icon-maximize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                 </svg>
-                <!-- Minimize Icon (Hidden by default) -->
                 <svg id="icon-minimize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
                     <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
                 </svg>
             </button>
 
             <button class="utility-btn" id="refresh-btn" title="Reset & Reload Data">
-                <!-- Refresh Icon -->
                 <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="23 4 23 10 17 10"></polyline>
                     <polyline points="1 20 1 14 7 14"></polyline>
@@ -568,6 +567,57 @@
             oscillator.stop(audioCtx.currentTime + duration);
         }
 
+        // NEW: Play a triumphant C Major Arpeggio when the modal pops up
+        function playCelebrationSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const now = audioCtx.currentTime;
+            
+            // C4, E4, G4, C5 (A bright, happy major chord sequence)
+            const frequencies = [261.63, 329.63, 392.00, 523.25]; 
+            
+            frequencies.forEach((freq, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'sine'; // Smooth tone for a clean fanfare
+                
+                // Arpeggiate by staggering the start times
+                const startTime = now + (index * 0.1);
+                osc.frequency.setValueAtTime(freq, startTime);
+                
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.5);
+                
+                osc.connect(gain);
+                gain.connect(masterCompressor);
+                
+                osc.start(startTime);
+                osc.stop(startTime + 1.5);
+            });
+            
+            // Final loud chord hitting right after the sequence finishes
+            const chordStartTime = now + 0.4; 
+            frequencies.forEach(freq => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle'; // Mixed with a triangle wave for extra punch
+                osc.frequency.setValueAtTime(freq, chordStartTime);
+                
+                gain.gain.setValueAtTime(0, chordStartTime);
+                gain.gain.linearRampToValueAtTime(0.4, chordStartTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, chordStartTime + 2.0);
+                
+                osc.connect(gain);
+                gain.connect(masterCompressor);
+                
+                osc.start(chordStartTime);
+                osc.stop(chordStartTime + 2.0);
+            });
+        }
+
         let isSpinning = false;
         let velocity = 0;
         let lastTickSlice = -1;
@@ -661,14 +711,15 @@
             });
 
             setTimeout(() => {
+                // Fire the new celebration sound exactly when the modal appears
+                playCelebrationSound();
+                
                 document.getElementById('modal-english').innerText = winner.english;
                 document.getElementById('modal-malayalam').innerText = winner.malayalam;
                 document.getElementById('modal-overlay').classList.add('active');
             }, 500);
         }
 
-        // --- Event Listeners ---
-        
         document.getElementById('btn-close').addEventListener('click', () => {
             document.getElementById('modal-overlay').classList.remove('active');
         });
@@ -693,14 +744,12 @@
             }
         });
 
-        // --- NEW: Fullscreen API Logic ---
         const fullscreenBtn = document.getElementById('fullscreen-btn');
         const iconMaximize = document.getElementById('icon-maximize');
         const iconMinimize = document.getElementById('icon-minimize');
 
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
-                // Request fullscreen on the entire document body
                 document.documentElement.requestFullscreen().catch(err => {
                     console.log(`Error attempting to enable fullscreen: ${err.message}`);
                 });
@@ -713,8 +762,6 @@
 
         fullscreenBtn.addEventListener('click', toggleFullscreen);
 
-        // Listen for standard browser fullscreen changes (like hitting the Escape key)
-        // so the button icons always stay perfectly in sync with the screen state
         document.addEventListener('fullscreenchange', () => {
             if (document.fullscreenElement) {
                 iconMaximize.style.display = 'none';
