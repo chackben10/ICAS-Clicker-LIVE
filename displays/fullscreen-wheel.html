@@ -138,24 +138,40 @@
             transform: none;
         }
 
-        #refresh-btn {
+        /* NEW: Discrete Utility Button Styles */
+        .utility-buttons {
             position: absolute;
             bottom: 30px;
             right: 30px;
-            background: none;
-            border: 1px solid rgba(255,255,255,0.2);
-            color: rgba(255,255,255,0.4);
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s;
+            display: flex;
+            gap: 12px;
+            z-index: 50;
         }
 
-        #refresh-btn:hover {
+        .utility-btn {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.5);
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .utility-btn:hover {
             color: var(--text-light);
-            border-color: rgba(255,255,255,0.5);
-            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .utility-btn:active {
+            transform: translateY(0);
         }
 
         #modal-overlay {
@@ -264,12 +280,33 @@
             <button id="spin-btn">SPIN</button>
         </div>
         
-        <button id="refresh-btn">Reset & Reload</button>
+        <!-- NEW: Grouped Utility Buttons with SVGs -->
+        <div class="utility-buttons">
+            <button class="utility-btn" id="fullscreen-btn" title="Toggle Fullscreen">
+                <!-- Maximize Icon -->
+                <svg id="icon-maximize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+                <!-- Minimize Icon (Hidden by default) -->
+                <svg id="icon-minimize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                </svg>
+            </button>
+
+            <button class="utility-btn" id="refresh-btn" title="Reset & Reload Data">
+                <!-- Refresh Icon -->
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+            </button>
+        </div>
 
         <div id="modal-overlay">
             <div class="modal-card">
                 <div id="modal-english">Loading...</div>
-                <div id="modal-malayalam">à´²àµà´¡àµ à´àµà´¯àµà´¯àµà´¨àµà´¨àµ...</div>
+                <div id="modal-malayalam">ലോഡ് ചെയ്യുന്നു...</div>
                 <div class="modal-buttons">
                     <button class="btn-close" id="btn-close">Close</button>
                     <button class="btn-remove" id="btn-remove">Remove & Close</button>
@@ -307,7 +344,7 @@
                     })
                     .then(data => {
                         wheelItems = data;
-                        if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "à´à´àµà´°à´ à´¶àµà´¨àµà´¯à´®à´¾à´£àµ" }];
+                        if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "ചക്രം ശൂന്യമാണ്" }];
                         saveData();
                         updateTextCanvases();
                         renderWheelToCache(); 
@@ -315,7 +352,7 @@
                     })
                     .catch(error => {
                         console.error("Error loading wheel_data.json:", error);
-                        wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "à´¡à´¾à´±àµà´± à´ªà´¿à´¶à´àµ" }];
+                        wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "ഡാറ്റ പിശക്" }];
                         updateTextCanvases();
                         renderWheelToCache(); 
                         drawWheel();
@@ -327,21 +364,15 @@
             localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
         }
 
-        // --- FIXED: Math correction for bleeding corners ---
         function updateTextCanvases() {
             const numSlices = wheelItems.length;
             if (numSlices === 0) return;
             
             const sliceAngle = (2 * Math.PI) / numSlices;
-            
-            // Limit the maximum angle to prevent distortion when there are very few slices.
-            // Text won't try to wrap across a huge 180-degree half-circle.
             const safeAngle = Math.min((sliceAngle / 2) * 0.80, Math.PI / 7); 
             
-            // Calculate EXACTLY how far right we can draw the text trapezoid 
-            // before its corners break outside the circular boundary of the wheel.
             const actualOuterX = OUTER_RADIUS * Math.cos(safeAngle);
-            const innerX = 120; // Fixed distance to keep text off the center hub
+            const innerX = 120; 
             
             const idealRatio = Math.log(actualOuterX / innerX) / (2 * Math.tan(safeAngle));
 
@@ -353,8 +384,6 @@
                 let textColor = textColors[colorIndex];
                 
                 wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, idealRatio);
-                
-                // Store the calculated geometric bounds for the cache renderer to use
                 wheelItems[i].drawBounds = { innerX: innerX, outerX: actualOuterX, safeAngle: safeAngle };
             }
         }
@@ -638,6 +667,8 @@
             }, 500);
         }
 
+        // --- Event Listeners ---
+        
         document.getElementById('btn-close').addEventListener('click', () => {
             document.getElementById('modal-overlay').classList.remove('active');
         });
@@ -659,6 +690,38 @@
             if(confirm("Are you sure you want to reset the wheel? This will re-fetch from the JSON and bring back all items.")) {
                 localStorage.removeItem('churchWheelData');
                 location.reload();
+            }
+        });
+
+        // --- NEW: Fullscreen API Logic ---
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const iconMaximize = document.getElementById('icon-maximize');
+        const iconMinimize = document.getElementById('icon-minimize');
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                // Request fullscreen on the entire document body
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // Listen for standard browser fullscreen changes (like hitting the Escape key)
+        // so the button icons always stay perfectly in sync with the screen state
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                iconMaximize.style.display = 'none';
+                iconMinimize.style.display = 'block';
+            } else {
+                iconMaximize.style.display = 'block';
+                iconMinimize.style.display = 'none';
             }
         });
 
