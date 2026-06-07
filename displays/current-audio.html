@@ -1,39 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Current Audio</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Current Audio</title>
 
-<style>
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000000;
+    }
 
-  html,
-  body {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #000;
-  }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+    }
 
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
-  }
+    #audioText {
+      display: block;
+      width: 100vw;
+      max-width: 100vw;
+      padding: 0;
+      margin: 0;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 800;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+  </style>
+</head>
 
-  #audioText {
-    display: block;
-    color: #fff;
-    white-space: nowrap;
-    text-transform: uppercase;
-    line-height: 0.82;
-    letter-spacing: -0.055em;
+<body>
+  <div id="audioText"></div>
+
+  <script>
+    (function () {
+      const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+      const POLL_MS = 500;
+      const MIN_FONT_PX = 8;
+      const MAX_FONT_PX = 300;
+
+      const audioText = document.getElementById("audioText");
+      let lastText = "";
+
+      function normalizeBase(u) {
+        u = String(u || "").trim();
+        return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+      }
+
+      function getApiBase() {
+        return normalizeBase(DEFAULT_API_BASE);
+      }
+
+      function endpoints() {
+        const base = getApiBase();
+        return {
+          audioActive: `${base}/audio/active`
+        };
+      }
+
+      function extractItemName(raw) {
+        raw = String(raw || "").trim();
+        if (!raw || raw.toLowerCase().includes("no audio playing")) return "";
+
+        // Expected Hammerspoon plain text:
+        // playlist: Major Pads
+        // item: F(Major)
+        const match = raw.match(/(?:^|\n)\s*item\s*:\s*(.+?)\s*$/im);
+        if (match && match[1]) return match[1].trim();
+
+        // Fallback if endpoint is ever changed to JSON later.
+        try {
+          const data = JSON.parse(raw);
+          if (data && data.item && data.item.name) return String(data.item.name).trim();
+          if (data && data.item) return String(data.item).trim();
+        } catch (_) {}
+
+        return "";
+      }
+
+      function fitText() {
+        const text = audioText.textContent || "";
+        if (!text) return;
+
+        const availableW = Math.max(1, window.innerWidth - 2);
+        const availableH = Math.max(1, window.innerHeight - 2);
+
+        let low = MIN_FONT_PX;
+        let high = Math.min(MAX_FONT_PX, availableH * 1.25);
+        let best = low;
+
+        audioText.style.fontSize = low + "px";
+
+        for (let i = 0; i < 18; i++) {
+          const mid = (low + high) / 2;
+          audioText.style.fontSize = mid + "px";
+
+          const fits = audioText.scrollWidth <= availableW && audioText.scrollHeight <= availableH;
+          if (fits) {
+            best = mid;
+            low = mid;
+          } else {
+            high = mid;
+          }
+        }
+
+        audioText.style.fontSize = Math.floor(best) + "px";
+      }
+
+      function setAudioText(value) {
+        const clean = String(value || "").trim();
+        if (clean === lastText) return;
+
+        lastText = clean;
+        audioText.textContent = clean.toUpperCase();
+        requestAnimationFrame(fitText);
+      }
+
+      async function refreshAudio() {
+        try {
+          const { audioActive } = endpoints();
+          const res = await fetch(audioActive, { cache: "no-cache" });
+          if (!res.ok) throw new Error("Bad response");
+
+          const raw = await res.text();
+          const item = extractItemName(raw);
+          setAudioText(item);
+        } catch (err) {
+          // Keep the screen clean if the backend briefly fails.
+          setAudioText("");
+        }
+      }
+
+      window.addEventListener("resize", () => requestAnimationFrame(fitText));
+
+      refreshAudio();
+      setInterval(refreshAudio, POLL_MS);
+    })();
+  </script>
+</body>
+</html>
     font-weight: 900;
     text-align: center;
     transform-origin: center center;
