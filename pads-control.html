@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ICAS Pads Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+<style>
+:root {
+--bg: #ffffff;
+--title-color: #d32f2f;
+--status-grey: #666666;
+
+--card-text: #111111;
+--border-color: #d0d0d0;
+
+--btn-bg: #ffffff;
+--btn-text: #111111;
+--btn-border: #d0d0d0;
+
+--btn-invert-bg: #111111;
+--btn-invert-text: #ffffff;
+
+--btn-hover-shadow: 0 12px 26px rgba(0,0,0,0.22);
+--btn-active-shadow: 0 8px 18px rgba(0,0,0,0.26);
+
+--danger: #ff5252;
+--danger-invert-bg: #ffffff;
+--danger-invert-text: #ff5252;
+
+--modal-bg: #ffffff;
+--modal-shadow: rgba(0,0,0,0.25);
+--settings-text: #111;
+
+--ok: #00c853;
+}
+
+body.dark {
+--bg: #000000;
+--title-color: #ff5252;
+--status-grey: #888888;
+
+--card-text: #ffffff;
+--border-color: #444444;
+
+--btn-bg: #111111;
+--btn-text: #ffffff;
+--btn-border: #444444;
+
+--btn-invert-bg: #ffffff;
+--btn-invert-text: #111111;
+
+--btn-hover-shadow: 0 0 0 2px rgba(255,255,255,0.20), 0 16px 34px rgba(255,255,255,0.18);
+--btn-active-shadow: 0 0 0 2px rgba(255,255,255,0.26), 0 12px 26px rgba(255,255,255,0.22);
+
+--danger: #ff5252;
+--danger-invert-bg: #ffffff;
+--danger-invert-text: #ff5252;
+
+--modal-bg: #111111;
+--modal-shadow: rgba(0,0,0,0.6);
+--settings-text: #ffffff;
+
+--ok: #00c853;
+}
+
+* {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+
+html {
+-webkit-text-size-adjust: 100%;
+}
+
+body {
+background: var(--bg);
+color: var(--card-text);
+font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+min-height: 100vh;
+display: flex;
+justify-content: center;
+align-items: flex-start;
+padding: 16px;
+transition: background 0.25s ease, color 0.25s ease;
+-webkit-overflow-scrolling: touch;
+touch-action: manipulation;
+}
+
+.wrapper {
+width: 100%;
+max-width: 520px;
+}
+
+.card {
+width: 100%;
+background: var(--modal-bg);
+color: var(--settings-text);
+border-radius: 14px;
+padding: 16px;
+box-shadow: 0 18px 40px var(--modal-shadow);
+border: 1px solid var(--border-color);
+}
+
+.top-row {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+margin-bottom: 10px;
+}
+
+.page-title {
+font-size: 1.25rem;
+font-weight: 900;
+color: var(--title-color);
+line-height: 1.1;
+}
+
+.status-pill {
+display: inline-flex;
+align-items: center;
+gap: 8px;
+border: 1px solid var(--border-color);
+border-radius: 999px;
+padding: 7px 10px;
+color: var(--status-grey);
+font-size: 0.82rem;
+font-weight: 900;
+white-space: nowrap;
+}
+
+.status-dot {
+width: 10px;
+height: 10px;
+border-radius: 999px;
+background: var(--danger);
+}
+
+.status-dot.ok {
+background: var(--ok);
+}
+
+.audio-now-playing {
+margin-top: 10px;
+margin-bottom: 12px;
+padding: 12px 14px;
+border: 1px solid var(--border-color);
+border-radius: 12px;
+background: color-mix(in srgb, var(--bg) 92%, transparent);
+color: var(--card-text);
+font-size: 1.05rem;
+font-weight: 900;
+line-height: 1.25;
+text-align: center;
+min-height: 46px;
+
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.audio-now-playing span {
+color: var(--title-color);
+}
+
+.segment {
+display: flex;
+width: 100%;
+border: 1px solid var(--border-color);
+border-radius: 10px;
+overflow: hidden;
+margin-top: 8px;
+}
+
+.segment button {
+flex: 1;
+padding: 11px 6px;
+background: transparent;
+border: none;
+color: var(--settings-text);
+cursor: pointer;
+font-size: 0.9rem;
+transition: background 0.15s, color 0.15s;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+}
+
+.segment button:hover {
+background: rgba(128,128,128,0.12);
+}
+
+.segment button.active {
+background: #ff5252;
+color: white;
+font-weight: 900;
+}
+
+.audio-grid {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 10px;
+margin-bottom: 18px;
+margin-top: 15px;
+}
+
+.audio-btn {
+padding: 15px 5px;
+border: 1px solid var(--border-color);
+border-radius: 8px;
+background: var(--btn-bg);
+color: var(--btn-text);
+font-weight: 900;
+font-size: 1rem;
+text-align: center;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+touch-action: manipulation;
+user-select: none;
+-webkit-user-select: none;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.audio-btn:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.audio-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.95);
+}
+
+.audio-clear-btn {
+width: 100%;
+border: 1px solid color-mix(in srgb, var(--danger) 70%, var(--btn-border));
+border-radius: 999px;
+background: var(--danger);
+color: #ffffff;
+font-size: 0.95rem;
+padding: 13px 0;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.audio-clear-btn:hover {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
+box-shadow: var(--btn-hover-shadow);
+}
+
+.audio-clear-btn:active {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.muted-message {
+grid-column: span 3;
+color: var(--status-grey);
+text-align: center;
+margin-top: 10px;
+font-weight: 800;
+}
+
+.last-action {
+margin-top: 12px;
+color: var(--status-grey);
+font-size: 0.88rem;
+font-weight: 800;
+text-align: center;
+min-height: 1.2em;
+}
+
+@media (max-width: 420px) {
+body {
+padding: 10px;
+}
+
+.card {
+padding: 14px;
+}
+
+.audio-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+
+.muted-message {
+grid-column: span 2;
+}
+
+.page-title {
+font-size: 1.15rem;
+}
+
+.status-pill {
+font-size: 0.78rem;
+padding: 6px 9px;
+}
+}
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+<div class="card">
+<div class="top-row">
+<div class="page-title">Ambient Pads</div>
+<div class="status-pill">
+<span id="backendDot" class="status-dot"></span>
+<span id="backendStatus">Checking…</span>
+</div>
+</div>
+
+<div id="audioNowPlaying" class="audio-now-playing">
+Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
+</div>
+
+<div class="segment" id="audioPlaylistSegment"></div>
+
+<div id="audioGrid" class="audio-grid"></div>
+
+<button id="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
+
+<div id="lastAction" class="last-action">—</div>
+</div>
+</div>
+
+<script>
+(function () {
+const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+const THEME_KEY = "icas-theme-mode";
+
+function normalizeBase(u) {
+u = String(u || "").trim();
+return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+}
+
+function getApiBase() {
+return normalizeBase(DEFAULT_API_BASE);
+}
+
+function endpoints() {
+const base = getApiBase();
+return {
+health: `${base}/health`,
+audioPlaylists: `${base}/audio/playlists`,
+audioTracks: `${base}/audio/tracks`,
+audioTrigger: `${base}/audio/trigger`,
+audioClear: `${base}/audio/clear`,
+audioActive: `${base}/audio/active`
+};
+}
+
+const backendDot = document.getElementById("backendDot");
+const backendStatus = document.getElementById("backendStatus");
+const lastAction = document.getElementById("lastAction");
+
+const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
+const audioPlaylistSegment = document.getElementById("audioPlaylistSegment");
+const audioGrid = document.getElementById("audioGrid");
+const btnClearAudio = document.getElementById("btnClearAudio");
+
+function setBackendStatus(ok, text) {
+backendDot.classList.toggle("ok", !!ok);
+backendStatus.textContent = text || (ok ? "Connected" : "Offline");
+}
+
+function setLastAction(text) {
+lastAction.textContent = text || "—";
+}
+
+function applyTheme(mode) {
+if (mode === "light") {
+document.body.classList.remove("dark");
+} else if (mode === "dark") {
+document.body.classList.add("dark");
+} else {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+document.body.classList.add("dark");
+} else {
+document.body.classList.remove("dark");
+}
+}
+}
+
+function loadTheme() {
+const stored = localStorage.getItem(THEME_KEY);
+applyTheme(stored || "system");
+}
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+const stored = localStorage.getItem(THEME_KEY) || "system";
+if (stored === "system") applyTheme("system");
+});
+
+async function testBackend() {
+const { health } = endpoints();
+
+try {
+const res = await fetch(health, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+setBackendStatus(true, "Connected");
+return true;
+} catch {
+setBackendStatus(false, "Offline");
+return false;
+}
+}
+
+function parseActiveAudioItem(text) {
+const raw = String(text || "").trim();
+if (!raw) return "";
+
+const itemMatch = raw.match(/^item:\s*(.+)$/im);
+if (itemMatch && itemMatch[1]) {
+return itemMatch[1].trim();
+}
+
+return "";
+}
+
+async function refreshNowPlayingAudio() {
+const { audioActive } = endpoints();
+
+try {
+const res = await fetch(audioActive, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const text = await res.text();
+const item = parseActiveAudioItem(text);
+
+audioNowPlayingItem.textContent = item || "—";
+} catch {
+audioNowPlayingItem.textContent = "—";
+}
+}
+
+function attachTapHandler(el, handler) {
+if (!el) return;
+
+let startX = 0;
+let startY = 0;
+let moved = false;
+let activePointerId = null;
+const MOVE_PX = 10;
+
+el.addEventListener("pointerdown", (e) => {
+if (el.disabled) return;
+if (e.isPrimary === false) return;
+
+activePointerId = e.pointerId;
+moved = false;
+startX = e.clientX;
+startY = e.clientY;
+
+try { el.setPointerCapture(e.pointerId); } catch {}
+});
+
+el.addEventListener("pointermove", (e) => {
+if (activePointerId === null || e.pointerId !== activePointerId) return;
+
+const dx = Math.abs(e.clientX - startX);
+const dy = Math.abs(e.clientY - startY);
+
+if (dx > MOVE_PX || dy > MOVE_PX) moved = true;
+});
+
+function finish(e) {
+if (activePointerId === null || e.pointerId !== activePointerId) return;
+
+try { el.releasePointerCapture(e.pointerId); } catch {}
+
+const shouldFire = !moved;
+activePointerId = null;
+
+if (shouldFire) handler();
+}
+
+el.addEventListener("pointerup", finish);
+el.addEventListener("pointercancel", () => {
+activePointerId = null;
+moved = false;
+});
+
+el.addEventListener("click", (e) => {
+e.preventDefault();
+e.stopPropagation();
+}, true);
+}
+
+window.loadTracks = async (name) => {
+const { audioTracks } = endpoints();
+
+try {
+const res = await fetch(`${audioTracks}?playlist=${encodeURIComponent(name)}`, {
+cache: "no-cache"
+});
+
+if (!res.ok) throw new Error("Bad response");
+
+const data = await res.json();
+const items = Array.isArray(data?.items) ? data.items : [];
+
+audioGrid.innerHTML = "";
+
+items.forEach(t => {
+let clean = String(t || "")
+.replace(/\.[^/.]+$/, "")
+.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "")
+.trim();
+
+const btn = document.createElement("div");
+btn.className = "audio-btn";
+btn.textContent = clean || t;
+
+attachTapHandler(btn, () => window.triggerAudio(name, t));
+
+audioGrid.appendChild(btn);
+});
+
+if (items.length === 0) {
+audioGrid.innerHTML = "<div class='muted-message'>No tracks found</div>";
+}
+} catch {
+audioGrid.innerHTML = "<div class='muted-message'>Failed to load tracks</div>";
+}
+};
+
+window.triggerAudio = async (playlist, track) => {
+setLastAction(`Playing Pad: ${track}`);
+
+const { audioTrigger } = endpoints();
+
+try {
+const res = await fetch(audioTrigger, {
+method: "POST",
+body: JSON.stringify({ playlist, track }),
+headers: { "Content-Type": "application/json" }
+});
+
+if (!res.ok) throw new Error("Bad response");
+
+setTimeout(refreshNowPlayingAudio, 300);
+} catch (err) {
+console.error(err);
+setLastAction("Failed to play pad");
+}
+};
+
+async function loadPlaylists() {
+const { audioPlaylists } = endpoints();
+
+try {
+const res = await fetch(audioPlaylists, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const data = await res.json();
+const items = Array.isArray(data?.items) ? data.items : [];
+
+audioPlaylistSegment.innerHTML = "";
+
+items.forEach((name, i) => {
+const btn = document.createElement("button");
+
+if (i === 0) btn.className = "active";
+
+btn.textContent = name;
+
+attachTapHandler(btn, () => {
+audioPlaylistSegment.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+btn.classList.add("active");
+window.loadTracks(name);
+});
+
+audioPlaylistSegment.appendChild(btn);
+});
+
+if (items[0]) {
+window.loadTracks(items[0]);
+} else {
+audioGrid.innerHTML = "<div class='muted-message'>No playlists found</div>";
+}
+} catch {
+audioPlaylistSegment.innerHTML = "";
+audioGrid.innerHTML = "<div class='muted-message'>Failed to load playlists</div>";
+}
+}
+
+attachTapHandler(btnClearAudio, async () => {
+setLastAction("Cleared Ambient Audio");
+
+const { audioClear } = endpoints();
+
+try {
+const res = await fetch(audioClear, { method: "POST" });
+if (!res.ok) throw new Error("Bad response");
+
+setTimeout(refreshNowPlayingAudio, 300);
+} catch (err) {
+console.error(err);
+setLastAction("Failed to clear audio");
+}
+});
+
+async function init() {
+loadTheme();
+
+setBackendStatus(false, "Checking…");
+setLastAction("—");
+
+await testBackend();
+await refreshNowPlayingAudio();
+await loadPlaylists();
+
+setInterval(testBackend, 10000);
+setInterval(refreshNowPlayingAudio, 1000);
+}
+
+init();
+})();
+</script>
+</body>
+</html>
