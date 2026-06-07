@@ -1,455 +1,229 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Current Audio</title>
 
   <style>
+
     html,
+
     body {
+
       width: 100%;
+
       height: 100%;
+
       margin: 0;
+
       padding: 0;
+
       overflow: hidden;
+
       background: #000000;
+
     }
 
     body {
+
       display: flex;
+
       align-items: center;
+
       justify-content: center;
+
       font-family: Arial, Helvetica, sans-serif;
+
     }
 
     #audioText {
+
       display: block;
-      width: 100vw;
-      max-width: 100vw;
-      padding: 0;
-      margin: 0;
+
       color: #ffffff;
+
       font-family: Arial, Helvetica, sans-serif;
-      font-weight: 800;
-      line-height: 1;
+
+      font-weight: 900;
+
       text-align: center;
+
       white-space: nowrap;
-      overflow: hidden;
+
+      line-height: 1;
+
+      margin: 0;
+
+      padding: 0;
+
+      overflow: visible;
+
       text-transform: uppercase;
-      letter-spacing: 0;
+
+      transform-origin: center center;
+
     }
+
   </style>
+
 </head>
 
 <body>
+
   <div id="audioText"></div>
 
   <script>
+
     (function () {
+
       const DEFAULT_API_BASE = "https://control.icas-clicker.work";
-      const POLL_MS = 500;
-      const MIN_FONT_PX = 8;
-      const MAX_FONT_PX = 300;
+
+      const POLL_INTERVAL_MS = 1000;
 
       const audioText = document.getElementById("audioText");
-      let lastText = "";
 
-      function normalizeBase(u) {
-        u = String(u || "").trim();
-        return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+      function normalizeBase(url) {
+
+        return String(url || "").replace(/\/+$/, "");
+
       }
 
-      function getApiBase() {
-        return normalizeBase(DEFAULT_API_BASE);
+      function getAudioEndpoint() {
+
+        return normalizeBase(DEFAULT_API_BASE) + "/audio/active";
+
       }
 
-      function endpoints() {
-        const base = getApiBase();
-        return {
-          audioActive: `${base}/audio/active`
-        };
-      }
+      function parseItemName(text) {
 
-      function extractItemName(raw) {
-        raw = String(raw || "").trim();
-        if (!raw || raw.toLowerCase().includes("no audio playing")) return "";
+        const raw = String(text || "").trim();
 
-        // Expected Hammerspoon plain text:
-        // playlist: Major Pads
-        // item: F(Major)
-        const match = raw.match(/(?:^|\n)\s*item\s*:\s*(.+?)\s*$/im);
-        if (match && match[1]) return match[1].trim();
+        if (!raw) return "";
 
-        // Fallback if endpoint is ever changed to JSON later.
-        try {
-          const data = JSON.parse(raw);
-          if (data && data.item && data.item.name) return String(data.item.name).trim();
-          if (data && data.item) return String(data.item).trim();
-        } catch (_) {}
+        const itemMatch = raw.match(/^item:\s*(.+)$/im);
+
+        if (itemMatch && itemMatch[1]) {
+
+          return itemMatch[1].trim();
+
+        }
 
         return "";
+
       }
 
       function fitText() {
-        const text = audioText.textContent || "";
-        if (!text) return;
 
-        const availableW = Math.max(1, window.innerWidth - 2);
-        const availableH = Math.max(1, window.innerHeight - 2);
+        const text = audioText.textContent.trim();
 
-        let low = MIN_FONT_PX;
-        let high = Math.min(MAX_FONT_PX, availableH * 1.25);
-        let best = low;
+        if (!text) {
 
-        audioText.style.fontSize = low + "px";
+          audioText.style.fontSize = "1px";
 
-        for (let i = 0; i < 18; i++) {
-          const mid = (low + high) / 2;
-          audioText.style.fontSize = mid + "px";
+          return;
 
-          const fits = audioText.scrollWidth <= availableW && audioText.scrollHeight <= availableH;
-          if (fits) {
-            best = mid;
-            low = mid;
-          } else {
-            high = mid;
-          }
         }
 
-        audioText.style.fontSize = Math.floor(best) + "px";
+        const windowWidth = Math.max(1, window.innerWidth);
+
+        const windowHeight = Math.max(1, window.innerHeight);
+
+        let low = 1;
+
+        let high = 300;
+
+        let best = 1;
+
+        audioText.style.transform = "none";
+
+        for (let i = 0; i < 20; i++) {
+
+          const mid = Math.floor((low + high) / 2);
+
+          audioText.style.fontSize = mid + "px";
+
+          const rect = audioText.getBoundingClientRect();
+
+          if (rect.width <= windowWidth && rect.height <= windowHeight) {
+
+            best = mid;
+
+            low = mid + 1;
+
+          } else {
+
+            high = mid - 1;
+
+          }
+
+        }
+
+        audioText.style.fontSize = best + "px";
+
       }
 
-      function setAudioText(value) {
-        const clean = String(value || "").trim();
-        if (clean === lastText) return;
+      function setText(value) {
 
-        lastText = clean;
-        audioText.textContent = clean.toUpperCase();
-        requestAnimationFrame(fitText);
+        const clean = String(value || "").trim().toUpperCase();
+
+        if (audioText.textContent !== clean) {
+
+          audioText.textContent = clean;
+
+          fitText();
+
+        }
+
       }
 
       async function refreshAudio() {
-        try {
-          const { audioActive } = endpoints();
-          const res = await fetch(audioActive, { cache: "no-cache" });
-          if (!res.ok) throw new Error("Bad response");
 
-          const raw = await res.text();
-          const item = extractItemName(raw);
-          setAudioText(item);
+        try {
+
+          const response = await fetch(getAudioEndpoint(), {
+
+            cache: "no-cache"
+
+          });
+
+          if (!response.ok) {
+
+            setText("");
+
+            return;
+
+          }
+
+          const text = await response.text();
+
+          const itemName = parseItemName(text);
+
+          setText(itemName);
+
         } catch (err) {
-          // Keep the screen clean if the backend briefly fails.
-          setAudioText("");
+
+          setText("");
+
         }
+
       }
 
-      window.addEventListener("resize", () => requestAnimationFrame(fitText));
+      window.addEventListener("resize", fitText);
 
       refreshAudio();
-      setInterval(refreshAudio, POLL_MS);
+
+      setInterval(refreshAudio, POLL_INTERVAL_MS);
+
     })();
+
   </script>
+
 </body>
-</html>
-    font-weight: 900;
-    text-align: center;
-    transform-origin: center center;
-    font-synthesis: weight;
-  }
-</style>
-</head>
 
-<body>
-  <div id="audioText"></div>
-
-<script>
-(function () {
-  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
-  const POLL_MS = 500;
-
-  const audioText = document.getElementById("audioText");
-  let lastShown = "";
-
-  function normalizeBase(u) {
-    return String(u || DEFAULT_API_BASE).trim().replace(/\/+$/, "");
-  }
-
-  function endpoints() {
-    const base = normalizeBase(DEFAULT_API_BASE);
-    return {
-      audioActive: `${base}/audio/active`
-    };
-  }
-
-  function extractItemName(raw) {
-    const text = String(raw || "").trim();
-    if (!text || /^no audio playing$/i.test(text)) return "";
-
-    const itemMatch = text.match(/^item:\s*(.+)$/im);
-    if (itemMatch && itemMatch[1]) return itemMatch[1].trim();
-
-    try {
-      const obj = JSON.parse(text);
-      const itemName = obj?.item?.name;
-      if (typeof itemName === "string") return itemName.trim();
-    } catch (_) {}
-
-    return "";
-  }
-
-  function fitText() {
-    const value = audioText.textContent || "";
-    if (!value) return;
-
-    const viewportW = Math.max(1, window.innerWidth);
-    const viewportH = Math.max(1, window.innerHeight);
-
-    // Start very large, then binary-search down until the text fits in one line.
-    let low = 1;
-    let high = Math.max(viewportW, viewportH) * 2;
-    let best = 1;
-
-    audioText.style.fontSize = "1px";
-    audioText.style.transform = "scaleX(1)";
-
-    for (let i = 0; i < 18; i++) {
-      const mid = (low + high) / 2;
-      audioText.style.fontSize = `${mid}px`;
-
-      const rect = audioText.getBoundingClientRect();
-      if (rect.width <= viewportW && rect.height <= viewportH) {
-        best = mid;
-        low = mid;
-      } else {
-        high = mid;
-      }
-    }
-
-    audioText.style.fontSize = `${best}px`;
-
-    // Final tiny horizontal squeeze only when needed, never wrap.
-    const rect = audioText.getBoundingClientRect();
-    if (rect.width > viewportW) {
-      audioText.style.transform = `scaleX(${viewportW / rect.width})`;
-    } else {
-      audioText.style.transform = "scaleX(1)";
-    }
-  }
-
-  function setDisplay(name) {
-    const clean = String(name || "").trim().toUpperCase();
-    if (clean === lastShown) return;
-
-    lastShown = clean;
-    audioText.textContent = clean;
-    requestAnimationFrame(fitText);
-  }
-
-  async function refreshAudio() {
-    try {
-      const res = await fetch(endpoints().audioActive, { cache: "no-cache" });
-      if (!res.ok) throw new Error("Bad response");
-      const raw = await res.text();
-      setDisplay(extractItemName(raw));
-    } catch (_) {
-      setDisplay("");
-    }
-  }
-
-  window.addEventListener("resize", () => requestAnimationFrame(fitText));
-
-  refreshAudio();
-  setInterval(refreshAudio, POLL_MS);
-})();
-</script>
-</body>
-</html>
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: #ffffff;
-  font-weight: 900;
-  line-height: 0.92;
-  white-space: nowrap;
-  overflow: hidden;
-  padding: 0 4px;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
-}
-</style>
-</head>
-
-<body>
-<div id="audioText"></div>
-
-<script>
-(function () {
-  // Same backend pattern as control.html
-  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
-
-  const POLL_MS = 500;
-  const MIN_FONT_PX = 16;
-  const MAX_FONT_PX = 78;
-  const audioText = document.getElementById("audioText");
-
-  function normalizeBase(u) {
-    u = String(u || "").trim();
-    return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
-  }
-
-  function getApiBase() {
-    return normalizeBase(DEFAULT_API_BASE);
-  }
-
-  function endpoints() {
-    const base = getApiBase();
-    return {
-      audioActive: `${base}/audio/active`
-    };
-  }
-
-  function extractItemName(text) {
-    text = String(text || "").trim();
-    if (!text || /^no audio playing$/i.test(text)) return "";
-
-    // Expected Hammerspoon response:
-    // playlist: Major Pads
-    // item: F(Major)
-    const match = text.match(/^item:\s*(.+)$/im);
-    if (match && match[1]) return match[1].trim();
-
-    return "";
-  }
-
-  function fitText() {
-    const text = audioText.textContent.trim();
-    if (!text) return;
-
-    const availableW = Math.max(1, audioText.clientWidth - 8);
-    const availableH = Math.max(1, audioText.clientHeight - 2);
-
-    let low = MIN_FONT_PX;
-    let high = MAX_FONT_PX;
-    let best = MIN_FONT_PX;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      audioText.style.fontSize = `${mid}px`;
-
-      const fits = audioText.scrollWidth <= availableW && audioText.scrollHeight <= availableH;
-      if (fits) {
-        best = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-
-    audioText.style.fontSize = `${best}px`;
-  }
-
-  async function refreshCurrentAudio() {
-    const { audioActive } = endpoints();
-
-    try {
-      const res = await fetch(audioActive, { cache: "no-cache" });
-      if (!res.ok) throw new Error("Bad response");
-
-      const body = await res.text();
-      const itemName = extractItemName(body);
-
-      if (audioText.textContent !== itemName) {
-        audioText.textContent = itemName;
-        requestAnimationFrame(fitText);
-      }
-    } catch (err) {
-      // Keep the display clean/transparent if backend is unavailable.
-      audioText.textContent = "";
-    }
-  }
-
-  window.addEventListener("resize", fitText);
-
-  refreshCurrentAudio();
-  setInterval(refreshCurrentAudio, POLL_MS);
-})();
-</script>
-</body>
-</html>
-  justify-content: center;
-  text-align: center;
-  color: #ffffff;
-  font-weight: 800;
-  font-size: clamp(22px, 8vw, 52px);
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 10px;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
-}
-</style>
-</head>
-
-<body>
-<div id="audioText"></div>
-
-<script>
-(function () {
-  // Same backend pattern as control.html
-  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
-
-  const POLL_MS = 500;
-  const audioText = document.getElementById("audioText");
-
-  function normalizeBase(u) {
-    u = String(u || "").trim();
-    return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
-  }
-
-  function getApiBase() {
-    return normalizeBase(DEFAULT_API_BASE);
-  }
-
-  function endpoints() {
-    const base = getApiBase();
-    return {
-      audioActive: `${base}/audio/active`
-    };
-  }
-
-  function extractItemName(text) {
-    text = String(text || "").trim();
-    if (!text || /^no audio playing$/i.test(text)) return "";
-
-    // Expected Hammerspoon response:
-    // playlist: Major Pads
-    // item: F(Major)
-    const match = text.match(/^item:\s*(.+)$/im);
-    if (match && match[1]) return match[1].trim();
-
-    return "";
-  }
-
-  async function refreshCurrentAudio() {
-    const { audioActive } = endpoints();
-
-    try {
-      const res = await fetch(audioActive, { cache: "no-cache" });
-      if (!res.ok) throw new Error("Bad response");
-
-      const body = await res.text();
-      const itemName = extractItemName(body);
-      audioText.textContent = itemName;
-    } catch (err) {
-      // Keep the display clean/transparent if backend is unavailable.
-      audioText.textContent = "";
-    }
-  }
-
-  refreshCurrentAudio();
-  setInterval(refreshCurrentAudio, POLL_MS);
-})();
-</script>
-</body>
 </html>
