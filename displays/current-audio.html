@@ -17,7 +17,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #000000;
+  background: transparent;
 }
 
 body {
@@ -30,10 +30,121 @@ body {
 
 #audioText {
   width: 100vw;
-  max-width: 450px;
-  height: 80px;
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #ffffff;
+  font-weight: 900;
+  line-height: 0.92;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 4px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+</style>
+</head>
+
+<body>
+<div id="audioText"></div>
+
+<script>
+(function () {
+  // Same backend pattern as control.html
+  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+
+  const POLL_MS = 500;
+  const MIN_FONT_PX = 16;
+  const MAX_FONT_PX = 78;
+  const audioText = document.getElementById("audioText");
+
+  function normalizeBase(u) {
+    u = String(u || "").trim();
+    return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+  }
+
+  function getApiBase() {
+    return normalizeBase(DEFAULT_API_BASE);
+  }
+
+  function endpoints() {
+    const base = getApiBase();
+    return {
+      audioActive: `${base}/audio/active`
+    };
+  }
+
+  function extractItemName(text) {
+    text = String(text || "").trim();
+    if (!text || /^no audio playing$/i.test(text)) return "";
+
+    // Expected Hammerspoon response:
+    // playlist: Major Pads
+    // item: F(Major)
+    const match = text.match(/^item:\s*(.+)$/im);
+    if (match && match[1]) return match[1].trim();
+
+    return "";
+  }
+
+  function fitText() {
+    const text = audioText.textContent.trim();
+    if (!text) return;
+
+    const availableW = Math.max(1, audioText.clientWidth - 8);
+    const availableH = Math.max(1, audioText.clientHeight - 2);
+
+    let low = MIN_FONT_PX;
+    let high = MAX_FONT_PX;
+    let best = MIN_FONT_PX;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      audioText.style.fontSize = `${mid}px`;
+
+      const fits = audioText.scrollWidth <= availableW && audioText.scrollHeight <= availableH;
+      if (fits) {
+        best = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    audioText.style.fontSize = `${best}px`;
+  }
+
+  async function refreshCurrentAudio() {
+    const { audioActive } = endpoints();
+
+    try {
+      const res = await fetch(audioActive, { cache: "no-cache" });
+      if (!res.ok) throw new Error("Bad response");
+
+      const body = await res.text();
+      const itemName = extractItemName(body);
+
+      if (audioText.textContent !== itemName) {
+        audioText.textContent = itemName;
+        requestAnimationFrame(fitText);
+      }
+    } catch (err) {
+      // Keep the display clean/transparent if backend is unavailable.
+      audioText.textContent = "";
+    }
+  }
+
+  window.addEventListener("resize", fitText);
+
+  refreshCurrentAudio();
+  setInterval(refreshCurrentAudio, POLL_MS);
+})();
+</script>
+</body>
+</html>
   justify-content: center;
   text-align: center;
   color: #ffffff;
