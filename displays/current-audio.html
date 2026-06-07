@@ -8,10 +8,10 @@
   <style>
     html,
     body {
-      width: 450px;
-      height: 80px;
       margin: 0;
       padding: 0;
+      width: 450px;
+      height: 80px;
       overflow: hidden;
       background: transparent;
     }
@@ -21,17 +21,17 @@
       align-items: center;
       justify-content: center;
       font-family: Arial, Helvetica, sans-serif;
+      color: #ffffff;
     }
 
     #audioText {
-      width: 450px;
-      padding: 0 14px;
+      width: 100%;
+      padding: 0 12px;
       box-sizing: border-box;
-      color: #ffffff;
-      font-size: 38px;
+      text-align: center;
+      font-size: 34px;
       font-weight: 700;
       line-height: 1;
-      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -43,49 +43,51 @@
   <div id="audioText"></div>
 
   <script>
-    const AUDIO_ENDPOINT = "/audio/active";
+    // This page is hosted online, so this must point back to the LOCAL
+    // Hammerspoon server running on the same Mac as ProPresenter/OBS.
+    const AUDIO_ENDPOINT = "http://127.0.0.1:1337/audio/active";
     const POLL_MS = 500;
 
     const audioText = document.getElementById("audioText");
 
     function extractItemName(text) {
-      const raw = String(text || "").trim();
-      if (!raw) return "";
+      if (!text) return "";
 
-      // Expected Hammerspoon format:
-      // playlist: Major Pads
-      // item: F(Major)
-      const itemMatch = raw.match(/^item:\s*(.+)$/im);
-      if (itemMatch && itemMatch[1]) {
-        return itemMatch[1].trim();
+      const lines = String(text).split(/\r?\n/);
+
+      for (const line of lines) {
+        const match = line.match(/^\s*item\s*:\s*(.+?)\s*$/i);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
       }
 
-      // Fallback in case the endpoint is later changed to JSON.
-      try {
-        const obj = JSON.parse(raw);
-        return obj?.item?.name || obj?.item || "";
-      } catch (e) {
-        return "";
-      }
+      return "";
     }
 
-    async function refreshAudio() {
+    async function updateAudio() {
       try {
-        const response = await fetch(AUDIO_ENDPOINT, { cache: "no-store" });
+        const response = await fetch(AUDIO_ENDPOINT, {
+          method: "GET",
+          cache: "no-store"
+        });
+
         if (!response.ok) {
           audioText.textContent = "";
           return;
         }
 
         const text = await response.text();
-        audioText.textContent = extractItemName(text);
-      } catch (e) {
+        const itemName = extractItemName(text);
+
+        audioText.textContent = itemName || "";
+      } catch (err) {
         audioText.textContent = "";
       }
     }
 
-    refreshAudio();
-    setInterval(refreshAudio, POLL_MS);
+    updateAudio();
+    setInterval(updateAudio, POLL_MS);
   </script>
 </body>
 </html>
