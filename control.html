@@ -44,7 +44,7 @@
 }
 
 body.dark {
---bg: #BB0000;
+--bg: #000000;
 --title-color: #ff5252;
 --status-grey: #888888;
 
@@ -806,7 +806,7 @@ Setup ProPresenter to display iMac screen on all in-house tvs.
 <div class="settings-title" style="margin-bottom: 0;">Ambient Pads</div>
 
 <div id="audioNowPlaying" class="audio-now-playing">
-Playing:   <span id="audioNowPlayingItem">—</span>
+Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 </div>
 
 <div class="segment" id="audioPlaylistSegment"></div>
@@ -1018,7 +1018,7 @@ const audioPlaylistSegment = document.getElementById("audioPlaylistSegment");
 const audioGrid = document.getElementById("audioGrid");
 const btnClearAudio = document.getElementById("btnClearAudio");
 const audioCloseButton = document.getElementById("audioCloseButton");
-const audioNowPlayingItem = " " + document.getElementById("audioNowPlayingItem");
+const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
 
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
 
