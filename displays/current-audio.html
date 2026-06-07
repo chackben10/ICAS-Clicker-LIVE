@@ -2,38 +2,151 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Current Audio</title>
 
 <style>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-html,
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: transparent;
-}
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
+  }
 
-#audioText {
-  width: 100vw;
-  height: 100vh;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
+  #audioText {
+    display: block;
+    color: #fff;
+    white-space: nowrap;
+    text-transform: uppercase;
+    line-height: 0.82;
+    letter-spacing: -0.055em;
+    font-weight: 900;
+    text-align: center;
+    transform-origin: center center;
+    font-synthesis: weight;
+  }
+</style>
+</head>
+
+<body>
+  <div id="audioText"></div>
+
+<script>
+(function () {
+  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+  const POLL_MS = 500;
+
+  const audioText = document.getElementById("audioText");
+  let lastShown = "";
+
+  function normalizeBase(u) {
+    return String(u || DEFAULT_API_BASE).trim().replace(/\/+$/, "");
+  }
+
+  function endpoints() {
+    const base = normalizeBase(DEFAULT_API_BASE);
+    return {
+      audioActive: `${base}/audio/active`
+    };
+  }
+
+  function extractItemName(raw) {
+    const text = String(raw || "").trim();
+    if (!text || /^no audio playing$/i.test(text)) return "";
+
+    const itemMatch = text.match(/^item:\s*(.+)$/im);
+    if (itemMatch && itemMatch[1]) return itemMatch[1].trim();
+
+    try {
+      const obj = JSON.parse(text);
+      const itemName = obj?.item?.name;
+      if (typeof itemName === "string") return itemName.trim();
+    } catch (_) {}
+
+    return "";
+  }
+
+  function fitText() {
+    const value = audioText.textContent || "";
+    if (!value) return;
+
+    const viewportW = Math.max(1, window.innerWidth);
+    const viewportH = Math.max(1, window.innerHeight);
+
+    // Start very large, then binary-search down until the text fits in one line.
+    let low = 1;
+    let high = Math.max(viewportW, viewportH) * 2;
+    let best = 1;
+
+    audioText.style.fontSize = "1px";
+    audioText.style.transform = "scaleX(1)";
+
+    for (let i = 0; i < 18; i++) {
+      const mid = (low + high) / 2;
+      audioText.style.fontSize = `${mid}px`;
+
+      const rect = audioText.getBoundingClientRect();
+      if (rect.width <= viewportW && rect.height <= viewportH) {
+        best = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    audioText.style.fontSize = `${best}px`;
+
+    // Final tiny horizontal squeeze only when needed, never wrap.
+    const rect = audioText.getBoundingClientRect();
+    if (rect.width > viewportW) {
+      audioText.style.transform = `scaleX(${viewportW / rect.width})`;
+    } else {
+      audioText.style.transform = "scaleX(1)";
+    }
+  }
+
+  function setDisplay(name) {
+    const clean = String(name || "").trim().toUpperCase();
+    if (clean === lastShown) return;
+
+    lastShown = clean;
+    audioText.textContent = clean;
+    requestAnimationFrame(fitText);
+  }
+
+  async function refreshAudio() {
+    try {
+      const res = await fetch(endpoints().audioActive, { cache: "no-cache" });
+      if (!res.ok) throw new Error("Bad response");
+      const raw = await res.text();
+      setDisplay(extractItemName(raw));
+    } catch (_) {
+      setDisplay("");
+    }
+  }
+
+  window.addEventListener("resize", () => requestAnimationFrame(fitText));
+
+  refreshAudio();
+  setInterval(refreshAudio, POLL_MS);
+})();
+</script>
+</body>
+</html>
   align-items: center;
   justify-content: center;
   text-align: center;
