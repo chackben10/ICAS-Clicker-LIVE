@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=450, height=80, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Current Audio</title>
 
   <style>
@@ -23,64 +23,69 @@
       font-family: Arial, Helvetica, sans-serif;
     }
 
-    #audioItem {
-      width: 100%;
-      padding: 0 12px;
+    #audioText {
+      width: 450px;
+      padding: 0 14px;
       box-sizing: border-box;
       color: #ffffff;
-      font-size: 42px;
+      font-size: 38px;
       font-weight: 700;
       line-height: 1;
       text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
     }
   </style>
 </head>
 <body>
-  <div id="audioItem"></div>
+  <div id="audioText"></div>
 
   <script>
-    const ENDPOINT = "http://localhost:1337/audio/active";
-    const POLL_INTERVAL_MS = 1000;
+    const AUDIO_ENDPOINT = "/audio/active";
+    const POLL_MS = 500;
 
-    const audioItemEl = document.getElementById("audioItem");
+    const audioText = document.getElementById("audioText");
 
     function extractItemName(text) {
-      if (!text) return "";
+      const raw = String(text || "").trim();
+      if (!raw) return "";
 
-      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-
-      for (const line of lines) {
-        const match = line.match(/^item:\s*(.+)$/i);
-        if (match && match[1]) {
-          return match[1].trim();
-        }
+      // Expected Hammerspoon format:
+      // playlist: Major Pads
+      // item: F(Major)
+      const itemMatch = raw.match(/^item:\s*(.+)$/im);
+      if (itemMatch && itemMatch[1]) {
+        return itemMatch[1].trim();
       }
 
-      return "";
+      // Fallback in case the endpoint is later changed to JSON.
+      try {
+        const obj = JSON.parse(raw);
+        return obj?.item?.name || obj?.item || "";
+      } catch (e) {
+        return "";
+      }
     }
 
-    async function updateCurrentAudio() {
+    async function refreshAudio() {
       try {
-        const response = await fetch(ENDPOINT, { cache: "no-store" });
-
+        const response = await fetch(AUDIO_ENDPOINT, { cache: "no-store" });
         if (!response.ok) {
-          audioItemEl.textContent = "";
+          audioText.textContent = "";
           return;
         }
 
         const text = await response.text();
-        audioItemEl.textContent = extractItemName(text);
-      } catch (error) {
-        audioItemEl.textContent = "";
+        audioText.textContent = extractItemName(text);
+      } catch (e) {
+        audioText.textContent = "";
       }
     }
 
-    updateCurrentAudio();
-    setInterval(updateCurrentAudio, POLL_INTERVAL_MS);
+    refreshAudio();
+    setInterval(refreshAudio, POLL_MS);
   </script>
 </body>
 </html>
