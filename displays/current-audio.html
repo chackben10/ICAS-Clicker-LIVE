@@ -1,93 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Current Audio</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Current Audio</title>
 
-  <style>
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      width: 450px;
-      height: 80px;
-      overflow: hidden;
-      background: transparent;
-    }
+<style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: Arial, Helvetica, sans-serif;
-      color: #ffffff;
-    }
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000000;
+}
 
-    #audioText {
-      width: 100%;
-      padding: 0 12px;
-      box-sizing: border-box;
-      text-align: center;
-      font-size: 34px;
-      font-weight: 700;
-      line-height: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
-    }
-  </style>
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#audioText {
+  width: 100vw;
+  max-width: 450px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: clamp(22px, 8vw, 52px);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 10px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+</style>
 </head>
+
 <body>
-  <div id="audioText"></div>
+<div id="audioText"></div>
 
-  <script>
-    // This page is hosted online, so this must point back to the LOCAL
-    // Hammerspoon server running on the same Mac as ProPresenter/OBS.
-    const AUDIO_ENDPOINT = "http://127.0.0.1:1337/audio/active";
-    const POLL_MS = 500;
+<script>
+(function () {
+  // Same backend pattern as control.html
+  const DEFAULT_API_BASE = "https://control.icas-clicker.work";
 
-    const audioText = document.getElementById("audioText");
+  const POLL_MS = 500;
+  const audioText = document.getElementById("audioText");
 
-    function extractItemName(text) {
-      if (!text) return "";
+  function normalizeBase(u) {
+    u = String(u || "").trim();
+    return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+  }
 
-      const lines = String(text).split(/\r?\n/);
+  function getApiBase() {
+    return normalizeBase(DEFAULT_API_BASE);
+  }
 
-      for (const line of lines) {
-        const match = line.match(/^\s*item\s*:\s*(.+?)\s*$/i);
-        if (match && match[1]) {
-          return match[1].trim();
-        }
-      }
+  function endpoints() {
+    const base = getApiBase();
+    return {
+      audioActive: `${base}/audio/active`
+    };
+  }
 
-      return "";
+  function extractItemName(text) {
+    text = String(text || "").trim();
+    if (!text || /^no audio playing$/i.test(text)) return "";
+
+    // Expected Hammerspoon response:
+    // playlist: Major Pads
+    // item: F(Major)
+    const match = text.match(/^item:\s*(.+)$/im);
+    if (match && match[1]) return match[1].trim();
+
+    return "";
+  }
+
+  async function refreshCurrentAudio() {
+    const { audioActive } = endpoints();
+
+    try {
+      const res = await fetch(audioActive, { cache: "no-cache" });
+      if (!res.ok) throw new Error("Bad response");
+
+      const body = await res.text();
+      const itemName = extractItemName(body);
+      audioText.textContent = itemName;
+    } catch (err) {
+      // Keep the display clean/transparent if backend is unavailable.
+      audioText.textContent = "";
     }
+  }
 
-    async function updateAudio() {
-      try {
-        const response = await fetch(AUDIO_ENDPOINT, {
-          method: "GET",
-          cache: "no-store"
-        });
-
-        if (!response.ok) {
-          audioText.textContent = "";
-          return;
-        }
-
-        const text = await response.text();
-        const itemName = extractItemName(text);
-
-        audioText.textContent = itemName || "";
-      } catch (err) {
-        audioText.textContent = "";
-      }
-    }
-
-    updateAudio();
-    setInterval(updateAudio, POLL_MS);
-  </script>
+  refreshCurrentAudio();
+  setInterval(refreshCurrentAudio, POLL_MS);
+})();
+</script>
 </body>
 </html>
