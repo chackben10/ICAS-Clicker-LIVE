@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=450, height=80, initial-scale=1.0" />
+  <title>Current Audio</title>
+
+  <style>
+    html,
+    body {
+      width: 450px;
+      height: 80px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #audioItem {
+      width: 100%;
+      padding: 0 12px;
+      box-sizing: border-box;
+      color: #ffffff;
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+    }
+  </style>
+</head>
+<body>
+  <div id="audioItem"></div>
+
+  <script>
+    const ENDPOINT = "http://localhost:1337/audio/active";
+    const POLL_INTERVAL_MS = 1000;
+
+    const audioItemEl = document.getElementById("audioItem");
+
+    function extractItemName(text) {
+      if (!text) return "";
+
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+
+      for (const line of lines) {
+        const match = line.match(/^item:\s*(.+)$/i);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+
+      return "";
+    }
+
+    async function updateCurrentAudio() {
+      try {
+        const response = await fetch(ENDPOINT, { cache: "no-store" });
+
+        if (!response.ok) {
+          audioItemEl.textContent = "";
+          return;
+        }
+
+        const text = await response.text();
+        audioItemEl.textContent = extractItemName(text);
+      } catch (error) {
+        audioItemEl.textContent = "";
+      }
+    }
+
+    updateCurrentAudio();
+    setInterval(updateCurrentAudio, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
