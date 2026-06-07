@@ -575,6 +575,29 @@ transform: translateY(1px) scale(0.995);
 .presets-header[hidden] { display: none !important; }
 
 /* ===== Audio Pads UI Elements ===== */
+.audio-now-playing {
+margin-top: 10px;
+margin-bottom: 12px;
+padding: 10px 12px;
+border: 1px solid var(--border-color);
+border-radius: 10px;
+background: color-mix(in srgb, var(--bg) 92%, transparent);
+color: var(--card-text);
+font-size: 1rem;
+font-weight: 900;
+line-height: 1.25;
+text-align: center;
+min-height: 42px;
+
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.audio-now-playing span {
+color: var(--title-color);
+}
+
 .audio-grid {
 display: grid;
 grid-template-columns: repeat(3, 1fr);
@@ -781,6 +804,11 @@ Setup ProPresenter to display iMac screen on all in-house tvs.
 <div id="audioOverlay" class="settings-overlay">
 <div class="settings-card">
 <div class="settings-title" style="margin-bottom: 0;">Ambient Pads</div>
+
+<div id="audioNowPlaying" class="audio-now-playing">
+Playing: <span id="audioNowPlayingItem">—</span>
+</div>
+
 <div class="segment" id="audioPlaylistSegment"></div>
 <div id="audioGrid" class="audio-grid"></div>
 <button id="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
@@ -879,6 +907,7 @@ audioPlaylists: `${base}/audio/playlists`,
 audioTracks: `${base}/audio/tracks`,
 audioTrigger: `${base}/audio/trigger`,
 audioClear: `${base}/audio/clear`,
+audioActive: `${base}/audio/active`,
 autoShow: `${base}/auto-show`
 };
 }
@@ -989,6 +1018,7 @@ const audioPlaylistSegment = document.getElementById("audioPlaylistSegment");
 const audioGrid = document.getElementById("audioGrid");
 const btnClearAudio = document.getElementById("btnClearAudio");
 const audioCloseButton = document.getElementById("audioCloseButton");
+const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
 
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
 
@@ -1357,6 +1387,36 @@ setLastAction(`Failed macro: ${name}`);
 }
 
 // ====== Audio Functions ======
+function parseActiveAudioItem(text) {
+const raw = String(text || "").trim();
+if (!raw) return "";
+
+const itemMatch = raw.match(/^item:\s*(.+)$/im);
+if (itemMatch && itemMatch[1]) {
+return itemMatch[1].trim();
+}
+
+return "";
+}
+
+async function refreshNowPlayingAudio() {
+if (!audioNowPlayingItem) return;
+
+const { audioActive } = endpoints();
+
+try {
+const res = await fetch(audioActive, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const text = await res.text();
+const item = parseActiveAudioItem(text);
+
+audioNowPlayingItem.textContent = item || "—";
+} catch {
+audioNowPlayingItem.textContent = "—";
+}
+}
+
 window.loadTracks = async (name) => {
 const { audioTracks } = endpoints();
 try {
@@ -1382,12 +1442,15 @@ audioGrid.innerHTML = "<div style='grid-column: span 3; color: var(--status-grey
 window.triggerAudio = async (p, t) => {
 setLastAction(`Playing Pad: ${t}`);
 const { audioTrigger } = endpoints();
+
 try {
 await fetch(audioTrigger, {
 method: "POST",
 body: JSON.stringify({ playlist: p, track: t }),
 headers: { "Content-Type": "application/json" }
 });
+
+setTimeout(refreshNowPlayingAudio, 300);
 } catch (err) {
 console.error(err);
 }
@@ -1395,6 +1458,8 @@ console.error(err);
 
 function openAudioModal() {
 audioOverlay.style.display = "flex";
+refreshNowPlayingAudio();
+
 const { audioPlaylists } = endpoints();
 fetch(audioPlaylists)
 .then(r => r.json())
@@ -1438,8 +1503,10 @@ attachTapHandler(btnAudioControl, () => openAudioModal());
 attachTapHandler(btnClearAudio, async () => {
 setLastAction("Cleared Ambient Audio");
 const { audioClear } = endpoints();
+
 try {
 await fetch(audioClear, { method: "POST" });
+setTimeout(refreshNowPlayingAudio, 300);
 } catch (err) {
 console.error(err);
 }
@@ -1515,6 +1582,7 @@ setButtonsEnabled(false);
 setBackendStatus(false, "Backend: Checking…");
 setLastAction("—");
 syncDescriptions();
+
 // Create a reusable refresh function
 const fullRefresh = async () => {
 const ok = await testBackend();
@@ -1524,10 +1592,19 @@ await refreshMacros();
 await refreshAutoShow();
 }
 };
+
 // Run it once on startup
 await fullRefresh();
+
 // Run it every 10 seconds to keep all computers active
 setInterval(fullRefresh, 10000);
+
+// Keep Ambient Pads “Playing” text live while the modal is open
+setInterval(() => {
+if (audioOverlay && audioOverlay.style.display === "flex") {
+refreshNowPlayingAudio();
+}
+}, 1000);
 }
 
 init();
