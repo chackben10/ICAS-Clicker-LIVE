@@ -8,7 +8,7 @@
 <style>
 :root {
 --bg: #ffffff;
---title-color: #ffffff;
+--title-color: #d32f2f;
 --status-grey: #666666;
 
 --card-text: #111111;
@@ -30,14 +30,16 @@
 
 --modal-bg: #ffffff;
 --modal-shadow: rgba(0,0,0,0.25);
---settings-text: #111;
+--settings-text: #111111;
 
 --ok: #00c853;
+
+--pads-scale: 1;
 }
 
 body.dark {
 --bg: #000000;
---title-color: #ffffff;
+--title-color: #ff5252;
 --status-grey: #888888;
 
 --card-text: #ffffff;
@@ -90,15 +92,15 @@ touch-action: manipulation;
 
 .wrapper {
 width: 100%;
-max-width: 520px;
+max-width: calc(520px * var(--pads-scale));
 }
 
 .card {
 width: 100%;
 background: var(--modal-bg);
 color: var(--settings-text);
-border-radius: 14px;
-padding: 16px;
+border-radius: calc(14px * var(--pads-scale));
+padding: calc(16px * var(--pads-scale));
 box-shadow: 0 18px 40px var(--modal-shadow);
 border: 1px solid var(--border-color);
 }
@@ -107,15 +109,21 @@ border: 1px solid var(--border-color);
 display: flex;
 align-items: center;
 justify-content: space-between;
-gap: 12px;
-margin-bottom: 10px;
+gap: calc(12px * var(--pads-scale));
+margin-bottom: calc(10px * var(--pads-scale));
 }
 
 .page-title {
-font-size: 1.25rem;
+font-size: calc(1.25rem * var(--pads-scale));
 font-weight: 900;
 color: var(--title-color);
 line-height: 1.1;
+}
+
+.top-actions {
+display: flex;
+align-items: center;
+gap: 8px;
 }
 
 .status-pill {
@@ -124,16 +132,16 @@ align-items: center;
 gap: 8px;
 border: 1px solid var(--border-color);
 border-radius: 999px;
-padding: 7px 10px;
+padding: calc(7px * var(--pads-scale)) calc(10px * var(--pads-scale));
 color: var(--status-grey);
-font-size: 0.82rem;
+font-size: calc(0.82rem * var(--pads-scale));
 font-weight: 900;
 white-space: nowrap;
 }
 
 .status-dot {
-width: 10px;
-height: 10px;
+width: calc(10px * var(--pads-scale));
+height: calc(10px * var(--pads-scale));
 border-radius: 999px;
 background: var(--danger);
 }
@@ -142,19 +150,48 @@ background: var(--danger);
 background: var(--ok);
 }
 
-.audio-now-playing {
-margin-top: 10px;
-margin-bottom: 12px;
-padding: 12px 14px;
+.top-btn {
+font-size: calc(0.9rem * var(--pads-scale));
+font-weight: 800;
+color: var(--btn-text);
+opacity: 0.92;
+padding: calc(7px * var(--pads-scale)) calc(12px * var(--pads-scale));
+border-radius: 999px;
 border: 1px solid var(--border-color);
-border-radius: 12px;
+background: transparent;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.10s ease;
+}
+
+.top-btn:hover {
+opacity: 1;
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.top-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.audio-now-playing {
+margin-top: calc(10px * var(--pads-scale));
+margin-bottom: calc(12px * var(--pads-scale));
+padding: calc(12px * var(--pads-scale)) calc(14px * var(--pads-scale));
+border: 1px solid var(--border-color);
+border-radius: calc(12px * var(--pads-scale));
 background: color-mix(in srgb, var(--bg) 92%, transparent);
 color: var(--card-text);
-font-size: 1.05rem;
+font-size: calc(1.05rem * var(--pads-scale));
 font-weight: 900;
 line-height: 1.25;
 text-align: center;
-min-height: 46px;
+min-height: calc(46px * var(--pads-scale));
 
 display: flex;
 align-items: center;
@@ -162,26 +199,26 @@ justify-content: center;
 }
 
 .audio-now-playing span {
-color: #ff5252;
+color: var(--title-color);
 }
 
 .segment {
 display: flex;
 width: 100%;
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: calc(10px * var(--pads-scale));
 overflow: hidden;
-margin-top: 8px;
+margin-top: calc(8px * var(--pads-scale));
 }
 
 .segment button {
 flex: 1;
-padding: 11px 6px;
+padding: calc(11px * var(--pads-scale)) calc(6px * var(--pads-scale));
 background: transparent;
 border: none;
 color: var(--settings-text);
 cursor: pointer;
-font-size: 0.9rem;
+font-size: calc(0.9rem * var(--pads-scale));
 transition: background 0.15s, color 0.15s;
 -webkit-tap-highlight-color: transparent;
 font-weight: 900;
@@ -201,19 +238,19 @@ font-weight: 900;
 .audio-grid {
 display: grid;
 grid-template-columns: repeat(3, 1fr);
-gap: 10px;
-margin-bottom: 18px;
-margin-top: 15px;
+gap: calc(10px * var(--pads-scale));
+margin-bottom: calc(18px * var(--pads-scale));
+margin-top: calc(15px * var(--pads-scale));
 }
 
 .audio-btn {
-padding: 15px 5px;
+padding: calc(15px * var(--pads-scale)) calc(5px * var(--pads-scale));
 border: 1px solid var(--border-color);
-border-radius: 8px;
+border-radius: calc(8px * var(--pads-scale));
 background: var(--btn-bg);
 color: var(--btn-text);
 font-weight: 900;
-font-size: 1rem;
+font-size: calc(1rem * var(--pads-scale));
 text-align: center;
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
@@ -242,8 +279,8 @@ border: 1px solid color-mix(in srgb, var(--danger) 70%, var(--btn-border));
 border-radius: 999px;
 background: var(--danger);
 color: #ffffff;
-font-size: 0.95rem;
-padding: 13px 0;
+font-size: calc(0.95rem * var(--pads-scale));
+padding: calc(13px * var(--pads-scale)) 0;
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
 font-weight: 900;
@@ -274,13 +311,104 @@ margin-top: 10px;
 font-weight: 800;
 }
 
+/* Settings modal */
+.settings-overlay {
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.65);
+display: none;
+align-items: center;
+justify-content: center;
+z-index: 999;
+padding: 18px;
+}
+
+.settings-card {
+width: 100%;
+max-width: 480px;
+background: var(--modal-bg);
+color: var(--settings-text);
+border-radius: 12px;
+padding: 16px;
+box-shadow: 0 18px 40px var(--modal-shadow);
+border: 1px solid var(--border-color);
+transition: background 0.2s ease, color 0.2s ease;
+}
+
+.settings-title {
+font-size: 1.1rem;
+font-weight: 900;
+margin-bottom: 12px;
+}
+
+.settings-section {
+border: 1px solid var(--border-color);
+border-radius: 12px;
+padding: 12px;
+margin-top: 12px;
+background: transparent;
+}
+
+.settings-label {
+font-weight: 900;
+margin-bottom: 6px;
+}
+
+.settings-muted {
+color: var(--status-grey);
+font-size: 0.92rem;
+line-height: 1.35;
+}
+
+.settings-close-btn {
+width: 100%;
+border: 1px solid var(--border-color);
+border-radius: 999px;
+background: transparent;
+color: var(--settings-text);
+font-size: 0.95rem;
+padding: 12px 0;
+margin-top: 14px;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.settings-close-btn:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.settings-close-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.settings-range {
+width: 100%;
+margin-top: 8px;
+}
+
+.settings-value {
+margin-top: 8px;
+font-size: 0.9rem;
+font-weight: 900;
+color: var(--status-grey);
+text-align: center;
+}
+
 @media (max-width: 420px) {
 body {
 padding: 10px;
 }
 
 .card {
-padding: 14px;
+padding: calc(14px * var(--pads-scale));
 }
 
 .audio-grid {
@@ -292,12 +420,22 @@ grid-column: span 2;
 }
 
 .page-title {
-font-size: 1.15rem;
+font-size: calc(1.15rem * var(--pads-scale));
 }
 
 .status-pill {
-font-size: 0.78rem;
-padding: 6px 9px;
+font-size: calc(0.78rem * var(--pads-scale));
+padding: calc(6px * var(--pads-scale)) calc(9px * var(--pads-scale));
+}
+
+.top-row {
+align-items: flex-start;
+}
+
+.top-actions {
+flex-direction: column;
+align-items: flex-end;
+gap: 6px;
 }
 }
 </style>
@@ -308,9 +446,13 @@ padding: 6px 9px;
 <div class="card">
 <div class="top-row">
 <div class="page-title">Pads Control</div>
+
+<div class="top-actions">
 <div class="status-pill">
 <span id="backendDot" class="status-dot"></span>
 <span id="backendStatus">Checking…</span>
+</div>
+<button class="top-btn" id="settingsButton" type="button">Settings</button>
 </div>
 </div>
 
@@ -326,10 +468,36 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 </div>
 </div>
 
+<div id="settingsOverlay" class="settings-overlay">
+<div class="settings-card">
+<div class="settings-title">Settings</div>
+
+<div class="settings-section">
+<div class="settings-label">Display Theme</div>
+<div class="segment" id="themeSegment">
+<button data-mode="light" type="button">Light</button>
+<button data-mode="dark" type="button">Dark</button>
+<button data-mode="system" type="button">System</button>
+</div>
+</div>
+
+<div class="settings-section">
+<div class="settings-label">Zoom</div>
+<div class="settings-muted">Adjust the size of the pads page.</div>
+<input class="settings-range" type="range" id="padsZoomSlider" min="70" max="180" step="10">
+<div class="settings-value" id="padsZoomValue">100%</div>
+</div>
+
+<button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+</div>
+</div>
+
 <script>
 (function () {
 const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+
 const THEME_KEY = "icas-theme-mode";
+const PADS_ZOOM_KEY = "icas-pads-control-zoom";
 
 function normalizeBase(u) {
 u = String(u || "").trim();
@@ -360,6 +528,16 @@ const audioPlaylistSegment = document.getElementById("audioPlaylistSegment");
 const audioGrid = document.getElementById("audioGrid");
 const btnClearAudio = document.getElementById("btnClearAudio");
 
+const settingsOverlay = document.getElementById("settingsOverlay");
+const settingsButton = document.getElementById("settingsButton");
+const settingsCloseButton = document.getElementById("settingsCloseButton");
+const padsZoomSlider = document.getElementById("padsZoomSlider");
+const padsZoomValue = document.getElementById("padsZoomValue");
+
+function clamp(n, lo, hi) {
+return Math.max(lo, Math.min(hi, n));
+}
+
 function setBackendStatus(ok, text) {
 backendDot.classList.toggle("ok", !!ok);
 backendStatus.textContent = text || (ok ? "Connected" : "Offline");
@@ -377,6 +555,14 @@ document.body.classList.add("dark");
 document.body.classList.remove("dark");
 }
 }
+
+updateThemeSegmentUI(mode);
+}
+
+function updateThemeSegmentUI(mode) {
+document.querySelectorAll("#themeSegment button").forEach(btn => {
+btn.classList.toggle("active", btn.dataset.mode === mode);
+});
 }
 
 function loadTheme() {
@@ -388,6 +574,63 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
 const stored = localStorage.getItem(THEME_KEY) || "system";
 if (stored === "system") applyTheme("system");
 });
+
+document.querySelectorAll("#themeSegment button").forEach(btn => {
+btn.addEventListener("click", () => {
+const mode = btn.dataset.mode;
+localStorage.setItem(THEME_KEY, mode);
+applyTheme(mode);
+});
+});
+
+function getPadsZoomPercent() {
+const raw = parseInt(localStorage.getItem(PADS_ZOOM_KEY), 10);
+if (Number.isNaN(raw)) return 100;
+return clamp(raw, 70, 180);
+}
+
+function applyPadsZoom(percent) {
+const n = clamp(parseInt(percent, 10) || 100, 70, 180);
+const scale = n / 100;
+
+document.documentElement.style.setProperty("--pads-scale", String(scale));
+
+if (padsZoomSlider) padsZoomSlider.value = n;
+if (padsZoomValue) padsZoomValue.textContent = `${n}%`;
+}
+
+function setPadsZoomPercent(value) {
+const n = clamp(parseInt(value, 10) || 100, 70, 180);
+localStorage.setItem(PADS_ZOOM_KEY, String(n));
+applyPadsZoom(n);
+}
+
+if (padsZoomSlider) {
+padsZoomSlider.addEventListener("input", () => {
+applyPadsZoom(padsZoomSlider.value);
+});
+
+padsZoomSlider.addEventListener("change", () => {
+setPadsZoomPercent(padsZoomSlider.value);
+});
+}
+
+function openSettings() {
+settingsOverlay.style.display = "flex";
+}
+
+function closeSettings() {
+settingsOverlay.style.display = "none";
+}
+
+if (settingsButton) settingsButton.onclick = openSettings;
+if (settingsCloseButton) settingsCloseButton.onclick = closeSettings;
+
+if (settingsOverlay) {
+settingsOverlay.addEventListener("click", (e) => {
+if (e.target === settingsOverlay) closeSettings();
+});
+}
 
 async function testBackend() {
 const { health } = endpoints();
@@ -595,6 +838,7 @@ console.error(err);
 
 async function init() {
 loadTheme();
+applyPadsZoom(getPadsZoomPercent());
 
 setBackendStatus(false, "Checking…");
 
