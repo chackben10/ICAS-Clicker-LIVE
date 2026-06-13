@@ -10,30 +10,50 @@
       --bg: #ffffff;
       --title-color: #d32f2f;
       --status-grey: #666666;
+
       --slide-bg: #e0e0e0;
       --slide-bg-current: #ffffff;
       --slide-text: #222222;
       --slide-text-current: #000000;
+
+      --disabled-slide-bg: #eeeeee;
+      --disabled-slide-opacity: 0.52;
+
       --selected-outline: 3px solid #007aff;
       --border-color: #d0d0d0;
+
       --modal-bg: #ffffff;
       --modal-shadow: rgba(0,0,0,0.25);
-      --settings-text: #111;
+      --settings-text: #111111;
+
+      --notes-border: rgba(128,128,128,0.55);
+      --label-bg: rgba(0,0,0,0.06);
+      --label-text: #555555;
     }
 
     body.dark {
       --bg: #000000;
       --title-color: #ff5252;
       --status-grey: #888888;
+
       --slide-bg: #333333;
       --slide-bg-current: #ffffff;
       --slide-text: #f0f0f0;
       --slide-text-current: #000000;
-      --selected-outline: 3px solid white;
-      --border-color: #444;
+
+      --disabled-slide-bg: #252525;
+      --disabled-slide-opacity: 0.48;
+
+      --selected-outline: 3px solid #ffffff;
+      --border-color: #444444;
+
       --modal-bg: #111111;
       --modal-shadow: rgba(0,0,0,0.6);
       --settings-text: #ffffff;
+
+      --notes-border: rgba(255,255,255,0.28);
+      --label-bg: rgba(255,255,255,0.09);
+      --label-text: #b8b8b8;
     }
 
     * {
@@ -54,6 +74,11 @@
       transition: background 0.25s ease, color 0.25s ease;
     }
 
+    button,
+    input {
+      font: inherit;
+    }
+
     .wrapper {
       width: 100%;
       max-width: 640px;
@@ -64,6 +89,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
       margin-bottom: 4px;
     }
 
@@ -73,20 +99,29 @@
       color: var(--status-grey);
     }
 
+    .top-btn,
+    .advanced-toggle-btn,
+    .settings-close-btn {
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--settings-text);
+      cursor: pointer;
+      transition: background 0.15s ease, opacity 0.15s ease;
+    }
+
     .top-btn {
       font-size: 0.9rem;
       font-weight: 500;
       color: var(--slide-text);
       opacity: 0.85;
-      text-decoration: none;
       padding: 6px 12px;
       border-radius: 999px;
-      border: 1px solid var(--border-color);
-      background: transparent;
-      cursor: pointer;
+      white-space: nowrap;
     }
 
-    .top-btn:hover {
+    .top-btn:hover,
+    .advanced-toggle-btn:hover,
+    .settings-close-btn:hover {
       opacity: 1;
       background: rgba(128,128,128,0.15);
     }
@@ -96,6 +131,7 @@
       font-size: 1.4rem;
       font-weight: 700;
       margin: 4px 0 8px 0;
+      overflow-wrap: anywhere;
     }
 
     .slide-status {
@@ -104,7 +140,8 @@
       margin-bottom: 10px;
     }
 
-    #slideCurrent {
+    #slideCurrent,
+    .status-current {
       color: var(--slide-text);
       font-weight: 700;
     }
@@ -117,13 +154,14 @@
     }
 
     .slide-item {
+      width: 100%;
       border-radius: 10px;
       padding: 10px 12px;
       background: var(--slide-bg);
       color: var(--slide-text);
       border: 1px solid var(--border-color);
       cursor: pointer;
-      transition: 0.1s ease;
+      transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease, opacity 0.1s ease;
       text-align: left;
     }
 
@@ -137,6 +175,16 @@
     .slide-item.selected {
       outline: var(--selected-outline);
       outline-offset: 3px;
+    }
+
+    .slide-item.disabled-slide {
+      background: var(--disabled-slide-bg);
+      opacity: var(--disabled-slide-opacity);
+      border-style: dashed;
+    }
+
+    .slide-item.disabled-slide.current {
+      opacity: 0.8;
     }
 
     .slide-item-header {
@@ -154,12 +202,29 @@
     .slide-group {
       font-size: 0.9rem;
       opacity: 0.9;
+      overflow-wrap: anywhere;
+    }
+
+    .slide-disabled-pill {
+      margin-left: auto;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      color: var(--status-grey);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
 
     .slide-text {
       font-size: 0.95rem;
-      white-space: normal;
-      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .slide-preview {
+      width: 100%;
     }
 
     .slide-thumb {
@@ -179,11 +244,32 @@
     .slide-notes {
       margin-top: 8px;
       padding-top: 8px;
-      border-top: 1px dashed rgba(128,128,128,0.55);
+      border-top: 1px dashed var(--notes-border);
       font-style: italic;
       opacity: 0.85;
-      white-space: normal;
-      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .slide-label-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+
+    .slide-label {
+      max-width: 100%;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--label-bg);
+      color: var(--label-text);
+      border: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.25;
+      text-align: right;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .settings-overlay {
@@ -194,6 +280,7 @@
       align-items: center;
       justify-content: center;
       z-index: 999;
+      padding: 18px;
     }
 
     .settings-card {
@@ -201,8 +288,9 @@
       color: var(--settings-text);
       border-radius: 12px;
       padding: 16px;
-      min-width: 260px;
-      max-width: 340px;
+      width: min(100%, 360px);
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
       box-shadow: 0 18px 40px var(--modal-shadow);
       transition: background 0.2s ease, color 0.2s ease;
     }
@@ -217,6 +305,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
       margin-top: 6px;
     }
 
@@ -231,6 +320,7 @@
       position: relative;
       width: 46px;
       height: 26px;
+      flex: 0 0 auto;
     }
 
     .switch input {
@@ -242,7 +332,7 @@
     .slider {
       position: absolute;
       inset: 0;
-      background-color: #999;
+      background-color: #999999;
       border-radius: 999px;
       transition: 0.2s;
     }
@@ -254,7 +344,7 @@
       width: 20px;
       left: 3px;
       top: 3px;
-      background-color: white;
+      background-color: #ffffff;
       border-radius: 50%;
       transition: 0.2s;
     }
@@ -292,7 +382,7 @@
       color: var(--settings-text);
       cursor: pointer;
       font-size: 0.9rem;
-      transition: background 0.15s;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .segment button:hover {
@@ -301,24 +391,53 @@
 
     .segment button.active {
       background: #ff5252;
-      color: white;
+      color: #ffffff;
       font-weight: 600;
+    }
+
+    .advanced-toggle-btn {
+      width: 100%;
+      border-radius: 10px;
+      padding: 9px 10px;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .advanced-toggle-icon {
+      transition: transform 0.18s ease;
+    }
+
+    .advanced-toggle-btn[aria-expanded="true"] .advanced-toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    .advanced-settings {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: rgba(128,128,128,0.08);
+    }
+
+    .advanced-settings.open {
+      display: block;
+    }
+
+    .advanced-settings .settings-row:first-child {
+      margin-top: 0;
     }
 
     .settings-close-btn {
       width: 100%;
-      border: 1px solid var(--border-color);
       border-radius: 999px;
-      background: transparent;
-      color: var(--settings-text);
       font-size: 0.95rem;
       padding: 8px 0;
       margin-top: 14px;
-      cursor: pointer;
-    }
-
-    .settings-close-btn:hover {
-      background: rgba(128,128,128,0.12);
     }
   </style>
 </head>
@@ -327,7 +446,7 @@
   <div class="wrapper">
     <div class="top-row">
       <div class="page-title">ICAS Presentation Clicker</div>
-      <button class="top-btn" id="settingsButton">Settings</button>
+      <button class="top-btn" id="settingsButton" type="button">Settings</button>
     </div>
 
     <div id="presentationName" class="presentation-name">Loading...</div>
@@ -339,49 +458,34 @@
     <div id="slidesContainer" class="slides-list"></div>
   </div>
 
-  <div id="settingsOverlay" class="settings-overlay">
-    <div class="settings-card">
-      <div class="settings-title">Settings</div>
+  <div id="settingsOverlay" class="settings-overlay" aria-hidden="true">
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div id="settingsTitle" class="settings-title">Settings</div>
 
       <div class="settings-row">
         <span>Viewer Mode</span>
-        <label class="switch">
+        <label class="switch" aria-label="Viewer Mode">
           <input type="checkbox" id="viewerModeToggle">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="settings-subtitle">
-        Disables slide picking
-      </div>
+      <div class="settings-subtitle">Disables slide picking</div>
 
       <div class="settings-row">
         <span>Auto-Scroll</span>
-        <label class="switch">
+        <label class="switch" aria-label="Auto-Scroll">
           <input type="checkbox" id="autoScrollToggle">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="settings-subtitle">
-        Automatically scrolls to the current slide
-      </div>
+      <div class="settings-subtitle">Automatically scrolls to the current slide</div>
 
       <div class="settings-row-column">
         <label>Slide Preview Preference</label>
         <div class="segment" id="previewPreferenceSegment">
-          <button data-pref="text">Text</button>
-          <button data-pref="image">Image</button>
+          <button type="button" data-pref="text">Text</button>
+          <button type="button" data-pref="image">Image</button>
         </div>
-      </div>
-
-      <div class="settings-row" style="margin-top: 12px;">
-        <span>Show Slide Notes</span>
-        <label class="switch">
-          <input type="checkbox" id="showNotesToggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="settings-subtitle">
-        Shows notes under each slide preview
       </div>
 
       <div class="settings-row-column">
@@ -395,119 +499,271 @@
       <div class="settings-row-column" style="margin-top: 14px;">
         <label style="margin-bottom: 6px;">Display Theme</label>
         <div class="segment" id="themeSegment" style="margin-top: 0;">
-          <button data-mode="light">Light</button>
-          <button data-mode="dark">Dark</button>
-          <button data-mode="system">System</button>
+          <button type="button" data-mode="light">Light</button>
+          <button type="button" data-mode="dark">Dark</button>
+          <button type="button" data-mode="system">System</button>
         </div>
       </div>
 
-      <button id="settingsCloseButton" class="settings-close-btn">Close</button>
+      <button id="advancedSettingsButton" class="advanced-toggle-btn" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">
+        <span>Advanced Settings</span>
+        <span class="advanced-toggle-icon" aria-hidden="true">⌄</span>
+      </button>
+
+      <div id="advancedSettingsPanel" class="advanced-settings">
+        <div class="settings-row">
+          <span>Show Slide Notes</span>
+          <label class="switch" aria-label="Show Slide Notes">
+            <input type="checkbox" id="showNotesToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="settings-subtitle">Shows notes under each slide preview</div>
+
+        <div class="settings-row" style="margin-top: 12px;">
+          <span>Show Disabled Slides</span>
+          <label class="switch" aria-label="Show Disabled Slides">
+            <input type="checkbox" id="showDisabledSlidesToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="settings-subtitle">Shows disabled slides slightly greyed-out while keeping them clickable</div>
+
+        <div class="settings-row" style="margin-top: 12px;">
+          <span>Show Labels</span>
+          <label class="switch" aria-label="Show Labels">
+            <input type="checkbox" id="showLabelsToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="settings-subtitle">Shows slide labels at the lower-right of each slide card</div>
+      </div>
+
+      <button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
     </div>
   </div>
 
   <script>
+    "use strict";
+
     const BASE_URL = "https://slides.icas-clicker.work";
 
-    const TEXT_SCALE_KEY = "icas-picker-text-scale";
-    const THEME_KEY = "icas-theme-mode";
-    const VIEWER_MODE_KEY = "icas-viewer-mode";
-    const PREVIEW_PREF_KEY = "icas-slide-preview-preference";
-    const AUTO_SCROLL_KEY = "icas-auto-scroll";
-    const SHOW_NOTES_KEY = "icas-show-slide-notes";
+    const STORAGE_KEYS = Object.freeze({
+      textScale: "icas-picker-text-scale",
+      theme: "icas-theme-mode",
+      viewerMode: "icas-viewer-mode",
+      previewPreference: "icas-slide-preview-preference",
+      autoScroll: "icas-auto-scroll",
+      showNotes: "icas-show-slide-notes",
+      showDisabledSlides: "icas-show-disabled-slides",
+      showLabels: "icas-show-slide-labels",
+      advancedOpen: "icas-advanced-settings-open"
+    });
+
+    const DEFAULTS = Object.freeze({
+      textScale: 100,
+      theme: "system",
+      viewerMode: false,
+      previewPreference: "text",
+      autoScroll: false,
+      showNotes: false,
+      showDisabledSlides: false,
+      showLabels: false,
+      advancedOpen: false
+    });
 
     const PLACEHOLDER_SIZE_BYTES_MAX = 100;
+    const THUMBNAIL_POLL_MS = 650;
+    const STATUS_REFRESH_MS = 1000;
+    const FOCUS_REFRESH_DELAY_MS = 350;
 
     let pendingSelectedIndex = null;
     let lastSlideIndexForAutoScroll = null;
+    let currentPresentationUuid = null;
 
-    const thumbCache = {};
-    const thumbInflight = {};
-    const thumbPollTimers = {};
-    const thumbTargets = {};
-    const thumbLatestBlobUrl = {};
+    const thumbCache = Object.create(null);
+    const thumbInflight = Object.create(null);
+    const thumbPollTimers = Object.create(null);
+    const thumbTargets = Object.create(null);
+    const dom = {};
 
-    function applyTheme(mode) {
-      if (mode === "light") {
-        document.body.classList.remove("dark");
-      } else if (mode === "dark") {
-        document.body.classList.add("dark");
-      } else {
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-          document.body.classList.add("dark");
-        } else {
-          document.body.classList.remove("dark");
-        }
-      }
-      updateThemeSegmentUI(mode);
+    function cacheDom() {
+      dom.presentationName = document.getElementById("presentationName");
+      dom.statusText = document.getElementById("statusText");
+      dom.slidesContainer = document.getElementById("slidesContainer");
+
+      dom.settingsButton = document.getElementById("settingsButton");
+      dom.settingsOverlay = document.getElementById("settingsOverlay");
+      dom.settingsCloseButton = document.getElementById("settingsCloseButton");
+
+      dom.viewerModeToggle = document.getElementById("viewerModeToggle");
+      dom.autoScrollToggle = document.getElementById("autoScrollToggle");
+      dom.showNotesToggle = document.getElementById("showNotesToggle");
+      dom.showDisabledSlidesToggle = document.getElementById("showDisabledSlidesToggle");
+      dom.showLabelsToggle = document.getElementById("showLabelsToggle");
+
+      dom.textSizeSlider = document.getElementById("textSizeSlider");
+      dom.textSizeValue = document.getElementById("textSizeValue");
+
+      dom.previewPreferenceButtons = document.querySelectorAll("#previewPreferenceSegment button");
+      dom.themeButtons = document.querySelectorAll("#themeSegment button");
+
+      dom.advancedSettingsButton = document.getElementById("advancedSettingsButton");
+      dom.advancedSettingsPanel = document.getElementById("advancedSettingsPanel");
     }
 
-    function updateThemeSegmentUI(mode) {
-      document.querySelectorAll("#themeSegment button").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.mode === mode);
-      });
+    function getStoredBool(key, fallback) {
+      const value = localStorage.getItem(key);
+      if (value === null) return fallback;
+      return value === "true";
     }
 
-    function loadTheme() {
-      const stored = localStorage.getItem(THEME_KEY);
-      const mode = stored || "system";
-      applyTheme(mode);
+    function setStoredBool(key, value) {
+      localStorage.setItem(key, value ? "true" : "false");
     }
 
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-      const stored = localStorage.getItem(THEME_KEY);
-      if (stored === "system") applyTheme("system");
-    });
+    function getStoredInt(key, fallback, min, max) {
+      const value = parseInt(localStorage.getItem(key), 10);
+      if (Number.isNaN(value)) return fallback;
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeLineBreaks(value) {
+      return String(value ?? "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n");
+    }
+
+    function hasVisibleContent(value) {
+      return normalizeLineBreaks(value).trim() !== "";
+    }
+
+    function setMultilineText(el, value) {
+      el.textContent = normalizeLineBreaks(value);
+    }
 
     function getViewerMode() {
-      return localStorage.getItem(VIEWER_MODE_KEY) === "true";
+      return getStoredBool(STORAGE_KEYS.viewerMode, DEFAULTS.viewerMode);
     }
 
-    function setViewerMode(v) {
-      localStorage.setItem(VIEWER_MODE_KEY, v ? "true" : "false");
+    function setViewerMode(value) {
+      setStoredBool(STORAGE_KEYS.viewerMode, value);
     }
 
     function getAutoScroll() {
-      return localStorage.getItem(AUTO_SCROLL_KEY) === "true";
+      return getStoredBool(STORAGE_KEYS.autoScroll, DEFAULTS.autoScroll);
     }
 
-    function setAutoScroll(v) {
-      localStorage.setItem(AUTO_SCROLL_KEY, v ? "true" : "false");
+    function setAutoScroll(value) {
+      setStoredBool(STORAGE_KEYS.autoScroll, value);
+    }
+
+    function getShowNotes() {
+      return getStoredBool(STORAGE_KEYS.showNotes, DEFAULTS.showNotes);
+    }
+
+    function setShowNotes(value) {
+      setStoredBool(STORAGE_KEYS.showNotes, value);
+    }
+
+    function getShowDisabledSlides() {
+      return getStoredBool(STORAGE_KEYS.showDisabledSlides, DEFAULTS.showDisabledSlides);
+    }
+
+    function setShowDisabledSlides(value) {
+      setStoredBool(STORAGE_KEYS.showDisabledSlides, value);
+    }
+
+    function getShowLabels() {
+      return getStoredBool(STORAGE_KEYS.showLabels, DEFAULTS.showLabels);
+    }
+
+    function setShowLabels(value) {
+      setStoredBool(STORAGE_KEYS.showLabels, value);
+    }
+
+    function getAdvancedOpen() {
+      return getStoredBool(STORAGE_KEYS.advancedOpen, DEFAULTS.advancedOpen);
+    }
+
+    function setAdvancedOpen(value) {
+      setStoredBool(STORAGE_KEYS.advancedOpen, value);
     }
 
     function getTextScale() {
-      const raw = parseInt(localStorage.getItem(TEXT_SCALE_KEY), 10);
-      return Number.isNaN(raw) ? 100 : Math.min(300, Math.max(50, raw));
+      return getStoredInt(STORAGE_KEYS.textScale, DEFAULTS.textScale, 50, 300);
     }
 
-    function setTextScale(v) {
-      localStorage.setItem(TEXT_SCALE_KEY, String(v));
+    function setTextScale(value) {
+      const parsed = parseInt(value, 10);
+      const nextValue = Number.isNaN(parsed) ? DEFAULTS.textScale : Math.min(300, Math.max(50, parsed));
+      localStorage.setItem(STORAGE_KEYS.textScale, String(nextValue));
+    }
+
+    function getPreviewPreference() {
+      const value = localStorage.getItem(STORAGE_KEYS.previewPreference);
+      return value === "image" || value === "text" ? value : DEFAULTS.previewPreference;
+    }
+
+    function setPreviewPreference(value) {
+      if (value === "image" || value === "text") {
+        localStorage.setItem(STORAGE_KEYS.previewPreference, value);
+      }
+    }
+
+    function getThemeMode() {
+      const value = localStorage.getItem(STORAGE_KEYS.theme);
+      return value === "light" || value === "dark" || value === "system" ? value : DEFAULTS.theme;
+    }
+
+    function setThemeMode(value) {
+      if (value === "light" || value === "dark" || value === "system") {
+        localStorage.setItem(STORAGE_KEYS.theme, value);
+      }
     }
 
     function applyTextScale(el, scale) {
       el.style.fontSize = (0.95 * (scale / 100)) + "rem";
     }
 
-    function getPreviewPreference() {
-      const v = localStorage.getItem(PREVIEW_PREF_KEY);
-      return (v === "text" || v === "image") ? v : "text";
-    }
-
-    function setPreviewPreference(v) {
-      localStorage.setItem(PREVIEW_PREF_KEY, v);
-    }
-
-    function updatePreviewPrefSegmentUI(pref) {
-      document.querySelectorAll("#previewPreferenceSegment button").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.pref === pref);
+    function updateSegmentUI(buttons, dataKey, activeValue) {
+      buttons.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset[dataKey] === activeValue);
       });
     }
 
-    function getShowNotes() {
-      return localStorage.getItem(SHOW_NOTES_KEY) === "true";
+    function applyTheme(mode) {
+      const shouldUseDark = mode === "dark" || (
+        mode === "system" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      );
+
+      document.body.classList.toggle("dark", shouldUseDark);
+      updateSegmentUI(dom.themeButtons, "mode", mode);
     }
 
-    function setShowNotes(v) {
-      localStorage.setItem(SHOW_NOTES_KEY, v ? "true" : "false");
+    function setAdvancedPanelOpen(isOpen) {
+      dom.advancedSettingsPanel.classList.toggle("open", isOpen);
+      dom.advancedSettingsButton.setAttribute("aria-expanded", String(isOpen));
+      setAdvancedOpen(isOpen);
+    }
+
+    function syncSettingsUI() {
+      const scale = getTextScale();
+
+      dom.textSizeSlider.value = scale;
+      dom.textSizeValue.textContent = `${scale}%`;
+
+      dom.viewerModeToggle.checked = getViewerMode();
+      dom.autoScrollToggle.checked = getAutoScroll();
+      dom.showNotesToggle.checked = getShowNotes();
+      dom.showDisabledSlidesToggle.checked = getShowDisabledSlides();
+      dom.showLabelsToggle.checked = getShowLabels();
+
+      updateSegmentUI(dom.previewPreferenceButtons, "pref", getPreviewPreference());
+      updateSegmentUI(dom.themeButtons, "mode", getThemeMode());
+      setAdvancedPanelOpen(getAdvancedOpen());
     }
 
     function thumbnailKey(uuid, index) {
@@ -515,35 +771,61 @@
     }
 
     function isPlaceholderBlob(blob) {
-      if (!blob) return true;
-      return blob.size <= PLACEHOLDER_SIZE_BYTES_MAX;
+      return !blob || blob.size <= PLACEHOLDER_SIZE_BYTES_MAX;
     }
 
-    function setImageSrc(img, newUrl) {
-      const oldManagedUrl = img.dataset.objectUrl || "";
-      img.src = newUrl;
-      img.dataset.objectUrl = newUrl;
-
-      if (oldManagedUrl && oldManagedUrl !== newUrl) {
-        try {
-          URL.revokeObjectURL(oldManagedUrl);
-        } catch {}
-      }
+    function clearThumbPoll(key) {
+      if (!thumbPollTimers[key]) return;
+      clearTimeout(thumbPollTimers[key]);
+      delete thumbPollTimers[key];
     }
 
-    async function fetchThumbnailBlob(uuid, index, { bust = false } = {}) {
+    function cleanupThumbTargets() {
+      Object.keys(thumbTargets).forEach(key => {
+        thumbTargets[key].forEach(img => {
+          if (!img.isConnected) thumbTargets[key].delete(img);
+        });
+
+        if (thumbTargets[key].size === 0) {
+          delete thumbTargets[key];
+          clearThumbPoll(key);
+        }
+      });
+    }
+
+    function clearThumbnailStateForNewPresentation(uuid) {
+      if (currentPresentationUuid === uuid) return;
+
+      Object.keys(thumbPollTimers).forEach(clearThumbPoll);
+
+      Object.keys(thumbCache).forEach(key => {
+        if (thumbCache[key]?.url) {
+          try {
+            URL.revokeObjectURL(thumbCache[key].url);
+          } catch {}
+        }
+        delete thumbCache[key];
+      });
+
+      Object.keys(thumbInflight).forEach(key => delete thumbInflight[key]);
+      Object.keys(thumbTargets).forEach(key => delete thumbTargets[key]);
+
+      currentPresentationUuid = uuid;
+    }
+
+    async function fetchThumbnailBlob(uuid, index, options = {}) {
       const key = thumbnailKey(uuid, index);
       if (thumbInflight[key]) return thumbInflight[key];
 
-      const reqUrl =
+      const bust = options.bust === true;
+      const requestUrl =
         `${BASE_URL}/thumbnail?uuid=${encodeURIComponent(uuid)}&index=${encodeURIComponent(index)}` +
         (bust ? `&t=${Date.now()}` : "");
 
-      thumbInflight[key] = fetch(reqUrl, { cache: "no-store" })
+      thumbInflight[key] = fetch(requestUrl, { cache: "no-store" })
         .then(async res => {
           if (!res.ok) throw new Error(`Thumbnail request failed: ${res.status}`);
-          const blob = await res.blob();
-          return blob;
+          return res.blob();
         })
         .finally(() => {
           delete thumbInflight[key];
@@ -560,73 +842,27 @@
       }
 
       try {
-        const blob = await fetchThumbnailBlob(uuid, index, { bust: !!options.bust });
-        const isPlaceholder = isPlaceholderBlob(blob);
+        const blob = await fetchThumbnailBlob(uuid, index, { bust: options.bust === true });
         const url = URL.createObjectURL(blob);
-
         const oldCached = thumbCache[key];
+
         thumbCache[key] = {
           url,
-          isPlaceholder,
+          isPlaceholder: isPlaceholderBlob(blob),
           fetchedAt: Date.now()
         };
 
-        if (oldCached && oldCached.url && oldCached.url !== url) {
+        if (oldCached?.url && oldCached.url !== url) {
           try {
             URL.revokeObjectURL(oldCached.url);
           } catch {}
         }
 
         return thumbCache[key];
-      } catch {
+      } catch (error) {
+        console.warn(error);
         return null;
       }
-    }
-
-    function clearThumbPoll(key) {
-      if (thumbPollTimers[key]) {
-        clearTimeout(thumbPollTimers[key]);
-        delete thumbPollTimers[key];
-      }
-    }
-
-    function pollUntilThumbnailReady(uuid, index) {
-      const key = thumbnailKey(uuid, index);
-      clearThumbPoll(key);
-
-      const run = async () => {
-        const targets = thumbTargets[key];
-        if (!targets || targets.size === 0) {
-          clearThumbPoll(key);
-          return;
-        }
-
-        const result = await loadThumbnail(uuid, index, { force: true, bust: true });
-        if (!result) {
-          thumbPollTimers[key] = setTimeout(run, 650);
-          return;
-        }
-
-        const currentTargets = thumbTargets[key];
-        if (!currentTargets || currentTargets.size === 0) {
-          clearThumbPoll(key);
-          return;
-        }
-
-        currentTargets.forEach(img => {
-          if (!img.isConnected) return;
-          setImageSrc(img, result.url);
-          img.classList.toggle("loading", !!result.isPlaceholder);
-        });
-
-        if (result.isPlaceholder) {
-          thumbPollTimers[key] = setTimeout(run, 650);
-        } else {
-          clearThumbPoll(key);
-        }
-      };
-
-      thumbPollTimers[key] = setTimeout(run, 650);
     }
 
     function registerThumbTarget(uuid, index, img) {
@@ -638,17 +874,66 @@
     function unregisterThumbTarget(uuid, index, img) {
       const key = thumbnailKey(uuid, index);
       if (!thumbTargets[key]) return;
+
       thumbTargets[key].delete(img);
+
       if (thumbTargets[key].size === 0) {
         delete thumbTargets[key];
         clearThumbPoll(key);
       }
     }
 
+    function emitThumbnailState(img, result) {
+      img.src = result.url;
+      img.classList.toggle("loading", result.isPlaceholder);
+      img.dispatchEvent(new CustomEvent("thumbnail-state", {
+        detail: { isPlaceholder: result.isPlaceholder }
+      }));
+    }
+
+    function pollUntilThumbnailReady(uuid, index) {
+      const key = thumbnailKey(uuid, index);
+      clearThumbPoll(key);
+
+      const run = async () => {
+        const targets = thumbTargets[key];
+
+        if (!targets || targets.size === 0) {
+          clearThumbPoll(key);
+          return;
+        }
+
+        const result = await loadThumbnail(uuid, index, { force: true, bust: true });
+
+        if (!result) {
+          thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+          return;
+        }
+
+        targets.forEach(img => {
+          if (!img.isConnected) {
+            targets.delete(img);
+            return;
+          }
+
+          emitThumbnailState(img, result);
+        });
+
+        if (result.isPlaceholder) {
+          thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+        } else {
+          clearThumbPoll(key);
+        }
+      };
+
+      thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+    }
+
     async function attachThumbnailToImage(img, uuid, index) {
       registerThumbTarget(uuid, index, img);
 
       const result = await loadThumbnail(uuid, index);
+
       if (!img.isConnected) {
         unregisterThumbTarget(uuid, index, img);
         return;
@@ -659,324 +944,398 @@
         return;
       }
 
-      setImageSrc(img, result.url);
-      img.classList.toggle("loading", !!result.isPlaceholder);
+      emitThumbnailState(img, result);
 
       if (result.isPlaceholder) {
         pollUntilThumbnailReady(uuid, index);
       }
     }
 
-    function focusSlide(i) {
-      pendingSelectedIndex = i;
-      fetch(`${BASE_URL}/focus?index=${i}`).catch(() => {});
-      setTimeout(fetchStatus, 350);
+    function makeTextElement(className, text, textScale) {
+      const el = document.createElement("div");
+      el.className = className;
+      setMultilineText(el, text);
+      applyTextScale(el, textScale);
+      return el;
     }
 
-    function makeNotesElement(notesHtml, textScale) {
-      const notesEl = document.createElement("div");
-      notesEl.className = "slide-notes";
-      notesEl.innerHTML = notesHtml;
-      applyTextScale(notesEl, textScale);
-      return notesEl;
+    function makeLabelElement(labelText) {
+      const labelRow = document.createElement("div");
+      labelRow.className = "slide-label-row";
+
+      const label = document.createElement("div");
+      label.className = "slide-label";
+      setMultilineText(label, labelText);
+
+      labelRow.appendChild(label);
+      return labelRow;
     }
 
-    function addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes) {
-      if (!showNotes || !hasNotes) return;
-      item.appendChild(makeNotesElement(notesHtml, textScale));
+    function appendMetadata(item, slide, settings) {
+      if (settings.showNotes && hasVisibleContent(slide.notes)) {
+        item.appendChild(makeTextElement("slide-notes", slide.notes, settings.textScale));
+      }
+
+      if (settings.showLabels && hasVisibleContent(slide.label)) {
+        item.appendChild(makeLabelElement(slide.label));
+      }
+    }
+
+    function appendTextPreview(item, slide, settings) {
+      if (!hasVisibleContent(slide.text)) return;
+      item.appendChild(makeTextElement("slide-text", slide.text, settings.textScale));
+    }
+
+    function appendImagePreview(item, slide, uuid, index, settings) {
+      const previewHost = document.createElement("div");
+      previewHost.className = "slide-preview";
+
+      const img = document.createElement("img");
+      img.className = "slide-thumb loading";
+      img.alt = `Slide ${index + 1} thumbnail`;
+
+      const hasText = hasVisibleContent(slide.text);
+      let fallbackTextEl = null;
+
+      if (hasText) {
+        fallbackTextEl = makeTextElement("slide-text", slide.text, settings.textScale);
+        previewHost.appendChild(fallbackTextEl);
+        img.hidden = true;
+      }
+
+      previewHost.appendChild(img);
+      item.appendChild(previewHost);
+
+      img.addEventListener("thumbnail-state", event => {
+        const isPlaceholder = event.detail?.isPlaceholder !== false;
+
+        if (isPlaceholder && fallbackTextEl) {
+          img.hidden = true;
+          return;
+        }
+
+        if (fallbackTextEl?.parentNode) {
+          fallbackTextEl.parentNode.removeChild(fallbackTextEl);
+          fallbackTextEl = null;
+        }
+
+        img.hidden = false;
+      });
+
+      attachThumbnailToImage(img, uuid, index);
+    }
+
+    function appendPreview(item, slide, uuid, index, settings) {
+      const hasText = hasVisibleContent(slide.text);
+
+      if (settings.previewPreference === "text" && hasText) {
+        appendTextPreview(item, slide, settings);
+        return;
+      }
+
+      if (uuid) {
+        appendImagePreview(item, slide, uuid, index, settings);
+        return;
+      }
+
+      if (hasText) {
+        appendTextPreview(item, slide, settings);
+      }
+    }
+
+    function buildSlideItem(slide, index, state, settings) {
+      const item = document.createElement("button");
+      item.className = "slide-item";
+      item.type = "button";
+
+      const isCurrent = !state.focused && index === state.currentIndex;
+      const isPending = pendingSelectedIndex === index;
+      const isDisabledSlide = slide.enabled === false;
+
+      if (isCurrent) {
+        item.classList.add("current");
+        item.disabled = true;
+      } else if (isPending) {
+        item.classList.add("selected");
+      }
+
+      if (isDisabledSlide) {
+        item.classList.add("disabled-slide");
+      }
+
+      const header = document.createElement("div");
+      header.className = "slide-item-header";
+
+      const slideNumber = document.createElement("span");
+      slideNumber.className = "slide-number";
+      slideNumber.textContent = index + 1;
+      header.appendChild(slideNumber);
+
+      if (hasVisibleContent(slide.groupName)) {
+        const groupName = document.createElement("span");
+        groupName.className = "slide-group";
+        groupName.textContent = normalizeLineBreaks(slide.groupName);
+        header.appendChild(groupName);
+      }
+
+      if (isDisabledSlide) {
+        const disabledPill = document.createElement("span");
+        disabledPill.className = "slide-disabled-pill";
+        disabledPill.textContent = "Disabled";
+        header.appendChild(disabledPill);
+      }
+
+      item.appendChild(header);
+      appendPreview(item, slide, state.uuid, index, settings);
+      appendMetadata(item, slide, settings);
+
+      item.addEventListener("click", () => {
+        if (!settings.viewerMode && !isCurrent) {
+          focusSlide(index);
+        }
+      });
+
+      return { item, isCurrent };
+    }
+
+    function getSlidesFromPresentation(presentation) {
+      const slides = [];
+      const groups = presentation?.groups;
+
+      if (!Array.isArray(groups)) return slides;
+
+      groups.forEach(group => {
+        const groupName = group?.name || "";
+        const groupSlides = Array.isArray(group?.slides) ? group.slides : [];
+
+        groupSlides.forEach(slide => {
+          slides.push({
+            groupName,
+            text: slide?.text || "",
+            notes: slide?.notes || "",
+            label: slide?.label || "",
+            enabled: slide?.enabled !== false
+          });
+        });
+      });
+
+      return slides;
+    }
+
+    function updateStatusText(currentIndex, totalSlides, focused) {
+      dom.statusText.replaceChildren();
+
+      if (focused) {
+        dom.statusText.append("Status: ");
+
+        const status = document.createElement("span");
+        status.className = "status-current";
+        status.textContent = "Not Active";
+
+        dom.statusText.appendChild(status);
+        return;
+      }
+
+      dom.statusText.append("Slide ");
+
+      const current = document.createElement("span");
+      current.id = "slideCurrent";
+      current.className = "status-current";
+      current.textContent = currentIndex + 1;
+
+      const total = document.createElement("span");
+      total.id = "slideTotal";
+      total.textContent = totalSlides;
+
+      dom.statusText.appendChild(current);
+      dom.statusText.append(" of ");
+      dom.statusText.appendChild(total);
+    }
+
+    function renderSlides(slides, state, settings) {
+      cleanupThumbTargets();
+      dom.slidesContainer.replaceChildren();
+
+      let currentSlideEl = null;
+
+      slides.forEach((slide, index) => {
+        const shouldRender = slide.enabled !== false || settings.showDisabledSlides;
+        if (!shouldRender) return;
+
+        const { item, isCurrent } = buildSlideItem(slide, index, state, settings);
+
+        if (isCurrent) currentSlideEl = item;
+        dom.slidesContainer.appendChild(item);
+      });
+
+      return currentSlideEl;
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`Request failed: ${response.status} ${url}`);
+      return response.json();
+    }
+
+    async function focusSlide(index) {
+      pendingSelectedIndex = index;
+      fetch(`${BASE_URL}/focus?index=${encodeURIComponent(index)}`).catch(() => {});
+      setTimeout(fetchStatus, FOCUS_REFRESH_DELAY_MS);
     }
 
     async function fetchStatus() {
       try {
-        const [presRes, idxRes] = await Promise.all([
-          fetch(`${BASE_URL}/active-presentation`, { cache: "no-cache" }),
-          fetch(`${BASE_URL}/slide-index`, { cache: "no-cache" })
+        const [presentationResponse, indexResponse] = await Promise.all([
+          fetchJson(`${BASE_URL}/active-presentation`),
+          fetchJson(`${BASE_URL}/slide-index`)
         ]);
 
-        const pres = await presRes.json();
-        const idx = await idxRes.json();
-
-        const uuid = pres.presentation?.id?.uuid || null;
-        const name = pres.presentation?.id?.name || "No active presentation";
-        document.getElementById("presentationName").textContent = name;
-
-        let slides = [];
-        if (Array.isArray(pres.presentation?.groups)) {
-          pres.presentation.groups.forEach(g =>
-            g.slides?.forEach(s => slides.push({
-              groupName: g.name || "",
-              text: s.text || "",
-              notes: s.notes || "",
-              enabled: s.enabled !== false
-            }))
-          );
-        }
-
+        const presentation = presentationResponse.presentation;
+        const uuid = presentation?.id?.uuid || null;
+        const name = presentation?.id?.name || "No active presentation";
+        const slides = getSlidesFromPresentation(presentation);
         const totalSlides = slides.length;
-        const indexValue = idx.presentation_index?.index ?? null;
+        const indexValue = indexResponse.presentation_index?.index ?? null;
         const focused = indexValue === null;
 
-        const statusEl = document.getElementById("statusText");
-        if (focused) {
-          statusEl.innerHTML = `Status: <span class="current">Not Active</span>`;
-        } else {
-          statusEl.innerHTML =
-            `Slide <span id="slideCurrent" class="current">${indexValue + 1}</span> of <span id="slideTotal">${totalSlides}</span>`;
-        }
+        clearThumbnailStateForNewPresentation(uuid);
+
+        dom.presentationName.textContent = name;
+        updateStatusText(indexValue, totalSlides, focused);
 
         if (!focused && pendingSelectedIndex === indexValue) {
           pendingSelectedIndex = null;
         }
 
-        const container = document.getElementById("slidesContainer");
-        container.innerHTML = "";
+        const settings = {
+          viewerMode: getViewerMode(),
+          autoScroll: getAutoScroll(),
+          textScale: getTextScale(),
+          previewPreference: getPreviewPreference(),
+          showNotes: getShowNotes(),
+          showDisabledSlides: getShowDisabledSlides(),
+          showLabels: getShowLabels()
+        };
 
-        const viewerMode = getViewerMode();
-        const textScale = getTextScale();
-        const previewPref = getPreviewPreference();
-        const autoScroll = getAutoScroll();
-        const showNotes = getShowNotes();
+        const currentSlideEl = renderSlides(
+          slides,
+          { uuid, currentIndex: indexValue, focused },
+          settings
+        );
 
-        let currentSlideEl = null;
-
-        slides.forEach((slide, i) => {
-          const item = document.createElement("button");
-          item.className = "slide-item";
-          item.type = "button";
-
-          if (!slide.enabled) {
-            item.style.display = "none";
-          }
-
-          if (!focused && i === indexValue) {
-            item.classList.add("current");
-            item.disabled = true;
-            currentSlideEl = item;
-          } else if (pendingSelectedIndex === i) {
-            item.classList.add("selected");
-          }
-
-          const header = document.createElement("div");
-          header.className = "slide-item-header";
-
-          const n = document.createElement("span");
-          n.className = "slide-number";
-          n.textContent = i + 1;
-          header.appendChild(n);
-
-          if (slide.groupName) {
-            const g = document.createElement("span");
-            g.className = "slide-group";
-            g.textContent = slide.groupName;
-            header.appendChild(g);
-          }
-
-          item.appendChild(header);
-
-          const hasText = (slide.text || "").trim() !== "";
-          const hasNotes = (slide.notes || "").trim() !== "";
-          const textHtml = (slide.text || "").replace(/\n/g, "<br>");
-          const notesHtml = (slide.notes || "").replace(/\n/g, "<br>");
-
-          if (previewPref === "text") {
-            if (hasText) {
-              const t = document.createElement("div");
-              t.className = "slide-text";
-              t.innerHTML = textHtml;
-              applyTextScale(t, textScale);
-              item.appendChild(t);
-
-              addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes);
-            } else if (uuid) {
-              const img = document.createElement("img");
-              img.className = "slide-thumb loading";
-              img.alt = `Slide ${i + 1} thumbnail`;
-              item.appendChild(img);
-
-              attachThumbnailToImage(img, uuid, i).then(() => {
-                if (!img.isConnected) return;
-                addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes);
-              });
-            } else {
-              addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes);
-            }
-          } else {
-            let fallbackTextEl = null;
-
-            if (hasText) {
-              const t = document.createElement("div");
-              t.className = "slide-text";
-              t.innerHTML = textHtml;
-              applyTextScale(t, textScale);
-              item.appendChild(t);
-              fallbackTextEl = t;
-            }
-
-            if (uuid) {
-              const img = document.createElement("img");
-              img.className = "slide-thumb loading";
-              img.alt = `Slide ${i + 1} thumbnail`;
-
-              attachThumbnailToImage(img, uuid, i).then(() => {
-                if (!img.isConnected) return;
-
-                const key = thumbnailKey(uuid, i);
-                const cached = thumbCache[key];
-
-                if (cached && !cached.isPlaceholder) {
-                  if (fallbackTextEl && fallbackTextEl.parentNode) {
-                    fallbackTextEl.parentNode.removeChild(fallbackTextEl);
-                    fallbackTextEl = null;
-                  }
-
-                  if (!img.parentNode) {
-                    item.appendChild(img);
-                  }
-                } else {
-                  if (!img.parentNode && !fallbackTextEl) {
-                    item.appendChild(img);
-                  } else if (!img.parentNode && fallbackTextEl) {
-                    item.appendChild(img);
-                  }
-                }
-              });
-
-              if (hasText) {
-                const observer = new MutationObserver(() => {
-                  const key = thumbnailKey(uuid, i);
-                  const cached = thumbCache[key];
-                  if (cached && !cached.isPlaceholder) {
-                    if (fallbackTextEl && fallbackTextEl.parentNode) {
-                      fallbackTextEl.parentNode.removeChild(fallbackTextEl);
-                      fallbackTextEl = null;
-                    }
-                    if (!img.parentNode) {
-                      item.appendChild(img);
-                    }
-                    observer.disconnect();
-                  }
-                });
-
-                observer.observe(img, {
-                  attributes: true,
-                  attributeFilter: ["src", "class"]
-                });
-              } else {
-                item.appendChild(img);
-              }
-
-              addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes);
-            } else {
-              addNotesIfNeeded(item, hasNotes, notesHtml, textScale, showNotes);
-            }
-          }
-
-          item.addEventListener("click", () => {
-            if (!viewerMode && !item.disabled) {
-              focusSlide(i);
-            }
-          });
-
-          container.appendChild(item);
-        });
-
-        if (!focused && autoScroll && typeof indexValue === "number" && indexValue !== lastSlideIndexForAutoScroll) {
+        if (
+          !focused &&
+          settings.autoScroll &&
+          typeof indexValue === "number" &&
+          indexValue !== lastSlideIndexForAutoScroll
+        ) {
           lastSlideIndexForAutoScroll = indexValue;
-          if (currentSlideEl) {
-            currentSlideEl.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        } else if (!focused && typeof indexValue === "number" && lastSlideIndexForAutoScroll === null) {
+          currentSlideEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (
+          !focused &&
+          typeof indexValue === "number" &&
+          lastSlideIndexForAutoScroll === null
+        ) {
           lastSlideIndexForAutoScroll = indexValue;
         }
-
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
       }
+    }
+
+    function openModal() {
+      syncSettingsUI();
+      dom.settingsOverlay.style.display = "flex";
+      dom.settingsOverlay.setAttribute("aria-hidden", "false");
     }
 
     function closeModal() {
-      document.getElementById("settingsOverlay").style.display = "none";
+      dom.settingsOverlay.style.display = "none";
+      dom.settingsOverlay.setAttribute("aria-hidden", "true");
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadTheme();
+    function bindEventListeners() {
+      dom.settingsButton.addEventListener("click", openModal);
+      dom.settingsCloseButton.addEventListener("click", closeModal);
 
-      setInterval(fetchStatus, 1000);
-      fetchStatus();
-
-      function syncSettingsUI() {
-        const scale = getTextScale();
-        document.getElementById("textSizeSlider").value = scale;
-        document.getElementById("textSizeValue").textContent = `${scale}%`;
-
-        document.getElementById("viewerModeToggle").checked = getViewerMode();
-        document.getElementById("autoScrollToggle").checked = getAutoScroll();
-
-        const pref = getPreviewPreference();
-        updatePreviewPrefSegmentUI(pref);
-
-        const themeMode = localStorage.getItem(THEME_KEY) || "system";
-        updateThemeSegmentUI(themeMode);
-
-        document.getElementById("showNotesToggle").checked = getShowNotes();
-      }
-
-      syncSettingsUI();
-
-      document.getElementById("settingsButton").onclick = () => {
-        syncSettingsUI();
-        document.getElementById("settingsOverlay").style.display = "flex";
-      };
-
-      document.getElementById("settingsCloseButton").onclick = () => closeModal();
-
-      const overlay = document.getElementById("settingsOverlay");
-      overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) closeModal();
+      dom.settingsOverlay.addEventListener("click", event => {
+        if (event.target === dom.settingsOverlay) closeModal();
       });
 
-      document.getElementById("viewerModeToggle").addEventListener("change", e => {
-        setViewerMode(e.target.checked);
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && dom.settingsOverlay.style.display === "flex") {
+          closeModal();
+        }
       });
 
-      document.getElementById("autoScrollToggle").addEventListener("change", e => {
-        setAutoScroll(e.target.checked);
+      dom.viewerModeToggle.addEventListener("change", event => {
+        setViewerMode(event.target.checked);
       });
 
-      document.getElementById("showNotesToggle").addEventListener("change", e => {
-        setShowNotes(e.target.checked);
+      dom.autoScrollToggle.addEventListener("change", event => {
+        setAutoScroll(event.target.checked);
+      });
+
+      dom.showNotesToggle.addEventListener("change", event => {
+        setShowNotes(event.target.checked);
         fetchStatus();
       });
 
-      document.querySelectorAll("#previewPreferenceSegment button").forEach(btn => {
+      dom.showDisabledSlidesToggle.addEventListener("change", event => {
+        setShowDisabledSlides(event.target.checked);
+        fetchStatus();
+      });
+
+      dom.showLabelsToggle.addEventListener("change", event => {
+        setShowLabels(event.target.checked);
+        fetchStatus();
+      });
+
+      dom.advancedSettingsButton.addEventListener("click", () => {
+        setAdvancedPanelOpen(!dom.advancedSettingsPanel.classList.contains("open"));
+      });
+
+      dom.previewPreferenceButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-          const pref = btn.dataset.pref;
-          setPreviewPreference(pref);
-          updatePreviewPrefSegmentUI(pref);
+          setPreviewPreference(btn.dataset.pref);
+          updateSegmentUI(dom.previewPreferenceButtons, "pref", getPreviewPreference());
           fetchStatus();
         });
       });
 
-      const textSlider = document.getElementById("textSizeSlider");
-      const textVal = document.getElementById("textSizeValue");
-
-      textSlider.addEventListener("input", () => {
-        textVal.textContent = `${textSlider.value}%`;
+      dom.themeButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          setThemeMode(btn.dataset.mode);
+          applyTheme(getThemeMode());
+        });
       });
 
-      textSlider.addEventListener("change", () => {
-        setTextScale(textSlider.value);
+      dom.textSizeSlider.addEventListener("input", () => {
+        dom.textSizeValue.textContent = `${dom.textSizeSlider.value}%`;
+      });
+
+      dom.textSizeSlider.addEventListener("change", () => {
+        setTextScale(dom.textSizeSlider.value);
         fetchStatus();
       });
 
-      document.querySelectorAll("#themeSegment button").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const mode = btn.dataset.mode;
-          localStorage.setItem(THEME_KEY, mode);
-          applyTheme(mode);
+      if (window.matchMedia) {
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+          if (getThemeMode() === "system") applyTheme("system");
         });
-      });
-    });
+      }
+    }
+
+    function init() {
+      cacheDom();
+      applyTheme(getThemeMode());
+      syncSettingsUI();
+      bindEventListeners();
+      fetchStatus();
+      setInterval(fetchStatus, STATUS_REFRESH_MS);
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
   </script>
 </body>
 </html>
