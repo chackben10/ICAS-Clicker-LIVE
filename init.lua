@@ -28,6 +28,10 @@ proRemote.PROPRESENTER_LOOK_CURRENT = "http://localhost:" .. proRemote.PRO_PORT 
 proRemote.BIBLE_LOOK_NAME           = "Bible"
 proRemote.BIBLE_MACRO_TRIGGER_URL   = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/macro/69293C79-69BB-4061-86E1-76F627CB3085/trigger"
 
+-- Clear layers
+proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/announcements"
+proRemote.PROPRESENTER_CLEAR_SLIDE         = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/slide"
+
 -- Audio Config
 proRemote.AUDIO_PLAYLISTS = { "Major Pads", "Minor Pads", "Neutral Pads" }
 proRemote.PROPRESENTER_AUDIO_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/audio/playlist"
@@ -49,9 +53,6 @@ proRemote._slideAudioPendingKey = proRemote._slideAudioPendingKey or nil
 -- Try to force a "real" presentation into focus if focused is announcements
 proRemote.PROPRESENTER_ACTIVE_FOCUS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/active/focus"
 proRemote.FOCUSED_RECHECK_DELAY_SEC = 0.20
-
--- Clear announcements layer
-proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/announcements"
 
 proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_ACTIVE_BASE
 
@@ -172,9 +173,14 @@ proRemote.PRESET_PTZ_CAMERA_UUID            = "D47223A2-73BD-4C86-BB82-0D95E90D8
 proRemote.PRESET_ENDING_ANNOUNCEMENTS_UUID  = "9CAAE21A-5AB2-41B3-B004-4135B36E134B"
 
 -- Utility presentations for one-shot triggers
-proRemote.PRESET_BLANK_PREVIEW_UUID   = "7475C13E-FE99-4AF1-8760-526A845A1860"
-proRemote.PRESET_IMAC_SCREEN_UUID      = "AC813C59-FF90-483F-8532-406CF8DD056A"
-proRemote.SAFECLEAR_DELAY_SEC         = 0.50
+-- Kept for compatibility with the presentation picker behavior.
+-- It is no longer used for "Clear Slide" actions.
+proRemote.PRESET_BLANK_PREVIEW_UUID = "7475C13E-FE99-4AF1-8760-526A845A1860"
+proRemote.PRESET_IMAC_SCREEN_UUID   = "AC813C59-FF90-483F-8532-406CF8DD056A"
+
+-- Clear Slide behavior
+-- Used when a preset is called with ?clearslide=true.
+proRemote.CLEAR_SLIDE_DELAY_SEC = 0.50
 
 -- Service Logo dictionary
 proRemote.SERVICE_LOGOS = {
@@ -318,7 +324,6 @@ local function fetchAudioPlaylistTracks(playlistName)
   playlistName = trim(playlistName)
   if playlistName == "" then return {} end
 
-  -- Check cache
   local cached = proRemote._audioCache[playlistName]
   if cached and (nowSec() - cached.storedAt) < proRemote.AUDIO_CACHE_TTL then
     return cached.tracks
@@ -467,6 +472,7 @@ end
 
 local obsSetSceneWithTransitionPolicy
 local proClearAnnouncementsLayer
+local proClearSlideLayer
 local syncObsSceneToProPresenterLook
 
 ------------------------------------------------------------
@@ -525,7 +531,6 @@ local function syncAudioFromActiveSlideLabel(activeObj, currentIndex)
 
   local slideKey = uuid .. ":" .. tostring(currentIndex) .. ":" .. cleanLabel
 
-  -- Do this only once per slide/label combination.
   if proRemote._slideAudioChecked[slideKey] then return end
   rememberSlideAudioChecked(slideKey)
 
@@ -598,8 +603,6 @@ local function enforceBibleLookIfNeeded()
 end
 
 local function checkAutoShowSlides()
-  -- 1. Fetch slide index.
-  -- This is used by both Auto Show Slides and slide-label audio sync.
   local okIdx, statusIdx, bodyIdx = pcall(function()
     return hs.http.get(proRemote.PROPRESENTER_SLIDE_INDEX, { ["accept"]="application/json" })
   end)
@@ -617,7 +620,6 @@ local function checkAutoShowSlides()
     end
   end
 
-  -- 2. Fetch active presentation to catch Bible verse changes and to read slide labels.
   local okAct, statusAct, bodyAct = pcall(function()
     return hs.http.get(proRemote.PROPRESENTER_ACTIVE_BASE, { ["accept"]="application/json" })
   end)
@@ -636,17 +638,14 @@ local function checkAutoShowSlides()
     end
   end
 
-  -- 3. If the current slide has an audio label, trigger the matching pad once.
   if activeObj and currentIndex ~= nil then
     pcall(function()
       syncAudioFromActiveSlideLabel(activeObj, currentIndex)
     end)
   end
 
-  -- 4. Existing Auto Show Slides behavior.
   if not proRemote.autoShowSlidesEnabled then return end
 
-  -- If cleared completely, reset state and do not trigger.
   if currentPos == "" and groupName == "" then
     proRemote._lastAutoShowState = nil
     return
@@ -1139,6 +1138,28 @@ end
 
 proClearAnnouncementsLayer = function()
   hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS, {}, function() end)
+  return true
+end
+
+proClearSlideLayer = function()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_SLIDE, {}, function() end)
+  return true
+end
+
+local function proClearSlideLayerAfter(delaySec)
+  delaySec = tonumber(delaySec) or 0
+
+  if delaySec <= 0 then
+    return proClearSlideLayer()
+  end
+
+  hs.timer.doAfter(delaySec, function()
+    if proClearSlideLayer then
+      proClearSlideLayer()
+    end
+  end)
+
+  return true
 end
 
 ------------------------------------------------------------
@@ -1277,7 +1298,6 @@ local function bridgeTrySetScene(sceneName, transitionName, durationMs)
   return false
 end
 
--- Function to query the actual current scene from OBS via node server
 local function bridgeGetCurrentScene()
   if not proRemote.OBS_BRIDGE_ENABLED then return proRemote._current_obs_scene end
 
@@ -1289,19 +1309,15 @@ local function bridgeGetCurrentScene()
   if ok and status == 200 and body and body ~= "" then
     local obj = decodeJson(body)
     if type(obj) == "table" then
-      -- Check common OBS websocket v5 response key
       if type(obj.currentProgramSceneName) == "string" then return obj.currentProgramSceneName end
-      -- Fallbacks for other generic JSON structures
       if type(obj.name) == "string" then return obj.name end
       if type(obj.scene) == "string" then return obj.scene end
     end
 
-    -- If the node server just returns a raw string
     local txt = trim(body):gsub('^"|"$', '')
     if txt ~= "" then return txt end
   end
 
-  -- Fallback to our local cache if the endpoint fails/is missing
   return proRemote._current_obs_scene
 end
 
@@ -1338,8 +1354,6 @@ local function obsLookRuleToPayload(rule)
     end
   end
 
-  -- Alternate format, if you ever prefer it later:
-  -- { items = { { id = 12, enabled = true }, { sceneItemId = 13, enabled = false } } }
   if type(rule.items) == "table" then
     for _, item in ipairs(rule.items) do
       if type(item) == "table" then
@@ -1388,7 +1402,6 @@ local function bridgeApplySceneItemVisibility(payload, signature)
       print(string.format("OBS look visibility apply failed: status=%s body=%s", tostring(status), tostring(body or "")))
     end
 
-    -- If a newer look/layout became pending while OBS was applying, apply it next.
     if proRemote._pendingObsLookVisibilityPayload and
        proRemote._pendingObsLookVisibilitySignature ~= "" and
        proRemote._pendingObsLookVisibilitySignature ~= proRemote._lastObsLookVisibilitySignature then
@@ -1468,7 +1481,6 @@ local function scheduleObsLookPayloadApply(payload, signature)
     proRemote._pendingObsLookTimer = nil
 
     if proRemote._obsLookApplyInFlight then
-      -- OBS is already processing a layout. Try again shortly with the newest pending payload.
       hs.timer.doAfter(0.05, function()
         if syncObsSceneToProPresenterLook then
           pcall(function() syncObsSceneToProPresenterLook(true) end)
@@ -1500,8 +1512,6 @@ syncObsSceneToProPresenterLook = function(force)
 
   local rule = proRemote.OBS_LOOK_RULES and proRemote.OBS_LOOK_RULES[lookName]
 
-  -- Important: unknown look means do nothing to OBS.
-  -- We still remember that we saw the unknown look so returning to a known look can re-apply cleanly.
   if type(rule) ~= "table" then return end
 
   local payload = obsLookRuleToPayload(rule)
@@ -1510,7 +1520,6 @@ syncObsSceneToProPresenterLook = function(force)
   local sig = obsLookRuleSignature(lookName, payload)
   if sig == "" then return end
 
-  -- Only apply when the look/layout changes, when forced, or when returning from an unknown/different look.
   if not force and not lookChanged and sig == proRemote._lastObsLookVisibilitySignature then
     return
   end
@@ -1573,6 +1582,18 @@ local function parseQuery(path)
     params[k] = v
   end
   return params
+end
+
+local function shouldClearSlideFromParams(params)
+  if type(params) ~= "table" then return false end
+
+  -- Primary new flag.
+  if toBoolish(params["clearslide"]) then return true end
+
+  -- Backward compatibility while older control pages are still open.
+  if toBoolish(params["safeclear"]) then return true end
+
+  return false
 end
 
 ------------------------------------------------------------
@@ -1689,7 +1710,7 @@ local function handleHttpPath(method, rawPath, body)
       local obj = decodeJson(body or "")
       if type(obj) == "table" and obj.enabled ~= nil then
         proRemote.autoShowSlidesEnabled = toBoolish(obj.enabled)
-        proRemote._lastAutoShowState = nil -- reset tracking
+        proRemote._lastAutoShowState = nil
       end
       return jsonResponse({ enabled = proRemote.autoShowSlidesEnabled }), 200, "application/json"
     end
@@ -1743,8 +1764,8 @@ local function handleHttpPath(method, rawPath, body)
 
     local preset = tostring(obj.preset or ""):lower()
     local serviceLogoUuid = tostring(obj.service_logo_uuid or "")
-    local doSafeClear = toBoolish(params["safeclear"])
-    local delay = tonumber(proRemote.SAFECLEAR_DELAY_SEC) or 0.5
+    local doClearSlide = shouldClearSlideFromParams(params)
+    local clearSlideDelay = tonumber(proRemote.CLEAR_SLIDE_DELAY_SEC) or 0.5
 
     if preset == "stream_beginning" then
       proTriggerPresentationUUID(proRemote.PRESET_STARTING_ANNOUNCEMENTS_UUID)
@@ -1755,11 +1776,11 @@ local function handleHttpPath(method, rawPath, body)
       proTriggerPresentationUUID(proRemote.PRESET_PTZ_CAMERA_UUID)
       obsSetSceneWithTransitionPolicy("PTZ Camera")
 
-      if doSafeClear then
-        proTriggerPresentationUUIDAfter(proRemote.PRESET_BLANK_PREVIEW_UUID, delay)
+      if doClearSlide then
+        proClearSlideLayerAfter(clearSlideDelay)
       end
 
-      return jsonResponse({ ok=true, safeclear=doSafeClear }), 200, "application/json"
+      return jsonResponse({ ok=true, clearslide=doClearSlide }), 200, "application/json"
 
     elseif preset == "show_slides" then
       proClearAnnouncementsLayer()
@@ -1774,11 +1795,11 @@ local function handleHttpPath(method, rawPath, body)
       proTriggerPresentationUUID(serviceLogoUuid)
       obsSetSceneWithTransitionPolicy("Audience Camera")
 
-      if doSafeClear then
-        proTriggerPresentationUUIDAfter(proRemote.PRESET_BLANK_PREVIEW_UUID, delay)
+      if doClearSlide then
+        proClearSlideLayerAfter(clearSlideDelay)
       end
 
-      return jsonResponse({ ok=true, safeclear=doSafeClear }), 200, "application/json"
+      return jsonResponse({ ok=true, clearslide=doClearSlide }), 200, "application/json"
 
     elseif preset == "testimonies" then
       if serviceLogoUuid == "" then
@@ -1793,9 +1814,9 @@ local function handleHttpPath(method, rawPath, body)
       obsSetSceneWithTransitionPolicy("Thanks Screen")
       return jsonResponse({ ok=true }), 200, "application/json"
 
-    elseif preset == "safely_clear_slide" then
-      proTriggerPresentationUUID(proRemote.PRESET_BLANK_PREVIEW_UUID)
-      return jsonResponse({ ok=true }), 200, "application/json"
+    elseif preset == "clear_slide" or preset == "safely_clear_slide" then
+      proClearSlideLayer()
+      return jsonResponse({ ok=true, clearslide=true }), 200, "application/json"
 
     elseif preset == "nsc_setup" then
       proClearAnnouncementsLayer()
@@ -1827,6 +1848,7 @@ local function httpCallback(method, path, headers, body)
 
   local ok, bodyData, status, contentType = pcall(handleHttpPath, method, path, body)
   if not ok then
+    print("HTTP handler error: " .. tostring(bodyData))
     return "Internal error\n", 500, h
   end
 
