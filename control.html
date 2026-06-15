@@ -38,9 +38,9 @@
 
 --ok: #00c853;
 
-/* Button scaling (applies ONLY inside preset buttons) */
---btn-scale: 1; /* 1 == 100% */
---grid-gap-base: 10px; /* scaled with --btn-scale */
+/* Button scaling applies only inside preset buttons */
+--btn-scale: 1;
+--grid-gap-base: 10px;
 }
 
 body.dark {
@@ -64,7 +64,7 @@ body.dark {
 --btn-hover-shadow: 0 0 0 2px rgba(255,255,255,0.20), 0 16px 34px rgba(255,255,255,0.18);
 --btn-active-shadow: 0 0 0 2px rgba(255,255,255,0.26), 0 12px 26px rgba(255,255,255,0.22);
 
-/* Danger invert in dark mode stays the same (white bg, red text) */
+/* Danger invert in dark mode stays the same */
 --danger: #ff5252;
 --danger-invert-bg: #ffffff;
 --danger-invert-text: #ff5252;
@@ -76,8 +76,15 @@ body.dark {
 --ok: #00c853;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; }
+* {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+
+html {
+-webkit-text-size-adjust: 100%;
+}
 
 body {
 background: var(--bg);
@@ -95,7 +102,11 @@ transition: background 0.25s ease, color 0.25s ease;
 touch-action: manipulation;
 }
 
-.wrapper { width: 100%; max-width: 680px; padding: 16px; }
+.wrapper {
+width: 100%;
+max-width: 680px;
+padding: 16px;
+}
 
 /* Top bar */
 .top-row {
@@ -127,13 +138,13 @@ touch-action: manipulation;
 transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.10s ease;
 }
 
-/* Invert on hover/press */
 .top-btn:hover {
 opacity: 1;
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
 box-shadow: var(--btn-hover-shadow);
 }
+
 .top-btn:active {
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
@@ -166,10 +177,12 @@ align-items: stretch;
 }
 
 @media (min-width: 700px) {
-.grid { grid-template-columns: 1fr 1fr; }
+.grid {
+grid-template-columns: 1fr 1fr;
+}
 }
 
-/* ===== Preset item as a "card" (main action + optional attached sub-action) ===== */
+/* Preset item as a card */
 .preset-card {
 width: 100%;
 display: flex;
@@ -198,6 +211,7 @@ background 0.15s ease,
 color 0.15s ease,
 box-shadow 0.15s ease,
 border-color 0.15s ease;
+
 box-shadow: 0 0 0 rgba(0,0,0,0);
 }
 
@@ -211,7 +225,7 @@ flex-direction: column;
 justify-content: flex-start;
 }
 
-/* Attached (no gap) addon button */
+/* Attached addon button */
 .preset-card.has-addon .preset-main {
 border-bottom-left-radius: 0;
 border-bottom-right-radius: 0;
@@ -230,7 +244,6 @@ font-weight: 900;
 letter-spacing: 0.2px;
 }
 
-/* Invert on hover/press (normal buttons) */
 .preset-main:hover,
 .preset-addon:hover {
 background: var(--btn-invert-bg);
@@ -248,16 +261,12 @@ box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
 
-/* Ensure subtext stays readable when inverted */
 .preset-main:hover .preset-sub,
 .preset-main:active .preset-sub {
 color: color-mix(in srgb, var(--btn-invert-text) 82%, transparent);
 }
 
-/* =========================================================
-✅ HARD LOCK: keep dropdown + wrapper NOT inverted
-========================================================= */
-
+/* Keep dropdowns from being visually inverted */
 .selector-row,
 .select-wrap,
 .select {
@@ -292,13 +301,18 @@ opacity: 0.85 !important;
 color: #111111;
 background: #ffffff;
 }
+
 body.dark .select option {
 color: #ffffff;
 background: #111111;
 }
 
 .preset-main:disabled,
-.preset-addon:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+.preset-addon:disabled {
+opacity: 0.55;
+cursor: not-allowed;
+box-shadow: none;
+}
 
 .preset-title {
 font-size: calc(1.15rem * var(--btn-scale));
@@ -321,7 +335,11 @@ gap: calc(10px * var(--btn-scale));
 align-items: center;
 }
 
-.select-wrap { position: relative; width: 100%; }
+.select-wrap {
+position: relative;
+width: 100%;
+}
+
 .select-wrap::after {
 content: "▾";
 position: absolute;
@@ -362,15 +380,18 @@ background: var(--danger);
 color: #ffffff;
 border-color: color-mix(in srgb, var(--danger) 70%, var(--btn-border));
 }
-.danger-fill .preset-sub { color: rgba(255,255,255,0.92); }
 
-/* Invert on hover/press for red buttons: white bg + red text */
+.danger-fill .preset-sub {
+color: rgba(255,255,255,0.92);
+}
+
 .danger-fill:hover {
 background: var(--danger-invert-bg);
 color: var(--danger-invert-text);
 border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
 box-shadow: var(--btn-hover-shadow);
 }
+
 .danger-fill:active {
 background: var(--danger-invert-bg);
 color: var(--danger-invert-text);
@@ -390,6 +411,7 @@ color: var(--danger-invert-text);
 border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
 box-shadow: var(--btn-hover-shadow);
 }
+
 .preset-addon.danger-fill:active {
 background: var(--danger-invert-bg);
 color: var(--danger-invert-text);
@@ -473,7 +495,10 @@ height: 10px;
 border-radius: 999px;
 background: var(--danger);
 }
-.status-dot.ok { background: var(--ok); }
+
+.status-dot.ok {
+background: var(--ok);
+}
 
 .status-text {
 font-variant-numeric: tabular-nums;
@@ -501,18 +526,25 @@ cursor: pointer;
 touch-action: manipulation;
 transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
 }
+
 .mini-btn:hover {
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
 box-shadow: var(--btn-hover-shadow);
 }
+
 .mini-btn:active {
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
 box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
-.mini-btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+
+.mini-btn:disabled {
+opacity: 0.55;
+cursor: not-allowed;
+box-shadow: none;
+}
 
 .segment {
 display: flex;
@@ -537,7 +569,10 @@ font-weight: 900;
 touch-action: manipulation;
 }
 
-.segment button:hover { background: rgba(128,128,128,0.12); }
+.segment button:hover {
+background: rgba(128,128,128,0.12);
+}
+
 .segment button.active {
 background: #ff5252;
 color: white;
@@ -559,11 +594,13 @@ font-weight: 900;
 touch-action: manipulation;
 transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
 }
+
 .settings-close-btn:hover {
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
 box-shadow: var(--btn-hover-shadow);
 }
+
 .settings-close-btn:active {
 background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
@@ -571,10 +608,12 @@ box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
 
-/* ===== Hide Presets heading + description when toggled off ===== */
-.presets-header[hidden] { display: none !important; }
+/* Hide Presets heading + description when toggled off */
+.presets-header[hidden] {
+display: none !important;
+}
 
-/* ===== Audio Pads UI Elements ===== */
+/* Audio Pads UI Elements */
 .audio-now-playing {
 margin-top: 10px;
 margin-bottom: 12px;
@@ -671,12 +710,14 @@ transform: translateY(1px) scale(0.995);
 <div class="wrapper">
 <div class="top-row">
 <div class="page-title">ICAS Media Control Panel</div>
+
 <div style="display: flex; gap: 12px; align-items: center;">
 <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; user-select: none; color: var(--card-text);">
 <input type="checkbox" id="autoShowToggle" style="transform: scale(1.2);">
 Auto Show
 </label>
-<button class="top-btn" id="settingsButton">Settings</button>
+
+<button class="top-btn" id="settingsButton" type="button">Settings</button>
 </div>
 </div>
 
@@ -705,7 +746,7 @@ Sets ProPresenter to <b>Starting Announcements</b> and sets OBS scene to <b>Stre
 Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
 </div>
 </button>
-<button class="preset-addon danger-fill" id="btnCameraSafeClear" type="button">Camera + Safely Clear Slide</button>
+<button class="preset-addon danger-fill" id="btnCameraClearSlide" type="button">Camera + Clear Slide</button>
 </div>
 
 <div class="preset-card has-addon" id="cardServiceLogo">
@@ -721,7 +762,7 @@ Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</
 </div>
 </div>
 </button>
-<button class="preset-addon danger-fill" id="btnServiceLogoSafeClear" type="button">Service Logo + Safely Clear Slide</button>
+<button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
 </div>
 
 <div class="preset-card" id="cardShowSlides">
@@ -772,11 +813,11 @@ Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 </button>
 </div>
 
-<div class="preset-card" id="cardSafelyClearSlide">
-<button class="preset-main danger-fill" id="btnSafelyClearSlide" type="button">
-<div class="preset-title">Safely Clear Slide</div>
+<div class="preset-card" id="cardClearSlide">
+<button class="preset-main danger-fill" id="btnClearSlide" type="button">
+<div class="preset-title">Clear Slide</div>
 <div class="preset-sub">
-Clear the presentation in ProPresenter without affecting the camera feeds of the OBS Stream.
+Clears only the ProPresenter slide layer. OBS scenes and camera feeds stay unchanged.
 </div>
 </button>
 </div>
@@ -794,7 +835,7 @@ Open pad controller to play ambient drones.
 <button class="preset-main" id="btnNSCSetup" type="button">
 <div class="preset-title">NSC setup</div>
 <div class="preset-sub">
-Setup ProPresenter to display iMac screen on all in-house tvs.
+Setup ProPresenter to display iMac screen on all in-house TVs.
 </div>
 </button>
 </div>
@@ -822,11 +863,13 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 
 <div class="settings-section">
 <div class="settings-label">Backend Status</div>
+
 <div class="pill-row" aria-live="polite">
 <span class="pill" title="Cloudflare Tunnel backend status">
 <span id="backendDot" class="status-dot"></span>
 <span class="status-text" id="backendStatus">Backend: Checking…</span>
 </span>
+
 <span class="pill" title="Most recent action run from this page">
 <span class="status-text" id="lastAction">Last action: —</span>
 </span>
@@ -845,6 +888,7 @@ Backend should be: <b>https://control.icas-clicker.work</b>
 <div class="settings-section">
 <div class="settings-label">Show Description</div>
 <div class="settings-muted">Hide/show the “Presets” header and description on the main page.</div>
+
 <div class="pill-row" style="margin-top: 10px;">
 <label class="pill" style="cursor:pointer; user-select:none;">
 <input id="showDescToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
@@ -854,24 +898,28 @@ Backend should be: <b>https://control.icas-clicker.work</b>
 </div>
 
 <div class="settings-section">
+<div class="settings-label">Button Size</div>
+<div class="settings-muted" style="margin-bottom: 10px;">Adjust preset button text and spacing.</div>
 <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
 </div>
 
 <div class="settings-section">
 <div class="settings-label">Display Theme</div>
 <div class="segment" id="themeSegment">
-<button data-mode="light">Light</button>
-<button data-mode="dark">Dark</button>
-<button data-mode="system">System</button>
+<button data-mode="light" type="button">Light</button>
+<button data-mode="dark" type="button">Dark</button>
+<button data-mode="system" type="button">System</button>
 </div>
 </div>
 
-<button id="settingsCloseButton" class="settings-close-btn">Close</button>
+<button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
 </div>
 </div>
 
 <script>
 (function () {
+"use strict";
+
 // ====== CONFIG ======
 const DEFAULT_API_BASE = "https://control.icas-clicker.work";
 
@@ -897,6 +945,7 @@ return normalizeBase(DEFAULT_API_BASE);
 
 function endpoints() {
 const base = getApiBase();
+
 return {
 health: `${base}/health`,
 serviceLogos: `${base}/service_logos`,
@@ -914,12 +963,18 @@ autoShow: `${base}/auto-show`
 
 // ====== THEME ======
 function applyTheme(mode) {
-if (mode === "light") document.body.classList.remove("dark");
-else if (mode === "dark") document.body.classList.add("dark");
-else {
-if (window.matchMedia("(prefers-color-scheme: dark)").matches) document.body.classList.add("dark");
-else document.body.classList.remove("dark");
+if (mode === "light") {
+document.body.classList.remove("dark");
+} else if (mode === "dark") {
+document.body.classList.add("dark");
+} else {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+document.body.classList.add("dark");
+} else {
+document.body.classList.remove("dark");
 }
+}
+
 updateThemeSegmentUI(mode);
 }
 
@@ -940,7 +995,9 @@ if (stored === "system") applyTheme("system");
 });
 
 // ====== Button scale ======
-function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+function clamp(n, lo, hi) {
+return Math.max(lo, Math.min(hi, n));
+}
 
 function getBtnScalePercent() {
 const raw = parseInt(localStorage.getItem(BTN_SCALE_KEY), 10);
@@ -965,7 +1022,7 @@ const showDescToggle = document.getElementById("showDescToggle");
 
 function getShowDesc() {
 const raw = localStorage.getItem(SHOW_DESC_KEY);
-if (raw === null) return true; // default ON
+if (raw === null) return true;
 return raw === "1";
 }
 
@@ -995,21 +1052,18 @@ const serviceLogoDesc = document.getElementById("serviceLogoDesc");
 const testimoniesDesc = document.getElementById("testimoniesDesc");
 const macroDesc = document.getElementById("macroDesc");
 
-// Buttons
+// Preset buttons
 const btnStreamBeginning = document.getElementById("btnStreamBeginning");
 const btnCamera = document.getElementById("btnCamera");
 const btnServiceLogo = document.getElementById("btnServiceLogo");
 const btnShowSlides = document.getElementById("btnShowSlides");
 const btnTestimonies = document.getElementById("btnTestimonies");
 const btnEndingStream = document.getElementById("btnEndingStream");
-
 const btnSetMacro = document.getElementById("btnSetMacro");
 const btnAudioControl = document.getElementById("btnAudioControl");
-
-const btnCameraSafeClear = document.getElementById("btnCameraSafeClear");
-const btnServiceLogoSafeClear = document.getElementById("btnServiceLogoSafeClear");
-
-const btnSafelyClearSlide = document.getElementById("btnSafelyClearSlide");
+const btnCameraClearSlide = document.getElementById("btnCameraClearSlide");
+const btnServiceLogoClearSlide = document.getElementById("btnServiceLogoClearSlide");
+const btnClearSlide = document.getElementById("btnClearSlide");
 const btnNSCSetup = document.getElementById("btnNSCSetup");
 
 // Audio UI
@@ -1020,56 +1074,85 @@ const btnClearAudio = document.getElementById("btnClearAudio");
 const audioCloseButton = document.getElementById("audioCloseButton");
 const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
 
+// Settings UI
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
-
 const autoShowToggle = document.getElementById("autoShowToggle");
+const settingsOverlay = document.getElementById("settingsOverlay");
+const settingsButton = document.getElementById("settingsButton");
+const settingsCloseButton = document.getElementById("settingsCloseButton");
 
 // Prevent select taps from triggering the main button
 function stopBtnClickWhenSelecting(selectEl) {
 if (!selectEl) return;
-["click","pointerdown","touchstart","mousedown"].forEach(evt => {
-selectEl.addEventListener(evt, (e) => e.stopPropagation(), { passive: true });
+
+["click", "pointerdown", "touchstart", "mousedown"].forEach(evt => {
+selectEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
 });
 }
+
 stopBtnClickWhenSelecting(serviceLogoSelect);
 stopBtnClickWhenSelecting(testimoniesLogoSelect);
 stopBtnClickWhenSelecting(macroSelect);
 
 function setBackendStatus(ok, text) {
+if (!backendDot || !backendStatus) return;
+
 backendDot.classList.toggle("ok", !!ok);
 backendStatus.textContent = text || (ok ? "Backend: Connected" : "Backend: Offline");
 }
 
 function setLastAction(text) {
+if (!lastAction) return;
 lastAction.textContent = `Last action: ${text || "—"}`;
 }
 
 function setButtonsEnabled(enabled) {
 [
-btnStreamBeginning, btnCamera, btnServiceLogo, btnShowSlides,
-btnTestimonies, btnEndingStream, btnCameraSafeClear, btnServiceLogoSafeClear,
-btnSafelyClearSlide, btnNSCSetup, btnSetMacro, btnAudioControl
-].forEach(b => { if (b) b.disabled = !enabled; });
+btnStreamBeginning,
+btnCamera,
+btnServiceLogo,
+btnShowSlides,
+btnTestimonies,
+btnEndingStream,
+btnCameraClearSlide,
+btnServiceLogoClearSlide,
+btnClearSlide,
+btnNSCSetup,
+btnSetMacro,
+btnAudioControl
+].forEach(button => {
+if (button) button.disabled = !enabled;
+});
 
 if (macroSelect) macroSelect.disabled = !enabled;
-refreshLogosBtn.disabled = !enabled;
-testBackendBtn.disabled = false;
-serviceLogoSelect.disabled = !enabled;
-testimoniesLogoSelect.disabled = !enabled;
+if (refreshLogosBtn) refreshLogosBtn.disabled = !enabled;
+if (testBackendBtn) testBackendBtn.disabled = false;
+if (serviceLogoSelect) serviceLogoSelect.disabled = !enabled;
+if (testimoniesLogoSelect) testimoniesLogoSelect.disabled = !enabled;
 if (autoShowToggle) autoShowToggle.disabled = !enabled;
 }
 
 function escapeHtml(s) {
 return String(s || "").replace(/[&<>"']/g, c => ({
-"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+"&": "&amp;",
+"<": "&lt;",
+">": "&gt;",
+'"': "&quot;",
+"'": "&#39;"
 }[c]));
 }
 
-function getStored(key) { return (localStorage.getItem(key) || "").trim(); }
-function setStored(key, val) { localStorage.setItem(key, String(val || "").trim()); }
+function getStored(key) {
+return (localStorage.getItem(key) || "").trim();
+}
+
+function setStored(key, val) {
+localStorage.setItem(key, String(val || "").trim());
+}
 
 function selectedName(selectEl) {
 if (!selectEl) return "—";
+
 const opt = selectEl.options[selectEl.selectedIndex];
 return opt ? (opt.textContent || "—") : "—";
 }
@@ -1079,10 +1162,16 @@ const sName = selectedName(serviceLogoSelect);
 const tName = selectedName(testimoniesLogoSelect);
 const mName = selectedName(macroSelect);
 
+if (serviceLogoDesc) {
 serviceLogoDesc.innerHTML =
 `Sets ProPresenter Announcement to <b>${escapeHtml(sName)}</b>, and shows the <b>Audience Camera</b> on OBS.`;
+}
+
+if (testimoniesDesc) {
 testimoniesDesc.innerHTML =
 `Sets ProPresenter Announcement to <b>${escapeHtml(tName)}</b> and sets OBS scene to <b>Testimonies</b>.`;
+}
+
 if (macroDesc) {
 macroDesc.innerHTML =
 `Triggers ProPresenter Macro: <b>${escapeHtml(mName)}</b> (sets look for In-House TVs + OBS).`;
@@ -1091,9 +1180,11 @@ macroDesc.innerHTML =
 
 async function testBackend() {
 const { health } = endpoints();
+
 try {
 const res = await fetch(health, { cache: "no-cache" });
 if (!res.ok) throw new Error("Bad response");
+
 setBackendStatus(true, "Backend: Connected ✔");
 setButtonsEnabled(true);
 return true;
@@ -1105,6 +1196,8 @@ return false;
 }
 
 function fillSelect(selectEl, items, storageKey, preferBasic) {
+if (!selectEl) return;
+
 const prev = getStored(storageKey);
 selectEl.innerHTML = "";
 
@@ -1128,8 +1221,13 @@ if (prev && items.some(x => String(x.uuid) === prev)) {
 selectEl.value = prev;
 } else if (preferBasic) {
 const basic = items.find(x => String(x.name) === "Basic Service Logo");
-if (basic) selectEl.value = String(basic.uuid || "");
-else selectEl.value = String(items[0].uuid || "");
+
+if (basic) {
+selectEl.value = String(basic.uuid || "");
+} else {
+selectEl.value = String(items[0].uuid || "");
+}
+
 setStored(storageKey, selectEl.value);
 } else {
 selectEl.value = String(items[0].uuid || "");
@@ -1138,10 +1236,13 @@ setStored(storageKey, selectEl.value);
 }
 
 function fillMacroSelect(selectEl, names, storageKey) {
+if (!selectEl) return;
+
 const prev = getStored(storageKey);
 selectEl.innerHTML = "";
 
 const list = Array.isArray(names) ? names.filter(Boolean).map(String) : [];
+
 if (list.length === 0) {
 const opt = document.createElement("option");
 opt.value = "";
@@ -1168,17 +1269,24 @@ setStored(storageKey, selectEl.value);
 
 async function refreshServiceLogos() {
 const { serviceLogos } = endpoints();
+
 try {
 const res = await fetch(serviceLogos, { cache: "no-cache" });
 if (!res.ok) throw new Error("Bad response");
+
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
 
 fillSelect(serviceLogoSelect, items, SERVICE_LOGO_UUID_KEY, true);
 fillSelect(testimoniesLogoSelect, items, TESTIMONIES_LOGO_UUID_KEY, true);
 
-if (!getStored(SERVICE_LOGO_UUID_KEY)) setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
-if (!getStored(TESTIMONIES_LOGO_UUID_KEY)) setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
+if (!getStored(SERVICE_LOGO_UUID_KEY) && serviceLogoSelect) {
+setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
+}
+
+if (!getStored(TESTIMONIES_LOGO_UUID_KEY) && testimoniesLogoSelect) {
+setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
+}
 
 syncDescriptions();
 } catch {
@@ -1190,19 +1298,25 @@ syncDescriptions();
 
 async function refreshMacros() {
 if (!macroSelect) return;
+
 const { macros } = endpoints();
+
 try {
 const res = await fetch(macros, { cache: "no-cache" });
 if (!res.ok) throw new Error("Bad response");
+
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
 const names = items.map(x => x?.name).filter(Boolean);
+
 fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
+
 const hasAny = names.length > 0;
 if (btnSetMacro) btnSetMacro.disabled = !hasAny;
 macroSelect.disabled = !hasAny;
-} catch (err) {
+} catch {
 fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
+
 if (btnSetMacro) btnSetMacro.disabled = true;
 macroSelect.disabled = true;
 } finally {
@@ -1211,45 +1325,55 @@ syncDescriptions();
 }
 
 async function refreshAutoShow() {
-  if (!autoShowToggle) return;
-  const { autoShow } = endpoints();
-  try {
-    const res = await fetch(autoShow, { cache: "no-cache" });
-    if (res.ok) {
-      const data = await res.json();
-      autoShowToggle.checked = !!data.enabled;
-    }
-  } catch (e) {}
+if (!autoShowToggle) return;
+
+const { autoShow } = endpoints();
+
+try {
+const res = await fetch(autoShow, { cache: "no-cache" });
+
+if (res.ok) {
+const data = await res.json();
+autoShowToggle.checked = !!data.enabled;
+}
+} catch {}
 }
 
 if (autoShowToggle) {
-  autoShowToggle.addEventListener("change", async (e) => {
-    const { autoShow } = endpoints();
-    const enabled = e.target.checked;
-    try {
-      const res = await fetch(autoShow, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled })
-      });
-      if (!res.ok) throw new Error("Failed to update auto show");
-      setLastAction(enabled ? "Auto Show Slides Enabled" : "Auto Show Slides Disabled");
-    } catch (err) {
-      e.target.checked = !enabled; // Revert visually if failed
-      setLastAction("Failed to update Auto Show Slides");
-    }
-  });
+autoShowToggle.addEventListener("change", async e => {
+const { autoShow } = endpoints();
+const enabled = e.target.checked;
+
+try {
+const res = await fetch(autoShow, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ enabled })
+});
+
+if (!res.ok) throw new Error("Failed to update auto show");
+
+setLastAction(enabled ? "Auto Show Slides Enabled" : "Auto Show Slides Disabled");
+} catch {
+e.target.checked = !enabled;
+setLastAction("Failed to update Auto Show Slides");
+}
+});
 }
 
+if (serviceLogoSelect) {
 serviceLogoSelect.addEventListener("change", () => {
 setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
 syncDescriptions();
 });
+}
 
+if (testimoniesLogoSelect) {
 testimoniesLogoSelect.addEventListener("change", () => {
 setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
 syncDescriptions();
 });
+}
 
 if (macroSelect) {
 macroSelect.addEventListener("change", () => {
@@ -1258,42 +1382,61 @@ syncDescriptions();
 });
 }
 
-// ====== Fix accidental presses during scroll (touch devices) ======
+// ====== Fix accidental presses during scroll on touch devices ======
 function attachTapHandler(el, handler) {
-if (!el) return;
+if (!el || typeof handler !== "function") return;
 
-let startX = 0, startY = 0, moved = false, activePointerId = null;
+let startX = 0;
+let startY = 0;
+let moved = false;
+let activePointerId = null;
+
 const MOVE_PX = 10;
 
-el.addEventListener("pointerdown", (e) => {
+el.addEventListener("pointerdown", e => {
 if (el.disabled) return;
 if (e.isPrimary === false) return;
+
 activePointerId = e.pointerId;
 moved = false;
 startX = e.clientX;
 startY = e.clientY;
-try { el.setPointerCapture(e.pointerId); } catch {}
+
+try {
+el.setPointerCapture(e.pointerId);
+} catch {}
 });
 
-el.addEventListener("pointermove", (e) => {
+el.addEventListener("pointermove", e => {
 if (activePointerId === null || e.pointerId !== activePointerId) return;
+
 const dx = Math.abs(e.clientX - startX);
 const dy = Math.abs(e.clientY - startY);
+
 if (dx > MOVE_PX || dy > MOVE_PX) moved = true;
 });
 
 function finish(e) {
 if (activePointerId === null || e.pointerId !== activePointerId) return;
-try { el.releasePointerCapture(e.pointerId); } catch {}
+
+try {
+el.releasePointerCapture(e.pointerId);
+} catch {}
+
 const shouldFire = !moved;
 activePointerId = null;
+
 if (shouldFire) handler();
 }
 
 el.addEventListener("pointerup", finish);
-el.addEventListener("pointercancel", () => { activePointerId = null; moved = false; });
 
-el.addEventListener("click", (e) => {
+el.addEventListener("pointercancel", () => {
+activePointerId = null;
+moved = false;
+});
+
+el.addEventListener("click", e => {
 e.preventDefault();
 e.stopPropagation();
 }, true);
@@ -1302,20 +1445,34 @@ e.stopPropagation();
 // ====== Actions ======
 async function runPreset(presetName) {
 const ok = await testBackend();
-if (!ok) { setLastAction("Failed (backend offline)"); return; }
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
 
 const { preset } = endpoints();
 const payload = { preset: presetName };
 
 if (presetName === "service_logo") {
-const uuid = getStored(SERVICE_LOGO_UUID_KEY) || serviceLogoSelect.value;
-if (!uuid) { setLastAction("Failed (no Service Logo selected)"); return; }
+const uuid = getStored(SERVICE_LOGO_UUID_KEY) || (serviceLogoSelect ? serviceLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Service Logo selected)");
+return;
+}
+
 payload.service_logo_uuid = uuid;
 }
 
 if (presetName === "testimonies") {
-const uuid = getStored(TESTIMONIES_LOGO_UUID_KEY) || testimoniesLogoSelect.value;
-if (!uuid) { setLastAction("Failed (no Testimonies logo selected)"); return; }
+const uuid = getStored(TESTIMONIES_LOGO_UUID_KEY) || (testimoniesLogoSelect ? testimoniesLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Testimonies logo selected)");
+return;
+}
+
 payload.service_logo_uuid = uuid;
 }
 
@@ -1327,28 +1484,39 @@ method: "POST",
 headers: { "Content-Type": "application/json" },
 body: JSON.stringify(payload)
 });
+
 if (!res.ok) throw new Error("Bad response");
+
 setLastAction(`Done: ${presetName}`);
 } catch {
 setLastAction(`Failed: ${presetName}`);
 }
 }
 
-async function runPresetSafeClear(presetName) {
+async function runPresetClearSlide(presetName) {
 const ok = await testBackend();
-if (!ok) { setLastAction("Failed (backend offline)"); return; }
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
 
 const { preset } = endpoints();
-const url = `${preset}?safeclear=true`;
+const url = `${preset}?clearslide=true`;
 const payload = { preset: presetName };
 
 if (presetName === "service_logo") {
-const uuid = getStored(SERVICE_LOGO_UUID_KEY) || serviceLogoSelect.value;
-if (!uuid) { setLastAction("Failed (no Service Logo selected)"); return; }
+const uuid = getStored(SERVICE_LOGO_UUID_KEY) || (serviceLogoSelect ? serviceLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Service Logo selected)");
+return;
+}
+
 payload.service_logo_uuid = uuid;
 }
 
-setLastAction(`Running: ${presetName} (safeclear)`);
+setLastAction(`Running: ${presetName} + clear slide`);
 
 try {
 const res = await fetch(url, {
@@ -1356,20 +1524,30 @@ method: "POST",
 headers: { "Content-Type": "application/json" },
 body: JSON.stringify(payload)
 });
+
 if (!res.ok) throw new Error("Bad response");
-setLastAction(`Done: ${presetName} (safeclear)`);
+
+setLastAction(`Done: ${presetName} + clear slide`);
 } catch {
-setLastAction(`Failed: ${presetName} (safeclear)`);
+setLastAction(`Failed: ${presetName} + clear slide`);
 }
 }
 
 async function runMacro() {
 const ok = await testBackend();
-if (!ok) { setLastAction("Failed (backend offline)"); return; }
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
 
 const { macro } = endpoints();
 const name = getStored(MACRO_NAME_KEY) || (macroSelect ? macroSelect.value : "");
-if (!name) { setLastAction("Failed (no macro selected)"); return; }
+
+if (!name) {
+setLastAction("Failed (no macro selected)");
+return;
+}
 
 setLastAction(`Running macro: ${name}`);
 
@@ -1379,7 +1557,9 @@ method: "POST",
 headers: { "Content-Type": "application/json" },
 body: JSON.stringify({ name })
 });
+
 if (!res.ok) throw new Error("Bad response");
+
 setLastAction(`Done macro: ${name}`);
 } catch {
 setLastAction(`Failed macro: ${name}`);
@@ -1389,9 +1569,11 @@ setLastAction(`Failed macro: ${name}`);
 // ====== Audio Functions ======
 function parseActiveAudioItem(text) {
 const raw = String(text || "").trim();
+
 if (!raw) return "";
 
 const itemMatch = raw.match(/^item:\s*(.+)$/im);
+
 if (itemMatch && itemMatch[1]) {
 return itemMatch[1].trim();
 }
@@ -1417,21 +1599,27 @@ audioNowPlayingItem.textContent = "—";
 }
 }
 
-window.loadTracks = async (name) => {
+window.loadTracks = async name => {
 const { audioTracks } = endpoints();
+
 try {
 const res = await fetch(`${audioTracks}?playlist=${encodeURIComponent(name)}`);
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
 
 audioGrid.innerHTML = "";
-items.forEach(t => {
-let clean = t.replace(/\.[^/.]+$/, "").replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "").trim();
+
+items.forEach(trackName => {
+const clean = String(trackName)
+.replace(/\.[^/.]+$/, "")
+.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "")
+.trim();
+
 const btn = document.createElement("div");
 btn.className = "audio-btn";
 btn.textContent = clean;
-// Attach robust tap handler to the audio buttons directly
-attachTapHandler(btn, () => window.triggerAudio(name, t));
+
+attachTapHandler(btn, () => window.triggerAudio(name, trackName));
 audioGrid.appendChild(btn);
 });
 } catch {
@@ -1439,15 +1627,21 @@ audioGrid.innerHTML = "<div style='grid-column: span 3; color: var(--status-grey
 }
 };
 
-window.triggerAudio = async (p, t) => {
-setLastAction(`Playing Pad: ${t}`);
+window.triggerAudio = async (playlistName, trackName) => {
+setLastAction(`Playing Pad: ${trackName}`);
+
 const { audioTrigger } = endpoints();
 
 try {
 await fetch(audioTrigger, {
 method: "POST",
-body: JSON.stringify({ playlist: p, track: t }),
-headers: { "Content-Type": "application/json" }
+body: JSON.stringify({
+playlist: playlistName,
+track: trackName
+}),
+headers: {
+"Content-Type": "application/json"
+}
 });
 
 setTimeout(refreshNowPlayingAudio, 300);
@@ -1457,26 +1651,37 @@ console.error(err);
 };
 
 function openAudioModal() {
+if (!audioOverlay) return;
+
 audioOverlay.style.display = "flex";
 refreshNowPlayingAudio();
 
 const { audioPlaylists } = endpoints();
+
 fetch(audioPlaylists)
-.then(r => r.json())
+.then(res => res.json())
 .then(data => {
 const items = Array.isArray(data?.items) ? data.items : [];
+
 audioPlaylistSegment.innerHTML = "";
+
 items.forEach((name, i) => {
 const btn = document.createElement("button");
+btn.type = "button";
+
 if (i === 0) btn.className = "active";
+
 btn.textContent = name;
+
 attachTapHandler(btn, () => {
 audioPlaylistSegment.querySelectorAll("button").forEach(b => b.classList.remove("active"));
 btn.classList.add("active");
 window.loadTracks(name);
 });
+
 audioPlaylistSegment.appendChild(btn);
 });
+
 if (items[0]) window.loadTracks(items[0]);
 })
 .catch(() => {
@@ -1492,9 +1697,9 @@ attachTapHandler(btnShowSlides, () => runPreset("show_slides"));
 attachTapHandler(btnTestimonies, () => runPreset("testimonies"));
 attachTapHandler(btnEndingStream, () => runPreset("ending_stream"));
 attachTapHandler(btnSetMacro, () => runMacro());
-attachTapHandler(btnCameraSafeClear, () => runPresetSafeClear("camera"));
-attachTapHandler(btnServiceLogoSafeClear, () => runPresetSafeClear("service_logo"));
-attachTapHandler(btnSafelyClearSlide, () => runPreset("safely_clear_slide"));
+attachTapHandler(btnCameraClearSlide, () => runPresetClearSlide("camera"));
+attachTapHandler(btnServiceLogoClearSlide, () => runPresetClearSlide("service_logo"));
+attachTapHandler(btnClearSlide, () => runPreset("clear_slide"));
 attachTapHandler(btnNSCSetup, () => runPreset("nsc_setup"));
 
 // Attach audio interactions
@@ -1502,6 +1707,7 @@ attachTapHandler(btnAudioControl, () => openAudioModal());
 
 attachTapHandler(btnClearAudio, async () => {
 setLastAction("Cleared Ambient Audio");
+
 const { audioClear } = endpoints();
 
 try {
@@ -1512,24 +1718,35 @@ console.error(err);
 }
 });
 
-if (audioCloseButton) audioCloseButton.onclick = () => audioOverlay.style.display = "none";
-if (audioOverlay) audioOverlay.addEventListener("click", (e) => {
+if (audioCloseButton) {
+audioCloseButton.onclick = () => {
+audioOverlay.style.display = "none";
+};
+}
+
+if (audioOverlay) {
+audioOverlay.addEventListener("click", e => {
 if (e.target === audioOverlay) audioOverlay.style.display = "none";
 });
+}
 
 // Settings interactions
-const settingsOverlay = document.getElementById("settingsOverlay");
-const settingsButton = document.getElementById("settingsButton");
-const settingsCloseButton = document.getElementById("settingsCloseButton");
+function openModal() {
+if (settingsOverlay) settingsOverlay.style.display = "flex";
+}
 
-function openModal() { settingsOverlay.style.display = "flex"; }
-function closeModal() { settingsOverlay.style.display = "none"; }
+function closeModal() {
+if (settingsOverlay) settingsOverlay.style.display = "none";
+}
 
-settingsButton.onclick = () => openModal();
-settingsCloseButton.onclick = () => closeModal();
-settingsOverlay.addEventListener("click", (e) => {
+if (settingsButton) settingsButton.onclick = () => openModal();
+if (settingsCloseButton) settingsCloseButton.onclick = () => closeModal();
+
+if (settingsOverlay) {
+settingsOverlay.addEventListener("click", e => {
 if (e.target === settingsOverlay) closeModal();
 });
+}
 
 document.querySelectorAll("#themeSegment button").forEach(btn => {
 btn.addEventListener("click", () => {
@@ -1539,26 +1756,36 @@ applyTheme(mode);
 });
 });
 
+if (refreshLogosBtn) {
 refreshLogosBtn.onclick = async () => {
 await refreshServiceLogos();
 await refreshMacros();
 };
+}
 
+if (testBackendBtn) {
 testBackendBtn.onclick = async () => {
 const ok = await testBackend();
+
 if (ok) {
 await refreshServiceLogos();
 await refreshMacros();
 await refreshAutoShow();
 }
 };
+}
 
 function syncBtnSliderUI() {
 const pct = getBtnScalePercent();
+
+if (btnTextSizeSlider) {
 btnTextSizeSlider.value = pct;
+}
+
 applyBtnScale(pct);
 }
 
+if (btnTextSizeSlider) {
 btnTextSizeSlider.addEventListener("input", () => {
 applyBtnScale(parseInt(btnTextSizeSlider.value, 10));
 });
@@ -1566,6 +1793,7 @@ applyBtnScale(parseInt(btnTextSizeSlider.value, 10));
 btnTextSizeSlider.addEventListener("change", () => {
 setBtnScalePercent(btnTextSizeSlider.value);
 });
+}
 
 if (showDescToggle) {
 showDescToggle.addEventListener("change", () => {
@@ -1578,14 +1806,15 @@ loadTheme();
 updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
 applyShowDesc(getShowDesc());
 syncBtnSliderUI();
+
 setButtonsEnabled(false);
 setBackendStatus(false, "Backend: Checking…");
 setLastAction("—");
 syncDescriptions();
 
-// Create a reusable refresh function
 const fullRefresh = async () => {
 const ok = await testBackend();
+
 if (ok) {
 await refreshServiceLogos();
 await refreshMacros();
@@ -1593,13 +1822,10 @@ await refreshAutoShow();
 }
 };
 
-// Run it once on startup
 await fullRefresh();
 
-// Run it every 10 seconds to keep all computers active
 setInterval(fullRefresh, 10000);
 
-// Keep Ambient Pads “Playing” text live while the modal is open
 setInterval(() => {
 if (audioOverlay && audioOverlay.style.display === "flex") {
 refreshNowPlayingAudio();
