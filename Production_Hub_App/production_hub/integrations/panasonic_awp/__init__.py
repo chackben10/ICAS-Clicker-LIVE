@@ -1,0 +1,2 @@
+"""Panasonic AWP camera integration."""
+

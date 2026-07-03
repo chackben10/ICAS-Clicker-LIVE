@@ -508,7 +508,19 @@
 
 <script>
 (function () {
-  const API_BASE = "https://score.icas-clicker.work";
+  const HOSTED_API_BASE = "https://score.icas-clicker.work";
+
+  function getApiBase() {
+    const params = new URLSearchParams(window.location.search || "");
+    const override = params.get("api") || localStorage.getItem("icas-score-api-base") || "";
+    if (override.trim()) return override.trim().replace(/\/+$/, "");
+    if (/^https?:$/.test(window.location.protocol) && window.location.pathname.includes("/remote/")) {
+      return window.location.origin;
+    }
+    return HOSTED_API_BASE;
+  }
+
+  const API_BASE = getApiBase();
   const SCORE_GET  = `${API_BASE}/score`;
   const SCORE_POST = `${API_BASE}/score`;
 

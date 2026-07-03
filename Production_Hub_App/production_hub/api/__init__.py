@@ -1,0 +1,2 @@
+"""Embedded HTTP API."""
+
