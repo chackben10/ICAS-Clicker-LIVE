@@ -1,0 +1,1889 @@
+------------------------------------------------------------
+-- ProPresenter Remote Control via Clicker + HTTP Server + OBS Control
+------------------------------------------------------------
+
+proRemote = proRemote or {}
+
+------------------------------------------------------------
+-- CONFIG
+------------------------------------------------------------
+
+-- Bible look enforcement
+proRemote.check_for_bible = true
+proRemote.BIBLE_CHECK_INTERVAL_SEC = 0.75
+proRemote.BIBLE_MACRO_COOLDOWN_SEC = 2.5
+
+-- Clicker keys (Hammerspoon keycodes)
+proRemote.nextSlideKey = 69
+proRemote.prevSlideKey = 78
+
+-- ProPresenter endpoints
+proRemote.PRO_PORT = "49232"
+proRemote.PROPRESENTER_ACTIVE_BASE  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/active"
+proRemote.PROPRESENTER_FOCUSED_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/focused"
+proRemote.PROPRESENTER_UUID_BASE    = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation"
+proRemote.PROPRESENTER_SLIDE_INDEX  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/slide_index"
+
+proRemote.PROPRESENTER_LOOK_CURRENT = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/look/current"
+proRemote.BIBLE_LOOK_NAME           = "Bible"
+proRemote.BIBLE_MACRO_TRIGGER_URL   = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/macro/69293C79-69BB-4061-86E1-76F627CB3085/trigger"
+
+-- Clear layers
+proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/announcements"
+proRemote.PROPRESENTER_CLEAR_SLIDE         = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/slide"
+
+-- Audio Config
+proRemote.AUDIO_PLAYLISTS = { "Major Pads", "Minor Pads", "Neutral Pads" }
+proRemote.PROPRESENTER_AUDIO_BASE = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/audio/playlist"
+proRemote.PROPRESENTER_ACTIVE_AUDIO = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/audio/playlist/active"
+proRemote.PROPRESENTER_CLEAR_AUDIO = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/clear/layer/audio"
+proRemote._audioCache = proRemote._audioCache or {}
+proRemote.AUDIO_CACHE_TTL = 300 -- 5 minutes
+
+-- Slide-label audio sync
+-- If the current slide label is something like D(Major).wav,
+-- this searches the configured pad playlists for D(Major) and triggers it.
+proRemote.SLIDE_AUDIO_SYNC_ENABLED = true
+proRemote.SLIDE_AUDIO_TRIGGER_DELAY_SEC = 0.5
+proRemote.SLIDE_AUDIO_HISTORY_MAX = 500
+proRemote._slideAudioChecked = proRemote._slideAudioChecked or {}
+proRemote._slideAudioCheckedOrder = proRemote._slideAudioCheckedOrder or {}
+proRemote._slideAudioPendingKey = proRemote._slideAudioPendingKey or nil
+
+-- Try to force a "real" presentation into focus if focused is announcements
+proRemote.PROPRESENTER_ACTIVE_FOCUS = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/presentation/active/focus"
+proRemote.FOCUSED_RECHECK_DELAY_SEC = 0.20
+
+proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_ACTIVE_BASE
+
+-- Chunked streams (kept; unused currently)
+proRemote.USE_CHUNKED_STREAMS = true
+proRemote.CURL_PATH = "/usr/bin/curl"
+proRemote.STREAM_RESTART_DELAY_SEC = 1.0
+
+-- HTTP server
+proRemote.HTTP_SERVER_PORT      = 1337
+proRemote.HTTP_SERVER_INTERFACE = "127.0.0.1"
+
+-- OBS Bridge (Node)
+proRemote.OBS_BRIDGE_ENABLED = true
+proRemote.OBS_BRIDGE_BASE    = "http://127.0.0.1:17777"
+
+-- OBS scene-item control based on current ProPresenter Look
+-- This watches the current ProPresenter Look and applies visibility only when
+-- the look name exists in OBS_LOOK_RULES. If the current look is not listed,
+-- it does nothing to the OBS scene.
+proRemote.OBS_LOOK_SYNC_ENABLED       = true
+proRemote.OBS_LOOK_SCENE_NAME         = "ProPresenter Input"
+proRemote.OBS_LOOK_PRINT_ON_STARTUP   = false
+proRemote.OBS_LOOK_PRINT_DELAY_SEC    = 2.0
+proRemote.OBS_LOOK_DEBOUNCE_SEC       = 0.20
+
+-- OBS sceneItemId map for the ProPresenter Input scene:
+-- 72 = Mixer Input
+-- 77 = Fullscreen Feed
+-- 81 = PTZ Camera, picture-in-picture placement
+-- 73 = Streamer Plate
+-- 78 = PTZ Camera, streamer placement
+-- 79 = Fullscreen Streamer
+-- 75 = Audience Camera
+-- 74 = PTZ Camera, lower-third/song/Bible placement
+-- 76 = LowerThirds Feed
+-- 82 = Fullscreen LW3
+proRemote.OBS_LOOK_RULES = {
+  ["Bible"] = {
+    show = { 72, 74, 76 },
+    hide = { 77, 81, 73, 78, 79, 75, 82 },
+  },
+
+  ["Malayalam Song"] = {
+    show = { 72, 74, 76 },
+    hide = { 77, 81, 73, 78, 79, 75, 82 },
+  },
+
+  ["[Aud] Malayalam Song"] = {
+    show = { 72, 75, 76 },
+    hide = { 77, 81, 73, 78, 79, 74, 82 },
+  },
+
+  ["English Song"] = {
+    show = { 72, 74, 76 },
+    hide = { 77, 81, 73, 78, 79, 75, 82 },
+  },
+
+  ["[Aud] English Song"] = {
+    show = { 72, 75, 76 },
+    hide = { 77, 81, 73, 78, 79, 74, 82 },
+  },
+
+  ["Presentation Slides"] = {
+    show = { 72, 74, 82 },
+    hide = { 77, 81, 73, 78, 79, 75, 76 },
+  },
+
+  ["Presentation Streamer"] = {
+    show = { 72, 73, 78, 79 },
+    hide = { 77, 81, 75, 74, 76, 82 },
+  },
+
+  ["Presentation Picture-in-Picture"] = {
+    show = { 72, 77, 81 },
+    hide = { 73, 78, 79, 75, 74, 76, 82 },
+  },
+
+  ["Presentation Fullscreen"] = {
+    show = { 72, 77 },
+    hide = { 81, 73, 78, 79, 75, 74, 76, 82 },
+  },
+}
+proRemote._lastObsLookVisibilitySignature = ""
+proRemote._lastObsLookSeenName = ""
+proRemote._pendingObsLookVisibilitySignature = ""
+proRemote._pendingObsLookVisibilityPayload = nil
+proRemote._pendingObsLookTimer = nil
+proRemote._obsLookApplyInFlight = false
+
+-- Set this to output of: which node
+proRemote.NODE_PATH          = "/opt/homebrew/bin/node"
+proRemote.OBS_BRIDGE_SCRIPT  = "/Users/icas/obs-bridge/server.mjs"
+proRemote.OBS_BRIDGE_WORKDIR = "/Users/icas/obs-bridge"
+
+-- Auto Show Slides + OBS State Tracking
+proRemote.autoShowSlidesEnabled = false
+proRemote._lastAutoShowState    = nil
+proRemote._current_obs_scene    = ""
+
+-- OBS transitions
+proRemote.OBS_DEFAULT_TRANSITION_NAME  = "Fade"
+proRemote.OBS_SPECIAL_TRANSITION_NAME  = "Old Film Logo"
+proRemote.OBS_FALLBACK_TRANSITION_NAME = "Fade"
+proRemote.OBS_FALLBACK_TRANSITION_MS   = 500
+
+-- Scenes that should use Old Film Logo (fallback Fade 500ms) when entering/leaving via control panel
+proRemote.OBS_SPECIAL_TRANSITION_SCENES = {
+  ["Stream Start"]  = true,
+  ["Testimonies"]   = true,
+  ["Stream Pause"]  = true,
+  ["Thanks Screen"] = true,
+}
+
+-- Preset ProPresenter presentations (UUID triggers)
+proRemote.PRESET_STARTING_ANNOUNCEMENTS_UUID = "C62E6449-3FD6-42C1-BDF4-CABCA5F8E491"
+proRemote.PRESET_PTZ_CAMERA_UUID            = "D47223A2-73BD-4C86-BB82-0D95E90D83F5"
+proRemote.PRESET_ENDING_ANNOUNCEMENTS_UUID  = "9CAAE21A-5AB2-41B3-B004-4135B36E134B"
+
+-- Utility presentations for one-shot triggers
+-- Kept for compatibility with the presentation picker behavior.
+-- It is no longer used for "Clear Slide" actions.
+proRemote.PRESET_BLANK_PREVIEW_UUID = "7475C13E-FE99-4AF1-8760-526A845A1860"
+proRemote.PRESET_IMAC_SCREEN_UUID   = "AC813C59-FF90-483F-8532-406CF8DD056A"
+
+-- Clear Slide behavior
+-- Used when a preset is called with ?clearslide=true.
+proRemote.CLEAR_SLIDE_DELAY_SEC = 0.50
+
+-- Service Logo dictionary
+proRemote.SERVICE_LOGOS = {
+  { name = "Basic Service Logo",     uuid = "4ED2B2D8-EFE7-4875-BE88-186756A5E57E" },
+  { name = "Communion Service Logo", uuid = "82668B6D-5B98-4640-94E3-C69173FA4183" },
+  { name = "Youth Meeting Logo",     uuid = "4B871221-EC8A-47A3-86F2-3E2D27311303" },
+}
+
+------------------------------------------------------------
+-- Macro dictionary (NAME triggers)
+------------------------------------------------------------
+
+proRemote.MACROS = {
+  { name = "Bible Macro" },
+  { name = "Malayalam Songs Macro" },
+  { name = "[Aud] Malayalam Song Macro" },
+  { name = "English Songs Macro" },
+  { name = "[Aud] English Songs Macro" },
+  { name = "Presentation Macro" },
+  { name = "Presentation Streamer Macro" },
+  { name = "Presentation Picture-in-Picture Macro" },
+  { name = "Presentation Fullscreen Macro" },
+}
+
+------------------------------------------------------------
+-- Timer proxy config (use EXACT working ProPresenter URLs)
+------------------------------------------------------------
+
+proRemote.PROPRESENTER_TIMER_START = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/start"
+proRemote.PROPRESENTER_TIMER_STOP  = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/stop"
+proRemote.PROPRESENTER_TIMER_RESET = "http://localhost:" .. proRemote.PRO_PORT .. "/v1/timer/Service%20Countdown/reset"
+proRemote.TIMER_STOP_RESET_DELAY_SEC = 0.5
+
+------------------------------------------------------------
+-- Thumbnail config
+------------------------------------------------------------
+
+proRemote.THUMBNAIL_LOW_QUALITY       = 220
+proRemote.THUMBNAIL_HIGH_QUALITY      = 800
+proRemote.THUMBNAIL_TYPE              = "png"
+
+-- How long to keep cached versions
+proRemote.THUMBNAIL_LOW_CACHE_TTL_SEC  = 20
+proRemote.THUMBNAIL_HIGH_CACHE_TTL_SEC = 300
+
+-- Limits / behavior
+proRemote.THUMBNAIL_CACHE_MAX           = 500
+proRemote.THUMBNAIL_PREFETCH_MAX_SLIDES = 250
+proRemote.THUMBNAIL_PREFETCH_PRIORITY   = 12
+proRemote.THUMBNAIL_QUEUE_DELAY_SEC     = 0.02
+
+proRemote._thumbnailCache     = proRemote._thumbnailCache     or {}
+proRemote._thumbnailQueue     = proRemote._thumbnailQueue     or {}
+proRemote._thumbnailQueuedSet = proRemote._thumbnailQueuedSet or {}
+proRemote._thumbnailInflight  = proRemote._thumbnailInflight  or {}
+proRemote._thumbnailWorkerBusy = proRemote._thumbnailWorkerBusy or false
+proRemote._thumbnailPrefetchedPresentations = proRemote._thumbnailPrefetchedPresentations or {}
+
+------------------------------------------------------------
+-- Utility
+------------------------------------------------------------
+
+local function trim(s)
+  if type(s) ~= "string" then return "" end
+  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function ltrim(s)
+  if type(s) ~= "string" then return "" end
+  return (s:gsub("^%s+", ""))
+end
+
+local function decodeJson(str)
+  if type(str) ~= "string" or str == "" then return nil end
+  str = ltrim(str)
+  local first = str:sub(1,1)
+  if first ~= "{" and first ~= "[" then return nil end
+  local ok, result = pcall(function() return hs.json.decode(str) end)
+  if ok then return result end
+  return nil
+end
+
+local function nowSec()
+  return hs.timer.secondsSinceEpoch()
+end
+
+local function sleepSec(sec)
+  sec = tonumber(sec) or 0
+  if sec <= 0 then return end
+  pcall(function()
+    hs.timer.usleep(math.floor(sec * 1000000))
+  end)
+end
+
+local function jsonResponse(obj)
+  return hs.json.encode(obj or {})
+end
+
+local function toBoolish(v)
+  v = tostring(v or ""):lower()
+  return (v == "1" or v == "true" or v == "yes" or v == "on")
+end
+
+local function stripAudioExtension(name)
+  name = trim(name)
+  name = name:gsub("%.[Ww][Aa][Vv]$", "")
+  name = name:gsub("%.[Mm][Pp]3$", "")
+  name = name:gsub("%.[Aa][Ii][Ff][Ff]$", "")
+  name = name:gsub("%.[Aa][Ii][Ff]$", "")
+  name = name:gsub("%.[Mm]4[Aa]$", "")
+  return trim(name)
+end
+
+local function normalizeAudioName(name)
+  name = stripAudioExtension(name)
+  name = name:gsub("%s+", "")
+  return name:lower()
+end
+
+local function rememberSlideAudioChecked(key)
+  if type(key) ~= "string" or key == "" then return end
+  if proRemote._slideAudioChecked[key] then return end
+
+  proRemote._slideAudioChecked[key] = true
+  table.insert(proRemote._slideAudioCheckedOrder, key)
+
+  local maxItems = tonumber(proRemote.SLIDE_AUDIO_HISTORY_MAX) or 500
+  while #proRemote._slideAudioCheckedOrder > maxItems do
+    local oldKey = table.remove(proRemote._slideAudioCheckedOrder, 1)
+    if oldKey then
+      proRemote._slideAudioChecked[oldKey] = nil
+    end
+  end
+end
+
+------------------------------------------------------------
+-- Audio Helpers
+------------------------------------------------------------
+
+local function fetchAudioPlaylistTracks(playlistName)
+  playlistName = trim(playlistName)
+  if playlistName == "" then return {} end
+
+  local cached = proRemote._audioCache[playlistName]
+  if cached and (nowSec() - cached.storedAt) < proRemote.AUDIO_CACHE_TTL then
+    return cached.tracks
+  end
+
+  local url = string.format("%s/%s", proRemote.PROPRESENTER_AUDIO_BASE, hs.http.encodeForQuery(playlistName))
+  local ok, status, body = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if not ok or status ~= 200 or not body then return {} end
+
+  local data = decodeJson(body)
+  local tracks = {}
+
+  if data and type(data.items) == "table" then
+    for _, item in ipairs(data.items) do
+      local name = nil
+
+      if item.id and item.id.name then
+        name = item.id.name
+      elseif item.name then
+        name = item.name
+      end
+
+      name = trim(name or "")
+      if name ~= "" then
+        table.insert(tracks, name)
+      end
+    end
+  end
+
+  proRemote._audioCache[playlistName] = {
+    tracks = tracks,
+    storedAt = nowSec()
+  }
+
+  return tracks
+end
+
+local function findAudioTrackInPlaylists(labelName)
+  labelName = trim(labelName)
+  if labelName == "" then return nil, nil end
+
+  local wanted = normalizeAudioName(labelName)
+  if wanted == "" then return nil, nil end
+
+  for _, playlistName in ipairs(proRemote.AUDIO_PLAYLISTS or {}) do
+    local tracks = fetchAudioPlaylistTracks(playlistName)
+
+    for _, trackName in ipairs(tracks or {}) do
+      if normalizeAudioName(trackName) == wanted then
+        return playlistName, trackName
+      end
+    end
+  end
+
+  return nil, nil
+end
+
+local function triggerAudioTrack(playlist, track)
+  local url = string.format(
+    "%s/%s/%s/trigger",
+    proRemote.PROPRESENTER_AUDIO_BASE,
+    hs.http.encodeForQuery(playlist),
+    hs.http.encodeForQuery(track)
+  )
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function clearAudioLayer()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_AUDIO, {}, function() end)
+  return true
+end
+
+local function fetchActiveAudioText()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_ACTIVE_AUDIO, { ["accept"]="application/json" })
+  end)
+
+  if not ok or status ~= 200 or not body or body == "" then
+    return "No audio playing\n"
+  end
+
+  local data = decodeJson(body)
+  if type(data) ~= "table" then
+    return "No audio playing\n"
+  end
+
+  local playlistName = data.playlist and data.playlist.name
+  local itemName = data.item and data.item.name
+
+  if type(playlistName) ~= "string" or playlistName == "" or
+     type(itemName) ~= "string" or itemName == "" then
+    return "No audio playing\n"
+  end
+
+  return string.format("playlist: %s\nitem: %s\n", playlistName, itemName)
+end
+
+------------------------------------------------------------
+-- Timer actions (proxy to ProPresenter)
+------------------------------------------------------------
+
+local function proTimerStart()
+  hs.http.asyncGet(proRemote.PROPRESENTER_TIMER_START, {}, function() end)
+end
+
+local function proTimerStopReset()
+  hs.http.asyncGet(proRemote.PROPRESENTER_TIMER_STOP, {}, function() end)
+  hs.timer.doAfter(proRemote.TIMER_STOP_RESET_DELAY_SEC or 0.5, function()
+    hs.http.asyncGet(proRemote.PROPRESENTER_TIMER_RESET, {}, function() end)
+  end)
+end
+
+------------------------------------------------------------
+-- Auto-select ACTIVE vs FOCUSED based on slide_index
+------------------------------------------------------------
+
+local function refreshPresentationBase()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_SLIDE_INDEX, { ["accept"]="application/json" })
+  end)
+
+  if not ok or status ~= 200 or not body or body == "" then
+    proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_FOCUSED_BASE
+    return
+  end
+
+  local data = decodeJson(body)
+  if not data or not data.presentation_index or not data.presentation_index.index then
+    proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_FOCUSED_BASE
+  else
+    proRemote.PROPRESENTER_PRESENTATION_BASE = proRemote.PROPRESENTER_ACTIVE_BASE
+  end
+end
+
+local function currentMode()
+  return (proRemote.PROPRESENTER_PRESENTATION_BASE == proRemote.PROPRESENTER_ACTIVE_BASE) and "active" or "focused"
+end
+
+------------------------------------------------------------
+-- OBS / ProPresenter Forward Definitions
+------------------------------------------------------------
+
+local obsSetSceneWithTransitionPolicy
+local proClearAnnouncementsLayer
+local proClearSlideLayer
+local syncObsSceneToProPresenterLook
+
+------------------------------------------------------------
+-- Active slide audio-label sync
+------------------------------------------------------------
+
+local function findCurrentSlideFromActivePresentation(activeObj, currentIndex)
+  currentIndex = tonumber(currentIndex)
+  if not currentIndex or currentIndex < 0 then return nil end
+
+  local pres = activeObj and activeObj.presentation
+  local groups = pres and pres.groups
+  if type(groups) ~= "table" then return nil end
+
+  local n = 0
+  for _, group in ipairs(groups) do
+    local slides = group and group.slides
+    if type(slides) == "table" then
+      for _, slide in ipairs(slides) do
+        if n == currentIndex then
+          return slide
+        end
+        n = n + 1
+      end
+    end
+  end
+
+  return nil
+end
+
+local function activePresentationUUID(activeObj)
+  local pres = activeObj and activeObj.presentation
+  local id = pres and pres.id
+  local uuid = id and id.uuid
+  if type(uuid) == "string" then return uuid end
+  return ""
+end
+
+local function syncAudioFromActiveSlideLabel(activeObj, currentIndex)
+  if not proRemote.SLIDE_AUDIO_SYNC_ENABLED then return end
+
+  currentIndex = tonumber(currentIndex)
+  if not currentIndex or currentIndex < 0 then return end
+
+  local uuid = activePresentationUUID(activeObj)
+  if uuid == "" then return end
+
+  local slide = findCurrentSlideFromActivePresentation(activeObj, currentIndex)
+  if type(slide) ~= "table" then return end
+
+  local rawLabel = trim(slide.label or "")
+  if rawLabel == "" then return end
+
+  local cleanLabel = stripAudioExtension(rawLabel)
+  if cleanLabel == "" then return end
+
+  local slideKey = uuid .. ":" .. tostring(currentIndex) .. ":" .. cleanLabel
+
+  if proRemote._slideAudioChecked[slideKey] then return end
+  rememberSlideAudioChecked(slideKey)
+
+  local playlistName, trackName = findAudioTrackInPlaylists(cleanLabel)
+  if not playlistName or not trackName then
+    return
+  end
+
+  proRemote._slideAudioPendingKey = slideKey
+
+  hs.timer.doAfter(tonumber(proRemote.SLIDE_AUDIO_TRIGGER_DELAY_SEC) or 0.5, function()
+    if proRemote._slideAudioPendingKey ~= slideKey then
+      return
+    end
+
+    triggerAudioTrack(playlistName, trackName)
+  end)
+end
+
+------------------------------------------------------------
+-- Bible + Auto Show enforcement
+------------------------------------------------------------
+
+local function activePresentationHasSingleGroupWithColon()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_ACTIVE_BASE, { ["accept"]="application/json" })
+  end)
+  if not ok or status ~= 200 or not body or body == "" then return false end
+
+  local data = decodeJson(body)
+  local pres = data and data.presentation
+  local groups = pres and pres.groups
+  if type(groups) ~= "table" then return false end
+  if #groups ~= 1 then return false end
+
+  local gname = groups[1] and groups[1].name
+  if type(gname) ~= "string" then return false end
+  return gname:find(":", 1, true) ~= nil
+end
+
+proRemote._bible_lastCondition = proRemote._bible_lastCondition or false
+proRemote._bible_lastMacroAt   = proRemote._bible_lastMacroAt   or 0
+
+local function enforceBibleLookIfNeeded()
+  if not proRemote.check_for_bible then
+    proRemote._bible_lastCondition = false
+    return
+  end
+
+  local cond = activePresentationHasSingleGroupWithColon()
+  local rising = (cond == true and proRemote._bible_lastCondition == false)
+  proRemote._bible_lastCondition = cond
+  if not rising then return end
+
+  local now = nowSec()
+  if (now - (proRemote._bible_lastMacroAt or 0)) < proRemote.BIBLE_MACRO_COOLDOWN_SEC then return end
+
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_LOOK_CURRENT, { ["accept"]="application/json" })
+  end)
+  if not ok or status ~= 200 or not body or body == "" then return end
+
+  local look = decodeJson(body)
+  local lookName = look and look.id and look.id.name
+
+  if lookName ~= proRemote.BIBLE_LOOK_NAME then
+    proRemote._bible_lastMacroAt = now
+    hs.http.asyncGet(proRemote.BIBLE_MACRO_TRIGGER_URL, {}, function() end)
+  end
+end
+
+local function checkAutoShowSlides()
+  local okIdx, statusIdx, bodyIdx = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_SLIDE_INDEX, { ["accept"]="application/json" })
+  end)
+
+  local currentPos = ""
+  local currentIndex = nil
+  local currentUuidFromIndex = ""
+
+  if okIdx and statusIdx == 200 and bodyIdx and bodyIdx ~= "" then
+    local dataIdx = decodeJson(bodyIdx)
+    if dataIdx and dataIdx.presentation_index then
+      currentIndex = dataIdx.presentation_index.index
+      currentUuidFromIndex = dataIdx.presentation_index.presentation_id and dataIdx.presentation_index.presentation_id.uuid or ""
+      currentPos = tostring(currentUuidFromIndex) .. ":" .. tostring(currentIndex)
+    end
+  end
+
+  local okAct, statusAct, bodyAct = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_ACTIVE_BASE, { ["accept"]="application/json" })
+  end)
+
+  local groupName = ""
+  local activeObj = nil
+
+  if okAct and statusAct == 200 and bodyAct and bodyAct ~= "" then
+    activeObj = decodeJson(bodyAct)
+
+    local pres = activeObj and activeObj.presentation
+    local groups = pres and pres.groups
+
+    if type(groups) == "table" and #groups > 0 then
+      groupName = tostring(groups[1].name or "")
+    end
+  end
+
+  if activeObj and currentIndex ~= nil then
+    pcall(function()
+      syncAudioFromActiveSlideLabel(activeObj, currentIndex)
+    end)
+  end
+
+  if not proRemote.autoShowSlidesEnabled then return end
+
+  if currentPos == "" and groupName == "" then
+    proRemote._lastAutoShowState = nil
+    return
+  end
+
+  local currentState = currentPos .. "|" .. groupName
+
+  if proRemote._lastAutoShowState and proRemote._lastAutoShowState ~= currentState then
+    if proClearAnnouncementsLayer and obsSetSceneWithTransitionPolicy then
+      proClearAnnouncementsLayer()
+      obsSetSceneWithTransitionPolicy("ProPresenter Input")
+    end
+  end
+
+  proRemote._lastAutoShowState = currentState
+end
+
+local function startBibleTimer()
+  if proRemote.bibleTimer then proRemote.bibleTimer:stop() end
+  proRemote.bibleTimer = hs.timer.doEvery(proRemote.BIBLE_CHECK_INTERVAL_SEC, function()
+    pcall(enforceBibleLookIfNeeded)
+    pcall(checkAutoShowSlides)
+    if syncObsSceneToProPresenterLook then
+      pcall(syncObsSceneToProPresenterLook)
+    end
+  end)
+end
+
+------------------------------------------------------------
+-- Slide actions (picker)
+------------------------------------------------------------
+
+local function triggerNextSlide()
+  refreshPresentationBase()
+  hs.http.asyncGet(proRemote.PROPRESENTER_PRESENTATION_BASE .. "/next/trigger", {}, function() end)
+end
+
+local function triggerPreviousSlide()
+  refreshPresentationBase()
+  hs.http.asyncGet(proRemote.PROPRESENTER_PRESENTATION_BASE .. "/previous/trigger", {}, function() end)
+end
+
+local function triggerFocusedSlide(index)
+  if type(index) ~= "number" or index < 0 then return end
+  refreshPresentationBase()
+  local url = string.format("%s/%d/trigger", proRemote.PROPRESENTER_PRESENTATION_BASE, index)
+  hs.http.asyncGet(url, {}, function() end)
+end
+
+------------------------------------------------------------
+-- Clicker key listener
+------------------------------------------------------------
+
+local function startClickerListener()
+  if proRemote._clickerTap then
+    pcall(function() proRemote._clickerTap:stop() end)
+    proRemote._clickerTap = nil
+  end
+
+  proRemote._clickerTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e)
+    local keyCode = e:getKeyCode()
+    if keyCode == proRemote.nextSlideKey then
+      pcall(triggerNextSlide)
+      return true
+    elseif keyCode == proRemote.prevSlideKey then
+      pcall(triggerPreviousSlide)
+      return true
+    end
+    return false
+  end)
+
+  proRemote._clickerTap:start()
+end
+
+------------------------------------------------------------
+-- Helpers: focused + destination check
+------------------------------------------------------------
+
+local function fetchFocusedInfo()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_FOCUSED_BASE, { ["accept"]="application/json" })
+  end)
+  if not ok or status ~= 200 or not body or body == "" then return nil end
+  local obj = decodeJson(body)
+  if type(obj) ~= "table" then return nil end
+  if type(obj.uuid) ~= "string" or obj.uuid == "" then return nil end
+  return obj
+end
+
+local function fetchPresentationByUUID(uuid)
+  if type(uuid) ~= "string" or uuid == "" then return nil, nil end
+  local url = string.format("%s/%s", proRemote.PROPRESENTER_UUID_BASE, uuid)
+  local ok, status, body = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+  if not ok or status ~= 200 or not body or body == "" then return nil, body end
+  local obj = decodeJson(body)
+  return obj, body
+end
+
+local function presentationDestinationFromObj(fullObj)
+  local pres = fullObj and fullObj.presentation
+  local dest = pres and pres.destination
+  if type(dest) == "string" then return dest end
+  return ""
+end
+
+local function activeUUIDFromObj(activeObj)
+  local pres = activeObj and activeObj.presentation
+  local id = pres and pres.id
+  local uuid = id and id.uuid
+  if type(uuid) == "string" then return uuid end
+  return ""
+end
+
+local function blankPresentationResponse(reason)
+  reason = tostring(reason or "blank")
+  return string.format('{"presentation":null,"reason":"%s"}', hs.http.encodeForQuery(reason)):gsub("%%22", '"')
+end
+
+local function isBlankPreviewUUID(uuid)
+  return type(uuid) == "string" and uuid ~= "" and uuid == proRemote.PRESET_BLANK_PREVIEW_UUID
+end
+
+------------------------------------------------------------
+-- Thumbnail cache + queue helpers
+------------------------------------------------------------
+
+local TRANSPARENT_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1Z0AAAAASUVORK5CYII="
+
+local function getTransparentPngBody()
+  local ok, body = pcall(function()
+    if hs.base64 and hs.base64.decode then
+      return hs.base64.decode(TRANSPARENT_PNG_BASE64)
+    end
+    return nil
+  end)
+  if ok and body then return body end
+  return ""
+end
+
+local function thumbnailCacheKey(uuid, index)
+  return tostring(uuid or "") .. ":" .. tostring(index or "")
+end
+
+local function thumbnailJobKey(uuid, index, tier)
+  return tostring(uuid or "") .. ":" .. tostring(index or "") .. ":" .. tostring(tier or "")
+end
+
+local function thumbnailIsEntryExpired(item)
+  if type(item) ~= "table" then return true end
+  local age = nowSec() - (tonumber(item.storedAt) or 0)
+  local ttl = (item.tier == "high")
+    and (tonumber(proRemote.THUMBNAIL_HIGH_CACHE_TTL_SEC) or 300)
+    or (tonumber(proRemote.THUMBNAIL_LOW_CACHE_TTL_SEC) or 20)
+  return age > ttl
+end
+
+local function thumbnailCacheGetBest(uuid, index)
+  local key = thumbnailCacheKey(uuid, index)
+  local item = proRemote._thumbnailCache[key]
+  if not item then return nil end
+  if thumbnailIsEntryExpired(item) then
+    proRemote._thumbnailCache[key] = nil
+    return nil
+  end
+  return item
+end
+
+local function thumbnailCacheGetHigh(uuid, index)
+  local item = thumbnailCacheGetBest(uuid, index)
+  if item and item.tier == "high" then return item end
+  return nil
+end
+
+local function thumbnailCachePut(uuid, index, body, contentType, tier)
+  local key = thumbnailCacheKey(uuid, index)
+  local existing = proRemote._thumbnailCache[key]
+
+  if existing and not thumbnailIsEntryExpired(existing) then
+    if existing.tier == "high" and tier ~= "high" then
+      return
+    end
+  end
+
+  proRemote._thumbnailCache[key] = {
+    body = body,
+    contentType = contentType or "image/png",
+    tier = tier or "low",
+    storedAt = nowSec(),
+  }
+
+  local count = 0
+  for _ in pairs(proRemote._thumbnailCache) do
+    count = count + 1
+  end
+
+  local maxItems = tonumber(proRemote.THUMBNAIL_CACHE_MAX) or 500
+  if count <= maxItems then return end
+
+  local oldestKey = nil
+  local oldestTime = math.huge
+  for k, v in pairs(proRemote._thumbnailCache) do
+    local t = tonumber(v.storedAt) or math.huge
+    if t < oldestTime then
+      oldestTime = t
+      oldestKey = k
+    end
+  end
+  if oldestKey then
+    proRemote._thumbnailCache[oldestKey] = nil
+  end
+end
+
+local function thumbnailBuildUrl(uuid, index, tier)
+  local quality = (tier == "high")
+    and (tonumber(proRemote.THUMBNAIL_HIGH_QUALITY) or 800)
+    or (tonumber(proRemote.THUMBNAIL_LOW_QUALITY) or 220)
+
+  local thumbType = tostring(proRemote.THUMBNAIL_TYPE or "png")
+
+  return string.format(
+    "%s/%s/thumbnail/%d?quality=%d&thumbnail_type=%s",
+    proRemote.PROPRESENTER_UUID_BASE,
+    uuid,
+    index,
+    quality,
+    hs.http.encodeForQuery(thumbType)
+  )
+end
+
+local function thumbnailEnqueue(uuid, index, tier, front)
+  uuid = tostring(uuid or "")
+  index = tonumber(index)
+  tier = tostring(tier or "low")
+
+  if uuid == "" or not index or index < 0 then return false end
+  if tier ~= "low" and tier ~= "high" then return false end
+
+  if tier == "high" then
+    if thumbnailCacheGetHigh(uuid, index) then return false end
+  else
+    if thumbnailCacheGetBest(uuid, index) then return false end
+  end
+
+  local key = thumbnailJobKey(uuid, index, tier)
+  if proRemote._thumbnailQueuedSet[key] or proRemote._thumbnailInflight[key] then
+    return false
+  end
+
+  local job = { uuid = uuid, index = index, tier = tier }
+  if front then
+    table.insert(proRemote._thumbnailQueue, 1, job)
+  else
+    table.insert(proRemote._thumbnailQueue, job)
+  end
+  proRemote._thumbnailQueuedSet[key] = true
+  return true
+end
+
+local processNextThumbnailJob
+
+local function thumbnailKickWorker()
+  hs.timer.doAfter(0, function()
+    pcall(function()
+      processNextThumbnailJob()
+    end)
+  end)
+end
+
+processNextThumbnailJob = function()
+  if proRemote._thumbnailWorkerBusy then return end
+
+  local job = table.remove(proRemote._thumbnailQueue, 1)
+  if not job then return end
+
+  local jobKey = thumbnailJobKey(job.uuid, job.index, job.tier)
+  proRemote._thumbnailQueuedSet[jobKey] = nil
+  proRemote._thumbnailInflight[jobKey] = true
+  proRemote._thumbnailWorkerBusy = true
+
+  local url = thumbnailBuildUrl(job.uuid, job.index, job.tier)
+
+  hs.http.asyncGet(url, { ["Accept"] = "image/png" }, function(status, body, headers)
+    proRemote._thumbnailInflight[jobKey] = nil
+    proRemote._thumbnailWorkerBusy = false
+
+    if status == 200 and body and body ~= "" then
+      local contentType = (headers and (headers["Content-Type"] or headers["content-type"])) or "image/png"
+      thumbnailCachePut(job.uuid, job.index, body, contentType, job.tier)
+
+      if job.tier == "low" then
+        thumbnailEnqueue(job.uuid, job.index, "high", false)
+      end
+    end
+
+    hs.timer.doAfter(tonumber(proRemote.THUMBNAIL_QUEUE_DELAY_SEC) or 0.02, function()
+      pcall(function()
+        processNextThumbnailJob()
+      end)
+    end)
+  end)
+end
+
+local function extractPresentationUuidAndSlideCountFromBody(body)
+  local obj = decodeJson(body or "")
+  local pres = obj and obj.presentation
+  if type(pres) ~= "table" then return nil, 0 end
+
+  local uuid = pres.id and pres.id.uuid
+  if type(uuid) ~= "string" or uuid == "" then return nil, 0 end
+
+  local groups = pres.groups
+  if type(groups) ~= "table" then return uuid, 0 end
+
+  local count = 0
+  for _, g in ipairs(groups) do
+    local slides = g and g.slides
+    if type(slides) == "table" then
+      count = count + #slides
+    end
+  end
+
+  return uuid, count
+end
+
+local function prefetchPresentationThumbnailsFromBody(body)
+  local uuid, count = extractPresentationUuidAndSlideCountFromBody(body)
+  if not uuid or uuid == "" or count <= 0 then return end
+  if isBlankPreviewUUID(uuid) then return end
+
+  local maxSlides = tonumber(proRemote.THUMBNAIL_PREFETCH_MAX_SLIDES) or 250
+  if count > maxSlides then count = maxSlides end
+
+  local marker = uuid .. ":" .. tostring(count)
+  if proRemote._thumbnailPrefetchedPresentations[marker] then return end
+  proRemote._thumbnailPrefetchedPresentations[marker] = nowSec()
+
+  local priority = tonumber(proRemote.THUMBNAIL_PREFETCH_PRIORITY) or 12
+  if priority < 1 then priority = 1 end
+  if priority > count then priority = count end
+
+  for i = 0, priority - 1 do
+    thumbnailEnqueue(uuid, i, "low", false)
+  end
+
+  for i = priority, count - 1 do
+    thumbnailEnqueue(uuid, i, "low", false)
+  end
+
+  thumbnailKickWorker()
+end
+
+------------------------------------------------------------
+-- Unified Presentation Fetcher (ACTIVE or FOCUSED MODE)
+------------------------------------------------------------
+
+local function fetchFullPresentationJSON()
+  refreshPresentationBase()
+
+  if currentMode() == "active" then
+    local ok, status, body = pcall(function()
+      return hs.http.get(proRemote.PROPRESENTER_ACTIVE_BASE, { ["accept"]="application/json" })
+    end)
+    if not ok or status ~= 200 or not body then
+      return '{"error":"cannot fetch active presentation"}'
+    end
+
+    local activeObj = decodeJson(body)
+    local activeUUID = activeUUIDFromObj(activeObj)
+
+    if isBlankPreviewUUID(activeUUID) then
+      -- fall through to focused logic below
+    else
+      pcall(function()
+        prefetchPresentationThumbnailsFromBody(body)
+      end)
+      return body
+    end
+  end
+
+  local focused = fetchFocusedInfo()
+  if not focused or not focused.uuid then
+    return blankPresentationResponse("no_focused")
+  end
+
+  if isBlankPreviewUUID(focused.uuid) then
+    return blankPresentationResponse("blank_preview")
+  end
+
+  local fullObj, fullBody = fetchPresentationByUUID(focused.uuid)
+  if not fullObj or not fullBody then
+    return '{"error":"cannot fetch presentation by uuid"}'
+  end
+
+  local dest = presentationDestinationFromObj(fullObj)
+
+  if dest == "announcements" then
+    pcall(function()
+      hs.http.get(proRemote.PROPRESENTER_ACTIVE_FOCUS, { ["accept"]="application/json" })
+    end)
+
+    sleepSec(proRemote.FOCUSED_RECHECK_DELAY_SEC)
+
+    local focused2 = fetchFocusedInfo()
+    if not focused2 or not focused2.uuid then
+      return blankPresentationResponse("focused_is_announcements")
+    end
+
+    if isBlankPreviewUUID(focused2.uuid) then
+      return blankPresentationResponse("blank_preview")
+    end
+
+    local fullObj2, fullBody2 = fetchPresentationByUUID(focused2.uuid)
+    if not fullObj2 or not fullBody2 then
+      return blankPresentationResponse("focused_is_announcements")
+    end
+
+    local dest2 = presentationDestinationFromObj(fullObj2)
+    if dest2 == "presentation" then
+      pcall(function()
+        prefetchPresentationThumbnailsFromBody(fullBody2)
+      end)
+      return fullBody2
+    end
+
+    return blankPresentationResponse("focused_is_announcements")
+  end
+
+  pcall(function()
+    prefetchPresentationThumbnailsFromBody(fullBody)
+  end)
+  return fullBody
+end
+
+------------------------------------------------------------
+-- Thumbnail Fetch
+------------------------------------------------------------
+
+local function fetchThumbnail(uuid, index)
+  if not uuid or index == nil then
+    return "Missing uuid or index", 400, "text/plain; charset=utf-8"
+  end
+
+  uuid = tostring(uuid or "")
+  index = tonumber(index)
+  if uuid == "" or not index or index < 0 then
+    return "Bad uuid or index", 400, "text/plain; charset=utf-8"
+  end
+
+  local high = thumbnailCacheGetHigh(uuid, index)
+  if high and high.body then
+    return high.body, 200, high.contentType or "image/png"
+  end
+
+  local best = thumbnailCacheGetBest(uuid, index)
+  if best and best.body then
+    thumbnailEnqueue(uuid, index, "high", false)
+    thumbnailKickWorker()
+    return best.body, 200, best.contentType or "image/png"
+  end
+
+  thumbnailEnqueue(uuid, index, "low", true)
+  thumbnailKickWorker()
+
+  return getTransparentPngBody(), 200, "image/png"
+end
+
+------------------------------------------------------------
+-- ProPresenter one-shot actions for control panel
+------------------------------------------------------------
+
+local function proTriggerPresentationUUID(uuid)
+  if type(uuid) ~= "string" or uuid == "" then return false end
+  local url = string.format("http://localhost:%s/v1/presentation/%s/trigger", proRemote.PRO_PORT, uuid)
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function proTriggerPresentationUUIDAfter(uuid, delaySec)
+  delaySec = tonumber(delaySec) or 0
+  if delaySec <= 0 then
+    return proTriggerPresentationUUID(uuid)
+  end
+  hs.timer.doAfter(delaySec, function()
+    proTriggerPresentationUUID(uuid)
+  end)
+  return true
+end
+
+proClearAnnouncementsLayer = function()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_ANNOUNCEMENTS, {}, function() end)
+  return true
+end
+
+proClearSlideLayer = function()
+  hs.http.asyncGet(proRemote.PROPRESENTER_CLEAR_SLIDE, {}, function() end)
+  return true
+end
+
+local function proClearSlideLayerAfter(delaySec)
+  delaySec = tonumber(delaySec) or 0
+
+  if delaySec <= 0 then
+    return proClearSlideLayer()
+  end
+
+  hs.timer.doAfter(delaySec, function()
+    if proClearSlideLayer then
+      proClearSlideLayer()
+    end
+  end)
+
+  return true
+end
+
+------------------------------------------------------------
+-- ProPresenter macros (name-based trigger)
+------------------------------------------------------------
+
+local function proTriggerMacroByName(macroName)
+  macroName = trim(macroName)
+  if macroName == "" then return false end
+
+  local url = string.format(
+    "http://localhost:%s/v1/macro/%s/trigger",
+    proRemote.PRO_PORT,
+    hs.http.encodeForQuery(macroName)
+  )
+
+  hs.http.asyncGet(url, {}, function() end)
+  return true
+end
+
+local function getMacrosList()
+  local items = {}
+  for _, it in ipairs(proRemote.MACROS or {}) do
+    if type(it) == "table" then
+      local nm = tostring(it.name or "")
+      nm = trim(nm)
+      if nm ~= "" then
+        table.insert(items, { name = nm })
+      end
+    end
+  end
+  return items
+end
+
+local function macroNameAllowed(name)
+  name = trim(name)
+  if name == "" then return false end
+  for _, it in ipairs(proRemote.MACROS or {}) do
+    if type(it) == "table" and trim(it.name or "") == name then
+      return true
+    end
+  end
+  return false
+end
+
+------------------------------------------------------------
+-- OBS Bridge start/watch
+------------------------------------------------------------
+
+proRemote._bridge = proRemote._bridge or { task=nil, running=false }
+
+local function bridgeHealth()
+  if not proRemote.OBS_BRIDGE_ENABLED then return false end
+  local ok, status = pcall(function()
+    return hs.http.get(proRemote.OBS_BRIDGE_BASE .. "/health", { ["accept"]="application/json" })
+  end)
+  return ok and status == 200
+end
+
+local function bridgeKillTask()
+  if proRemote._bridge.task then
+    pcall(function() proRemote._bridge.task:terminate() end)
+    proRemote._bridge.task = nil
+  end
+end
+
+local function bridgeStart()
+  if not proRemote.OBS_BRIDGE_ENABLED then return end
+  if bridgeHealth() then
+    proRemote._bridge.running = true
+    return
+  end
+
+  bridgeKillTask()
+
+  local function streamFn(task, stdOut, stdErr)
+    return true
+  end
+
+  local function exitFn(task, exitCode, stdOut, stdErr)
+    proRemote._bridge.running = false
+    hs.timer.doAfter(1.0, function() bridgeStart() end)
+    return true
+  end
+
+  local t = hs.task.new(proRemote.NODE_PATH, exitFn, streamFn, { proRemote.OBS_BRIDGE_SCRIPT })
+  if not t then return end
+
+  if proRemote.OBS_BRIDGE_WORKDIR and proRemote.OBS_BRIDGE_WORKDIR ~= "" then
+    pcall(function() t:setWorkingDirectory(proRemote.OBS_BRIDGE_WORKDIR) end)
+  end
+
+  proRemote._bridge.task = t
+  t:start()
+
+  hs.timer.doAfter(0.8, function()
+    proRemote._bridge.running = bridgeHealth()
+  end)
+end
+
+local function bridgeWatchdogStart()
+  if proRemote.bridgeWatchdog then proRemote.bridgeWatchdog:stop() end
+  proRemote.bridgeWatchdog = hs.timer.doEvery(4.0, function()
+    if not bridgeHealth() then
+      proRemote._bridge.running = false
+      bridgeStart()
+    else
+      proRemote._bridge.running = true
+    end
+  end)
+end
+
+local function bridgeTrySetScene(sceneName, transitionName, durationMs)
+  if not proRemote.OBS_BRIDGE_ENABLED then return false end
+  if type(sceneName) ~= "string" or sceneName == "" then return false end
+
+  transitionName = tostring(transitionName or "")
+  durationMs = tonumber(durationMs)
+
+  local url = string.format(
+    "%s/scene/set?name=%s&transition=%s&duration=%s",
+    proRemote.OBS_BRIDGE_BASE,
+    hs.http.encodeForQuery(sceneName),
+    hs.http.encodeForQuery(transitionName),
+    hs.http.encodeForQuery(durationMs and tostring(durationMs) or "")
+  )
+
+  local ok, status = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if ok and status == 200 then
+    proRemote._current_obs_scene = sceneName
+    return true
+  end
+  return false
+end
+
+local function bridgeGetCurrentScene()
+  if not proRemote.OBS_BRIDGE_ENABLED then return proRemote._current_obs_scene end
+
+  local url = proRemote.OBS_BRIDGE_BASE .. "/scene/current"
+  local ok, status, body = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if ok and status == 200 and body and body ~= "" then
+    local obj = decodeJson(body)
+    if type(obj) == "table" then
+      if type(obj.currentProgramSceneName) == "string" then return obj.currentProgramSceneName end
+      if type(obj.name) == "string" then return obj.name end
+      if type(obj.scene) == "string" then return obj.scene end
+    end
+
+    local txt = trim(body):gsub('^"|"$', '')
+    if txt ~= "" then return txt end
+  end
+
+  return proRemote._current_obs_scene
+end
+
+local function fetchCurrentLookName()
+  local ok, status, body = pcall(function()
+    return hs.http.get(proRemote.PROPRESENTER_LOOK_CURRENT, { ["accept"]="application/json" })
+  end)
+
+  if not ok or status ~= 200 or not body or body == "" then return "" end
+
+  local look = decodeJson(body)
+  local name = look and look.id and look.id.name
+  if type(name) == "string" then return trim(name) end
+  return ""
+end
+
+local function obsLookRuleToPayload(rule)
+  if type(rule) ~= "table" then return nil end
+
+  local show = {}
+  local hide = {}
+
+  if type(rule.show) == "table" then
+    for _, id in ipairs(rule.show) do
+      id = tonumber(id)
+      if id then table.insert(show, id) end
+    end
+  end
+
+  if type(rule.hide) == "table" then
+    for _, id in ipairs(rule.hide) do
+      id = tonumber(id)
+      if id then table.insert(hide, id) end
+    end
+  end
+
+  if type(rule.items) == "table" then
+    for _, item in ipairs(rule.items) do
+      if type(item) == "table" then
+        local id = tonumber(item.id or item.sceneItemId or item.scene_item_id)
+        if id then
+          if item.enabled == true or item.enabled == 1 or item.enabled == "true" then
+            table.insert(show, id)
+          elseif item.enabled == false or item.enabled == 0 or item.enabled == "false" then
+            table.insert(hide, id)
+          end
+        end
+      end
+    end
+  end
+
+  return {
+    sceneName = proRemote.OBS_LOOK_SCENE_NAME,
+    show = show,
+    hide = hide,
+  }
+end
+
+local function obsLookRuleSignature(lookName, payload)
+  if type(payload) ~= "table" then return "" end
+  local show = table.concat(payload.show or {}, ",")
+  local hide = table.concat(payload.hide or {}, ",")
+  return tostring(lookName or "") .. "|" .. tostring(payload.sceneName or "") .. "|show=" .. show .. "|hide=" .. hide
+end
+
+local function bridgeApplySceneItemVisibility(payload, signature)
+  if not proRemote.OBS_BRIDGE_ENABLED then return false end
+  if type(payload) ~= "table" then return false end
+  if proRemote._obsLookApplyInFlight then return false end
+
+  local url = proRemote.OBS_BRIDGE_BASE .. "/scene/items/apply"
+  local jsonBody = hs.json.encode(payload)
+
+  proRemote._obsLookApplyInFlight = true
+
+  hs.http.asyncPost(url, jsonBody, { ["Content-Type"]="application/json", ["accept"]="application/json" }, function(status, body)
+    proRemote._obsLookApplyInFlight = false
+
+    if status == 200 then
+      proRemote._lastObsLookVisibilitySignature = signature or obsLookRuleSignature("", payload)
+    else
+      print(string.format("OBS look visibility apply failed: status=%s body=%s", tostring(status), tostring(body or "")))
+    end
+
+    if proRemote._pendingObsLookVisibilityPayload and
+       proRemote._pendingObsLookVisibilitySignature ~= "" and
+       proRemote._pendingObsLookVisibilitySignature ~= proRemote._lastObsLookVisibilitySignature then
+      hs.timer.doAfter(0.05, function()
+        if syncObsSceneToProPresenterLook then
+          pcall(function() syncObsSceneToProPresenterLook(true) end)
+        end
+      end)
+    end
+  end)
+
+  return true
+end
+
+local function bridgeFetchSceneItems(sceneName)
+  if not proRemote.OBS_BRIDGE_ENABLED then return nil end
+  sceneName = trim(sceneName or proRemote.OBS_LOOK_SCENE_NAME)
+  if sceneName == "" then return nil end
+
+  local url = string.format("%s/scene/items?scene=%s", proRemote.OBS_BRIDGE_BASE, hs.http.encodeForQuery(sceneName))
+  local ok, status, body = pcall(function()
+    return hs.http.get(url, { ["accept"]="application/json" })
+  end)
+
+  if ok and status == 200 and body and body ~= "" then
+    return decodeJson(body)
+  end
+
+  print(string.format("OBS scene item fetch failed: status=%s body=%s", tostring(status), tostring(body or "")))
+  return nil
+end
+
+local function printObsSceneItems(sceneName)
+  sceneName = trim(sceneName or proRemote.OBS_LOOK_SCENE_NAME)
+  local data = bridgeFetchSceneItems(sceneName)
+  if type(data) ~= "table" or type(data.items) ~= "table" then
+    print("OBS scene item list unavailable for scene: " .. sceneName)
+    return nil
+  end
+
+  print("------------------------------------------------------------")
+  print("OBS scene items for: " .. sceneName)
+  print("Use sceneItemId in proRemote.OBS_LOOK_RULES show/hide lists.")
+  print("------------------------------------------------------------")
+
+  for _, item in ipairs(data.items) do
+    local line = string.format(
+      "sceneItemId=%s | index=%s | enabled=%s | sourceName=%s | sourceType=%s | sourceUuid=%s",
+      tostring(item.sceneItemId or item.itemId or ""),
+      tostring(item.sceneItemIndex or ""),
+      tostring(item.sceneItemEnabled),
+      tostring(item.sourceName or ""),
+      tostring(item.sourceType or ""),
+      tostring(item.sourceUuid or "")
+    )
+    print(line)
+  end
+
+  print("------------------------------------------------------------")
+  return data
+end
+
+local function scheduleObsLookPayloadApply(payload, signature)
+  if type(payload) ~= "table" or signature == "" then return end
+
+  proRemote._pendingObsLookVisibilityPayload = payload
+  proRemote._pendingObsLookVisibilitySignature = signature
+
+  if proRemote._pendingObsLookTimer then
+    pcall(function() proRemote._pendingObsLookTimer:stop() end)
+    proRemote._pendingObsLookTimer = nil
+  end
+
+  local delay = tonumber(proRemote.OBS_LOOK_DEBOUNCE_SEC) or 0.20
+
+  proRemote._pendingObsLookTimer = hs.timer.doAfter(delay, function()
+    proRemote._pendingObsLookTimer = nil
+
+    if proRemote._obsLookApplyInFlight then
+      hs.timer.doAfter(0.05, function()
+        if syncObsSceneToProPresenterLook then
+          pcall(function() syncObsSceneToProPresenterLook(true) end)
+        end
+      end)
+      return
+    end
+
+    local pendingPayload = proRemote._pendingObsLookVisibilityPayload
+    local pendingSig = proRemote._pendingObsLookVisibilitySignature
+
+    if type(pendingPayload) ~= "table" or pendingSig == "" then return end
+    if not bridgeApplySceneItemVisibility(pendingPayload, pendingSig) then return end
+
+    proRemote._pendingObsLookVisibilityPayload = nil
+    proRemote._pendingObsLookVisibilitySignature = ""
+  end)
+end
+
+syncObsSceneToProPresenterLook = function(force)
+  if not proRemote.OBS_LOOK_SYNC_ENABLED then return end
+
+  local lookName = fetchCurrentLookName()
+  if lookName == "" then return end
+
+  local previousSeenLook = proRemote._lastObsLookSeenName or ""
+  local lookChanged = (lookName ~= previousSeenLook)
+  proRemote._lastObsLookSeenName = lookName
+
+  local rule = proRemote.OBS_LOOK_RULES and proRemote.OBS_LOOK_RULES[lookName]
+
+  if type(rule) ~= "table" then return end
+
+  local payload = obsLookRuleToPayload(rule)
+  if type(payload) ~= "table" then return end
+
+  local sig = obsLookRuleSignature(lookName, payload)
+  if sig == "" then return end
+
+  if not force and not lookChanged and sig == proRemote._lastObsLookVisibilitySignature then
+    return
+  end
+
+  if not force and sig == proRemote._pendingObsLookVisibilitySignature then
+    return
+  end
+
+  scheduleObsLookPayloadApply(payload, sig)
+end
+
+obsSetSceneWithTransitionPolicy = function(sceneName)
+  local liveCurrentScene = bridgeGetCurrentScene()
+
+  local isSpecialDest = proRemote.OBS_SPECIAL_TRANSITION_SCENES[sceneName] == true
+  local isSpecialSrc  = proRemote.OBS_SPECIAL_TRANSITION_SCENES[liveCurrentScene] == true
+
+  if isSpecialDest or isSpecialSrc then
+    local okOld = bridgeTrySetScene(sceneName, proRemote.OBS_SPECIAL_TRANSITION_NAME, nil)
+    if okOld then return end
+
+    local okFade = bridgeTrySetScene(sceneName, proRemote.OBS_FALLBACK_TRANSITION_NAME, proRemote.OBS_FALLBACK_TRANSITION_MS)
+    if okFade then return end
+  end
+
+  bridgeTrySetScene(sceneName, proRemote.OBS_DEFAULT_TRANSITION_NAME, nil)
+end
+
+------------------------------------------------------------
+-- Service logos API helpers
+------------------------------------------------------------
+
+local function getServiceLogosList()
+  local items = {}
+  for _, it in ipairs(proRemote.SERVICE_LOGOS or {}) do
+    if type(it) == "table" then
+      local nm = tostring(it.name or "")
+      local uu = tostring(it.uuid or "")
+      if nm ~= "" and uu ~= "" then
+        table.insert(items, { name = nm, uuid = uu })
+      end
+    end
+  end
+  return items
+end
+
+------------------------------------------------------------
+-- HTTP Helpers
+------------------------------------------------------------
+
+local function cleanPath(path)
+  local p = path and path:match("^[^?]+") or ""
+  return p ~= "" and p or "/"
+end
+
+local function parseQuery(path)
+  local params = {}
+  local q = path:match("%?(.*)$") or ""
+  for k, v in q:gmatch("([^&=]+)=([^&=]+)") do
+    params[k] = v
+  end
+  return params
+end
+
+local function shouldClearSlideFromParams(params)
+  if type(params) ~= "table" then return false end
+
+  -- Primary new flag.
+  if toBoolish(params["clearslide"]) then return true end
+
+  -- Backward compatibility while older control pages are still open.
+  if toBoolish(params["safeclear"]) then return true end
+
+  return false
+end
+
+------------------------------------------------------------
+-- Route Handler
+------------------------------------------------------------
+
+local function handleHttpPath(method, rawPath, body)
+  local p = cleanPath(rawPath)
+  local params = parseQuery(rawPath)
+
+  if p == "/next" then
+    triggerNextSlide()
+    return "OK\n", 200, "text/plain"
+
+  elseif p == "/previous" or p == "/prev" then
+    triggerPreviousSlide()
+    return "OK\n", 200, "text/plain"
+
+  elseif p == "/focus" then
+    local idx = tonumber(params["index"])
+    if not idx then return "Bad index", 400, "text/plain" end
+    triggerFocusedSlide(idx)
+    return "OK\n", 200, "text/plain"
+
+  ----------------------------------------------------------
+  -- Audio endpoints
+  ----------------------------------------------------------
+  elseif p == "/audio/playlists" then
+    return jsonResponse({ items = proRemote.AUDIO_PLAYLISTS }), 200, "application/json"
+
+  elseif p == "/audio/active" then
+    return fetchActiveAudioText(), 200, "text/plain; charset=utf-8"
+
+  elseif p == "/audio/tracks" then
+    local name = params["playlist"]
+    if not name then return "Missing playlist name", 400, "text/plain" end
+    local tracks = fetchAudioPlaylistTracks(name)
+    return jsonResponse({ items = tracks }), 200, "application/json"
+
+  elseif p == "/audio/trigger" then
+    if method ~= "POST" then return "Method Not Allowed", 405, "text/plain" end
+    local obj = decodeJson(body or "")
+    if not obj or not obj.playlist or not obj.track then
+      return jsonResponse({ ok=false, error="missing_params" }), 400, "application/json"
+    end
+    triggerAudioTrack(obj.playlist, obj.track)
+    return jsonResponse({ ok=true }), 200, "application/json"
+
+  elseif p == "/audio/clear" then
+    clearAudioLayer()
+    return jsonResponse({ ok=true }), 200, "application/json"
+
+  ----------------------------------------------------------
+  -- Timer proxy endpoints
+  ----------------------------------------------------------
+  elseif p == "/timer/start" then
+    proTimerStart()
+    return "OK\n", 200, "text/plain"
+
+  elseif p == "/timer/stop-reset" then
+    proTimerStopReset()
+    return "OK\n", 200, "text/plain"
+
+  ----------------------------------------------------------
+  -- Presentation / slide endpoints
+  ----------------------------------------------------------
+  elseif p == "/active-presentation" then
+    return fetchFullPresentationJSON(), 200, "application/json"
+
+  elseif p == "/slide-index" then
+    local ok, status, b = pcall(function()
+      return hs.http.get(proRemote.PROPRESENTER_SLIDE_INDEX, { ["accept"]="application/json" })
+    end)
+    return b or "{}", 200, "application/json"
+
+  elseif p == "/thumbnail" then
+    return fetchThumbnail(params.uuid, tonumber(params.index))
+
+  elseif p == "/current-base" then
+    refreshPresentationBase()
+    local out = string.format('{"mode":"%s","base_url":"%s"}', currentMode(), proRemote.PROPRESENTER_PRESENTATION_BASE)
+    return out, 200, "application/json"
+
+  ----------------------------------------------------------
+  -- OBS ProPresenter Input scene-item inspection / look sync
+  ----------------------------------------------------------
+  elseif p == "/obs/propresenter-input/items" then
+    local data = printObsSceneItems(proRemote.OBS_LOOK_SCENE_NAME)
+    return jsonResponse(data or { ok=false, error="unavailable" }), data and 200 or 503, "application/json"
+
+  elseif p == "/obs/look/refresh" then
+    if syncObsSceneToProPresenterLook then
+      syncObsSceneToProPresenterLook(true)
+    end
+    return jsonResponse({ ok=true }), 200, "application/json"
+
+  elseif p == "/health" then
+    return "OK", 200, "text/plain"
+
+  ----------------------------------------------------------
+  -- Service logos list
+  ----------------------------------------------------------
+  elseif p == "/service_logos" then
+    local out = { items = getServiceLogosList() }
+    return jsonResponse(out), 200, "application/json"
+
+  ----------------------------------------------------------
+  -- Auto Show Slides endpoint
+  ----------------------------------------------------------
+  elseif p == "/auto-show" then
+    if method == "GET" then
+      return jsonResponse({ enabled = proRemote.autoShowSlidesEnabled }), 200, "application/json"
+    elseif method == "POST" then
+      local obj = decodeJson(body or "")
+      if type(obj) == "table" and obj.enabled ~= nil then
+        proRemote.autoShowSlidesEnabled = toBoolish(obj.enabled)
+        proRemote._lastAutoShowState = nil
+      end
+      return jsonResponse({ enabled = proRemote.autoShowSlidesEnabled }), 200, "application/json"
+    end
+    return "Method Not Allowed", 405, "text/plain"
+
+  ----------------------------------------------------------
+  -- Macros list + trigger
+  ----------------------------------------------------------
+  elseif p == "/macros" then
+    local out = { items = getMacrosList() }
+    return jsonResponse(out), 200, "application/json"
+
+  elseif p == "/macro" then
+    if method ~= "POST" then
+      return "Method Not Allowed", 405, "text/plain"
+    end
+
+    local obj = decodeJson(body or "")
+    if type(obj) ~= "table" then
+      return jsonResponse({ ok=false, error="bad_json" }), 400, "application/json"
+    end
+
+    local macroName = trim(obj.name or obj.macro_name or "")
+    if macroName == "" then
+      return jsonResponse({ ok=false, error="missing_macro_name" }), 400, "application/json"
+    end
+
+    if not macroNameAllowed(macroName) then
+      return jsonResponse({ ok=false, error="macro_not_in_list", name=macroName }), 400, "application/json"
+    end
+
+    local ok = proTriggerMacroByName(macroName)
+    if not ok then
+      return jsonResponse({ ok=false, error="trigger_failed" }), 500, "application/json"
+    end
+
+    return jsonResponse({ ok=true, name=macroName }), 200, "application/json"
+
+  ----------------------------------------------------------
+  -- Presets
+  ----------------------------------------------------------
+  elseif p == "/preset" then
+    if method ~= "POST" then
+      return "Method Not Allowed", 405, "text/plain"
+    end
+
+    local obj = decodeJson(body or "")
+    if type(obj) ~= "table" then
+      return jsonResponse({ ok=false, error="bad_json" }), 400, "application/json"
+    end
+
+    local preset = tostring(obj.preset or ""):lower()
+    local serviceLogoUuid = tostring(obj.service_logo_uuid or "")
+    local doClearSlide = shouldClearSlideFromParams(params)
+    local clearSlideDelay = tonumber(proRemote.CLEAR_SLIDE_DELAY_SEC) or 0.5
+
+    if preset == "stream_beginning" then
+      proTriggerPresentationUUID(proRemote.PRESET_STARTING_ANNOUNCEMENTS_UUID)
+      obsSetSceneWithTransitionPolicy("Stream Start")
+      return jsonResponse({ ok=true }), 200, "application/json"
+
+    elseif preset == "camera" then
+      proTriggerPresentationUUID(proRemote.PRESET_PTZ_CAMERA_UUID)
+      obsSetSceneWithTransitionPolicy("PTZ Camera")
+
+      if doClearSlide then
+        proClearSlideLayerAfter(clearSlideDelay)
+      end
+
+      return jsonResponse({ ok=true, clearslide=doClearSlide }), 200, "application/json"
+
+    elseif preset == "show_slides" then
+      proClearAnnouncementsLayer()
+      obsSetSceneWithTransitionPolicy("ProPresenter Input")
+      return jsonResponse({ ok=true }), 200, "application/json"
+
+    elseif preset == "service_logo" then
+      if serviceLogoUuid == "" then
+        return jsonResponse({ ok=false, error="missing_service_logo_uuid" }), 400, "application/json"
+      end
+
+      proTriggerPresentationUUID(serviceLogoUuid)
+      obsSetSceneWithTransitionPolicy("Audience Camera")
+
+      if doClearSlide then
+        proClearSlideLayerAfter(clearSlideDelay)
+      end
+
+      return jsonResponse({ ok=true, clearslide=doClearSlide }), 200, "application/json"
+
+    elseif preset == "testimonies" then
+      if serviceLogoUuid == "" then
+        return jsonResponse({ ok=false, error="missing_service_logo_uuid" }), 400, "application/json"
+      end
+      proTriggerPresentationUUID(serviceLogoUuid)
+      obsSetSceneWithTransitionPolicy("Testimonies")
+      return jsonResponse({ ok=true }), 200, "application/json"
+
+    elseif preset == "ending_stream" then
+      proTriggerPresentationUUID(proRemote.PRESET_ENDING_ANNOUNCEMENTS_UUID)
+      obsSetSceneWithTransitionPolicy("Thanks Screen")
+      return jsonResponse({ ok=true }), 200, "application/json"
+
+    elseif preset == "clear_slide" or preset == "safely_clear_slide" then
+      proClearSlideLayer()
+      return jsonResponse({ ok=true, clearslide=true }), 200, "application/json"
+
+    elseif preset == "nsc_setup" then
+      proClearAnnouncementsLayer()
+      proTriggerPresentationUUID(proRemote.PRESET_IMAC_SCREEN_UUID)
+      return jsonResponse({ ok=true }), 200, "application/json"
+
+    else
+      return jsonResponse({ ok=false, error="unknown_preset" }), 400, "application/json"
+    end
+  end
+
+  return "Not found", 404, "text/plain"
+end
+
+------------------------------------------------------------
+-- HTTP server
+------------------------------------------------------------
+
+local function httpCallback(method, path, headers, body)
+  local h = {
+    ["Access-Control-Allow-Origin"]  = "*",
+    ["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS",
+    ["Access-Control-Allow-Headers"] = "Content-Type",
+  }
+
+  if method == "OPTIONS" then
+    return "", 204, h
+  end
+
+  local ok, bodyData, status, contentType = pcall(handleHttpPath, method, path, body)
+  if not ok then
+    print("HTTP handler error: " .. tostring(bodyData))
+    return "Internal error\n", 500, h
+  end
+
+  h["Content-Type"] = contentType
+  return bodyData, status, h
+end
+
+if proRemote.server then
+  proRemote.server:stop()
+end
+
+proRemote.server = hs.httpserver.new(false, false)
+proRemote.server:setPort(proRemote.HTTP_SERVER_PORT)
+proRemote.server:setInterface(proRemote.HTTP_SERVER_INTERFACE)
+proRemote.server:setCallback(httpCallback)
+proRemote.server:start()
+
+------------------------------------------------------------
+-- STARTUP
+------------------------------------------------------------
+
+startBibleTimer()
+startClickerListener()
+
+bridgeStart()
+bridgeWatchdogStart()
+
+if proRemote.OBS_LOOK_PRINT_ON_STARTUP then
+  hs.timer.doAfter(tonumber(proRemote.OBS_LOOK_PRINT_DELAY_SEC) or 2.0, function()
+    pcall(function()
+      printObsSceneItems(proRemote.OBS_LOOK_SCENE_NAME)
+    end)
+  end)
+end
+
+thumbnailKickWorker()
+
+hs.alert.show("ProPresenter Remote/OBS Remote Control Ready")
