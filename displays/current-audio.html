@@ -47,6 +47,9 @@
         return String(url || "").replace(/\/+$/, "");
       }
       function getAudioEndpoint() {
+        if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+          return window.location.origin + "/audio/active";
+        }
         return normalizeBase(DEFAULT_API_BASE) + "/audio/active";
       }
       function parseItemName(text) {

@@ -514,7 +514,7 @@
     const params = new URLSearchParams(window.location.search || "");
     const override = params.get("api") || localStorage.getItem("icas-score-api-base") || "";
     if (override.trim()) return override.trim().replace(/\/+$/, "");
-    if (/^https?:$/.test(window.location.protocol) && window.location.pathname.includes("/remote/")) {
+    if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
       return window.location.origin;
     }
     return HOSTED_API_BASE;

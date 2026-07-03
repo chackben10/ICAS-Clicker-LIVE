@@ -51,10 +51,11 @@ class ThumbnailCache:
         if cached:
             return cached
         quality = self.config.high_quality if tier == "high" else self.config.low_quality
-        path = f"/presentation/{uuid}/thumbnail/{index}?quality={quality}&type={self.config.image_format}"
+        uuid_q = self.client.quote_segment(uuid)
+        format_q = self.client.quote_segment(self.config.image_format)
+        path = f"/presentation/{uuid_q}/thumbnail/{index}?quality={quality}&thumbnail_type={format_q}"
         try:
             body = await self.client.get_bytes(path, accept="image/png")
         except Exception:
             return ThumbnailEntry(TRANSPARENT_PNG, "image/png", time.time(), tier)
         return self.put(uuid, index, body, f"image/{self.config.image_format}", tier)
-

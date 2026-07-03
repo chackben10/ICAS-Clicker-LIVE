@@ -546,7 +546,19 @@
   <script>
     "use strict";
 
-    const BASE_URL = "https://slides.icas-clicker.work";
+    const HOSTED_API_BASE = "https://slides.icas-clicker.work";
+
+    function getApiBase() {
+      const params = new URLSearchParams(window.location.search || "");
+      const override = params.get("api") || localStorage.getItem("icas-slides-api-base") || "";
+      if (override.trim()) return override.trim().replace(/\/+$/, "");
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        return window.location.origin;
+      }
+      return HOSTED_API_BASE;
+    }
+
+    const BASE_URL = getApiBase();
 
     const STORAGE_KEYS = Object.freeze({
       textScale: "icas-picker-text-scale",

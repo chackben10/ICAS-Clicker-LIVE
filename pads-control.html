@@ -505,6 +505,9 @@ return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
 }
 
 function getApiBase() {
+if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+return window.location.origin;
+}
 return normalizeBase(DEFAULT_API_BASE);
 }
 

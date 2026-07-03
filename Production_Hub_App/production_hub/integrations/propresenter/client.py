@@ -20,6 +20,10 @@ class ProPresenterClient(IntegrationBase):
         path = path if path.startswith("/") else f"/{path}"
         return f"{self.config.base_url}{path}"
 
+    @staticmethod
+    def quote_segment(value: str) -> str:
+        return urllib.parse.quote(str(value), safe="")
+
     async def get_json(self, path: str) -> dict[str, Any]:
         body = await self.get_bytes(path, accept="application/json")
         if not body:
@@ -49,15 +53,14 @@ class ProPresenterClient(IntegrationBase):
         return True
 
     async def trigger_macro(self, macro_name: str) -> bool:
-        encoded = urllib.parse.quote(macro_name, safe="")
+        encoded = self.quote_segment(macro_name)
         return await self.trigger(f"/macro/{encoded}/trigger")
 
     async def trigger_presentation(self, uuid: str) -> bool:
-        encoded = urllib.parse.quote(uuid, safe="")
+        encoded = self.quote_segment(uuid)
         return await self.trigger(f"/presentation/{encoded}/trigger")
 
     async def trigger_audio(self, playlist: str, track: str) -> bool:
-        playlist_q = urllib.parse.quote(playlist, safe="")
-        track_q = urllib.parse.quote(track, safe="")
+        playlist_q = self.quote_segment(playlist)
+        track_q = self.quote_segment(track)
         return await self.trigger(f"/audio/playlist/{playlist_q}/{track_q}/trigger")
-

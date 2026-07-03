@@ -99,7 +99,14 @@
   </div>
 
   <script>
-    const SCORE_API = "https://score.icas-clicker.work/score";
+    function getScoreApi() {
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        return window.location.origin + "/score";
+      }
+      return "https://score.icas-clicker.work/score";
+    }
+
+    const SCORE_API = getScoreApi();
     const MAX_TEAMS = 10;
 
     async function refreshScoreboard() {

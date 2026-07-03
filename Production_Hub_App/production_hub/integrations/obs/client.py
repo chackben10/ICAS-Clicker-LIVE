@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 from typing import Any
 
 from production_hub.core.config.models import ObsConfig
@@ -22,6 +23,18 @@ class ObsClient(IntegrationBase):
             except Exception as exc:
                 self.connected = False
                 self.mark_error(f"obsws-python is not installed: {exc}")
+                return False
+
+            try:
+                await asyncio.to_thread(
+                    lambda: socket.create_connection(
+                        (self.config.host, self.config.port),
+                        timeout=self.config.connection_timeout_seconds,
+                    ).close()
+                )
+            except Exception as exc:
+                self.connected = False
+                self.mark_error(str(exc))
                 return False
 
             try:
@@ -55,4 +68,3 @@ class ObsClient(IntegrationBase):
             self.connected = False
             self.mark_error(str(exc))
             raise
-

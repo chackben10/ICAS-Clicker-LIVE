@@ -13,7 +13,7 @@ def router(context) -> APIRouter:
     @api.post("/preset")
     async def preset(request: Request, payload: dict) -> dict:
         preset_name = str(payload.get("preset") or "").lower()
-        clear_slide = _boolish(request.query_params.get("clearslide"))
+        clear_slide = _boolish(request.query_params.get("clearslide")) or _boolish(request.query_params.get("safeclear"))
         clear_delay = context.config.integrations.propresenter.clear_slide_delay_seconds
         logo_uuid = str(payload.get("service_logo_uuid") or payload.get("serviceLogoUuid") or "").strip()
 

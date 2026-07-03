@@ -34,7 +34,8 @@ class ProPresenterAudioService:
         cached = self._cache.get(playlist)
         if cached and (time.time() - cached[0]) < self.config.cache_ttl_seconds:
             return cached[1]
-        data = await self.client.get_json(f"/audio/playlist/{playlist}")
+        playlist_q = self.client.quote_segment(playlist)
+        data = await self.client.get_json(f"/audio/playlist/{playlist_q}")
         tracks: list[str] = []
         for item in data.get("items", []):
             name = ""
@@ -86,4 +87,3 @@ class ProPresenterAudioService:
         if not playlist or not item:
             return "No audio playing\n"
         return f"playlist: {playlist}\nitem: {item}\n"
-

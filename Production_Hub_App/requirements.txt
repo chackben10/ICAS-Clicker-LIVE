@@ -5,4 +5,4 @@ PySide6>=6.7
 httpx>=0.27
 obsws-python>=1.7
 qrcode[pil]>=7.4
-
+pyobjc-framework-Quartz>=10.3; sys_platform == "darwin"

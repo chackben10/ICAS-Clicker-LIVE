@@ -26,7 +26,7 @@ def router(context) -> APIRouter:
 
     @api.get("/active-presentation")
     async def active_presentation() -> dict:
-        return await context.propresenter.active_presentation()
+        return await context.propresenter.full_presentation()
 
     @api.get("/slide-index")
     async def slide_index() -> dict:
@@ -79,7 +79,7 @@ def router(context) -> APIRouter:
         await context.propresenter.audio.trigger(playlist, track)
         return {"ok": True}
 
-    @api.post("/audio/clear")
+    @api.api_route("/audio/clear", methods=["GET", "POST"])
     async def audio_clear() -> dict:
         await context.propresenter.audio.clear()
         return {"ok": True}

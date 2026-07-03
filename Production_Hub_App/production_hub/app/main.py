@@ -8,7 +8,20 @@ import time
 from pathlib import Path
 
 from production_hub.app.bootstrap import build_context
-from production_hub.app.lifecycle import start_api_server, startup_checks
+from production_hub.app.lifecycle import start_api_server, start_background_services, startup_checks
+
+
+class RuntimeHandle:
+    def __init__(self, *handles) -> None:
+        self.handles = [handle for handle in handles if handle is not None]
+        self._stopped = False
+
+    def stop(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
+        for handle in reversed(self.handles):
+            handle.stop()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -34,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         context.logger.warning("startup_checks_failed", "Startup checks did not complete", error=str(exc))
 
+    background_handle = start_background_services(context)
     api_handle = None
     if not args.no_api:
         try:
@@ -42,7 +56,10 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             if "required to run" in str(exc):
                 print("Install dependencies with: python3 -m pip install -r Production_Hub_App/requirements.txt", file=sys.stderr)
+            background_handle.stop()
             return 2
+
+    runtime_handle = RuntimeHandle(api_handle, background_handle)
 
     if args.api_only:
         print(f"Production Hub API running at {context.config.api.base_url}")
@@ -56,8 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGTERM, _stop)
         while not stop:
             time.sleep(0.25)
-        if api_handle:
-            api_handle.stop()
+        runtime_handle.stop()
         return 0
 
     try:
@@ -66,13 +82,11 @@ def main(argv: list[str] | None = None) -> int:
         print("PySide6 is required for the Production Hub desktop UI.", file=sys.stderr)
         print(f"Import error: {exc}", file=sys.stderr)
         print("Install dependencies with: python3 -m pip install -r Production_Hub_App/requirements.txt", file=sys.stderr)
-        if api_handle:
-            api_handle.stop()
+        runtime_handle.stop()
         return 2
 
-    code = run_desktop_app(context, api_handle)
-    if api_handle:
-        api_handle.stop()
+    code = run_desktop_app(context, runtime_handle)
+    runtime_handle.stop()
     return int(code)
 
 

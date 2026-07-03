@@ -221,6 +221,7 @@
   <div class="split" id="splitRoot">
     <div class="pane" id="leftPane">
       <iframe
+        id="leftFrame"
         src="https://icas-clicker.work"
         title="ICAS Clicker"
         loading="eager"
@@ -243,6 +244,7 @@
 
     <div class="pane" id="rightPane">
       <iframe
+        id="rightFrame"
         src="https://icas-clicker.work/control"
         title="ICAS Control"
         loading="eager"
@@ -256,11 +258,18 @@
     (function () {
       const divider = document.getElementById("divider");
       const splitRoot = document.getElementById("splitRoot");
+      const leftFrame = document.getElementById("leftFrame");
+      const rightFrame = document.getElementById("rightFrame");
 
       const LEFT_W_KEY = "icas-ipad-leftW-px";
 
       const HOLD_MS = 2000;
       const MOVE_CANCEL_PX = 10;
+
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        leftFrame.src = `${window.location.origin}/remote/index.html`;
+        rightFrame.src = `${window.location.origin}/remote/control.html`;
+      }
 
       function clamp(n, lo, hi){
         return Math.max(lo, Math.min(hi, n));

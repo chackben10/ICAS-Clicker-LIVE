@@ -11,7 +11,7 @@ from production_hub.core.security.sanitize import redact_secrets
 
 def create_app(context):
     try:
-        from fastapi import FastAPI, Request
+        from fastapi import FastAPI, HTTPException, Request
         from fastapi.middleware.cors import CORSMiddleware
         from fastapi.responses import FileResponse
     except Exception as exc:  # pragma: no cover - exercised only without dependencies
@@ -89,14 +89,44 @@ def create_app(context):
             "runtime": context.runtime_state_repo.load().to_dict(),
         }
 
-    @app.get("/remote/{asset_path:path}")
-    async def remote_asset(asset_path: str):
+    def remote_file_response(asset_path: str):
         path = (Path(context.workspace_root) / asset_path).resolve()
         root = Path(context.workspace_root).resolve()
         if not path.is_file() or root not in path.parents:
-            from fastapi import HTTPException
-
             raise HTTPException(status_code=404, detail="Remote page not found")
         return FileResponse(path)
+
+    @app.get("/remote/{asset_path:path}")
+    async def remote_asset(asset_path: str):
+        return remote_file_response(asset_path)
+
+    page_aliases = {
+        "": "index.html",
+        "index": "index.html",
+        "index.html": "index.html",
+        "control": "control.html",
+        "control.html": "control.html",
+        "pads-control": "pads-control.html",
+        "pads-control.html": "pads-control.html",
+        "picker": "picker.html",
+        "picker.html": "picker.html",
+        "ipad-control": "ipad-control.html",
+        "ipad-control.html": "ipad-control.html",
+        "debug.html": "debug.html",
+        "score.html": "score.html",
+    }
+
+    @app.get("/")
+    async def root_remote_page():
+        return remote_file_response(page_aliases[""])
+
+    @app.get("/{page_path:path}")
+    async def remote_page_alias(page_path: str):
+        normalized = page_path.strip("/")
+        if normalized in page_aliases:
+            return remote_file_response(page_aliases[normalized])
+        if normalized and Path(normalized).suffix.lower() in {".html", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"}:
+            return remote_file_response(normalized)
+        raise HTTPException(status_code=404, detail="Not found")
 
     return app
