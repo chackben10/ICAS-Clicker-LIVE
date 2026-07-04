@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from production_hub.core.automation.engine import AutomationEngine
+from production_hub.core.config.defaults import build_default_automations, build_default_endpoints
 from production_hub.core.config.models import AppPaths
 from production_hub.core.config.repository import ConfigRepository, default_app_root
 from production_hub.core.endpoints.actions import ActionRouter
 from production_hub.core.endpoints.executor import EndpointExecutor
-from production_hub.core.endpoints.models import ActionDefinition, ActionResult
+from production_hub.core.endpoints.models import ActionDefinition, ActionResult, EndpointDefinition
 from production_hub.core.endpoints.registry import EndpointRegistry
+from production_hub.core.endpoints.variables import resolve_template
 from production_hub.core.health.monitor import HealthMonitor
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_DISABLED, STATUS_OFFLINE
 from production_hub.core.logging.log_repository import LogRepository
@@ -25,6 +27,7 @@ from production_hub.integrations.propresenter.service import ProPresenterService
 from production_hub.integrations.scoreboard.repository import ScoreboardRepository
 from production_hub.integrations.scoreboard.service import ScoreboardService
 from production_hub.state.state_repository import RuntimeStateRepository
+from production_hub.state.undo_manager import UndoManager
 
 
 @dataclass
@@ -46,6 +49,7 @@ class ApplicationContext:
     health_monitor: HealthMonitor
     log_repository: LogRepository
     logger: StructuredLogger
+    undo_manager: UndoManager
 
 
 def _workspace_root() -> Path:
@@ -72,8 +76,15 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     paths = AppPaths(data_dir or default_app_root())
     config_repository = ConfigRepository(paths)
     config = config_repository.load_app_config()
-    endpoints = config_repository.load_endpoints()
-    automations = config_repository.load_automations()
+    loaded_endpoints = config_repository.load_endpoints()
+    endpoints = ensure_required_endpoints(loaded_endpoints)
+    if not any(item.key == "audio_clear" for item in loaded_endpoints):
+        config_repository.save_endpoints(endpoints)
+    loaded_automations = config_repository.load_automations()
+    loaded_automation_data = [item.to_dict() for item in loaded_automations]
+    automations = ensure_builtin_automation_steps(loaded_automations)
+    if [item.to_dict() for item in automations] != loaded_automation_data:
+        config_repository.save_automations(automations)
 
     base_logger = configure_logging(paths.logs_dir)
     logger = StructuredLogger(base_logger, "bootstrap")
@@ -94,6 +105,7 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     automation_engine = AutomationEngine(automations)
     health_monitor = HealthMonitor(config)
     log_repository = LogRepository(paths.logs_dir)
+    undo_manager = UndoManager(max_items=100)
 
     context = ApplicationContext(
         paths=paths,
@@ -113,12 +125,37 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
         health_monitor=health_monitor,
         log_repository=log_repository,
         logger=logger,
+        undo_manager=undo_manager,
     )
 
     register_action_handlers(context, router)
     seed_initial_health(context)
     logger.info("context_ready", "Production Hub context initialized", data_dir=str(paths.root))
     return context
+
+
+def ensure_required_endpoints(endpoints: list[EndpointDefinition]) -> list[EndpointDefinition]:
+    if any(item.key == "audio_clear" for item in endpoints):
+        return endpoints
+    defaults = {item.key: item for item in build_default_endpoints()}
+    audio_clear = defaults.get("audio_clear")
+    return [*endpoints, audio_clear] if audio_clear else endpoints
+
+
+def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
+    defaults = {item.key: item for item in build_default_automations()}
+    repaired = []
+    for automation in automations:
+        default = defaults.get(automation.key)
+        if default is None:
+            repaired.append(automation)
+            continue
+        if not automation.conditions and default.conditions:
+            automation.conditions = [dict(condition) for condition in default.conditions]
+        if not automation.actions and default.actions:
+            automation.actions = [ActionDefinition.from_dict(action.to_dict()) for action in default.actions]
+        repaired.append(automation)
+    return repaired
 
 
 def seed_initial_health(context: ApplicationContext) -> None:
@@ -156,6 +193,11 @@ def seed_initial_health(context: ApplicationContext) -> None:
 
 
 def register_action_handlers(context: ApplicationContext, router: ActionRouter) -> None:
+    def param(action: ActionDefinition, action_context: dict[str, Any], key: str, default: Any = "") -> Any:
+        if key in action.params:
+            return resolve_template(action.params[key], action_context)
+        return resolve_template(action_context.get(key, default), action_context)
+
     async def propresenter_next(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         await context.propresenter.next_slide()
         return await _action_ok(action, "next slide triggered")
@@ -165,17 +207,17 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         return await _action_ok(action, "previous slide triggered")
 
     async def propresenter_focus(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        index = int(action_context.get("index", action.params.get("index", 0)))
+        index = int(param(action, action_context, "index", 0))
         await context.propresenter.focus_slide(index)
         return await _action_ok(action, "slide focused", {"index": index})
 
     async def trigger_presentation(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        label = str(action.params.get("label") or action_context.get("label") or "")
+        label = str(param(action, action_context, "label", ""))
         await context.propresenter.trigger_presentation_label(label)
         return await _action_ok(action, "presentation triggered", {"label": label})
 
     async def trigger_service_logo(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        logo = str(action_context.get("service_logo_uuid") or action.params.get("service_logo_uuid") or "")
+        logo = str(param(action, action_context, "service_logo_uuid", ""))
         await context.propresenter.trigger_service_logo(logo)
         return await _action_ok(action, "service logo triggered", {"service_logo_uuid": logo})
 
@@ -184,12 +226,12 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         return await _action_ok(action, "announcements layer cleared")
 
     async def clear_slide(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        delay = float(action.params.get("delay_seconds", 0))
+        delay = float(param(action, action_context, "delay_seconds", 0))
         await context.propresenter.clear_slide(delay)
         return await _action_ok(action, "slide layer cleared")
 
     async def trigger_macro(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        macro = str(action_context.get("macro_name") or action_context.get("name") or action.params.get("macro_name") or "")
+        macro = str(param(action, action_context, "macro_name", action_context.get("name", "")))
         await context.propresenter.trigger_macro(macro)
         return await _action_ok(action, "macro triggered", {"name": macro})
 
@@ -206,8 +248,8 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         return await _action_ok(action, "timer reset")
 
     async def audio_trigger(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        playlist = str(action_context.get("playlist") or action.params.get("playlist") or "")
-        track = str(action_context.get("track") or action.params.get("track") or "")
+        playlist = str(param(action, action_context, "playlist", ""))
+        track = str(param(action, action_context, "track", ""))
         await context.propresenter.audio.trigger(playlist, track)
         return await _action_ok(action, "audio triggered", {"playlist": playlist, "track": track})
 
@@ -216,17 +258,46 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         return await _action_ok(action, "audio cleared")
 
     async def obs_set_scene(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        scene = str(action.params.get("scene") or action_context.get("scene") or "")
-        use_policy = bool(action.params.get("transition_policy", True))
+        scene = str(param(action, action_context, "scene", ""))
+        use_policy = str(param(action, action_context, "transition_policy", True)).lower() not in {"0", "false", "no", "off"}
         await context.obs.set_scene(scene, use_policy=use_policy)
         return await _action_ok(action, "OBS scene set", {"scene": scene})
 
+    async def obs_apply_look_rule(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        look_name = str(param(action, action_context, "look_name", ""))
+        result = await context.obs.apply_look_rule(look_name, force=True)
+        return await _action_ok(action, "OBS look rule applied", result or {"look_name": look_name, "skipped": True})
+
+    async def obs_reconnect(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        connected = await context.obs.connect()
+        context.health_monitor.update(context.obs.client.health())
+        if connected:
+            return await _action_ok(action, "OBS reconnected")
+        return ActionResult(action.action_type, False, "OBS unavailable")
+
     async def runtime_auto_show(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         state = context.runtime_state_repo.load()
-        if "enabled" in action_context:
-            state.auto_show_enabled = bool(action_context["enabled"])
+        if "enabled" in action.params or "enabled" in action_context:
+            enabled = str(param(action, action_context, "enabled", state.auto_show_enabled)).lower() in {"1", "true", "yes", "on"}
+            state.auto_show_enabled = enabled
             context.runtime_state_repo.save(state)
         return await _action_ok(action, "auto-show state read", {"enabled": state.auto_show_enabled})
+
+    async def panasonic_recall_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        preset = int(param(action, action_context, "preset", 0))
+        await context.panasonic.recall_preset(preset)
+        return await _action_ok(action, "camera preset recalled", {"preset": preset})
+
+    async def panasonic_save_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        preset = int(param(action, action_context, "preset", 0))
+        await context.panasonic.save_preset(preset)
+        return await _action_ok(action, "camera preset saved", {"preset": preset})
+
+    async def panasonic_send_command(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        command = str(param(action, action_context, "command", ""))
+        endpoint = str(param(action, action_context, "endpoint", "aw_ptz"))
+        await context.panasonic.send_command(command, endpoint)
+        return await _action_ok(action, "camera command sent", {"command": command, "endpoint": endpoint})
 
     handlers = {
         "propresenter.next_slide": propresenter_next,
@@ -243,7 +314,12 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.audio_trigger": audio_trigger,
         "propresenter.audio_clear": audio_clear,
         "obs.set_scene": obs_set_scene,
+        "obs.apply_look_rule": obs_apply_look_rule,
+        "obs.reconnect": obs_reconnect,
         "runtime.auto_show": runtime_auto_show,
+        "panasonic.recall_preset": panasonic_recall_preset,
+        "panasonic.save_preset": panasonic_save_preset,
+        "panasonic.send_command": panasonic_send_command,
     }
     for action_type, handler in handlers.items():
         router.register(action_type, handler)

@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from production_hub.core.endpoints.models import ActionDefinition, ActionResult
+from production_hub.core.endpoints.variables import resolve_template
 
 ActionHandler = Callable[[ActionDefinition, dict[str, Any]], Awaitable[ActionResult]]
 
@@ -19,10 +20,10 @@ class ActionRouter:
         if action.action_type == "delay":
             import asyncio
 
-            await asyncio.sleep(float(action.params.get("seconds", action.delay_seconds)))
+            seconds = resolve_template(action.params.get("seconds", action.delay_seconds), context)
+            await asyncio.sleep(float(seconds))
             return ActionResult(action.action_type, True, "delay complete")
         handler = self._handlers.get(action.action_type)
         if handler is None:
             return ActionResult(action.action_type, False, f"No handler registered for {action.action_type}")
         return await handler(action, context)
-

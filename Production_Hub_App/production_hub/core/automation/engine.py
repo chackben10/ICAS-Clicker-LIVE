@@ -17,6 +17,9 @@ class AutomationEngine:
     def register_handler(self, key: str, handler: AutomationHandler) -> None:
         self._handlers[key] = handler
 
+    def has_handler(self, key: str) -> bool:
+        return key in self._handlers
+
     def pause_all(self) -> None:
         self.paused = True
 
@@ -45,4 +48,3 @@ class AutomationEngine:
 
     def inspector_rows(self) -> list[AutomationRunState]:
         return list(self.states.values())
-

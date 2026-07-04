@@ -9,7 +9,9 @@ from typing import Any
 
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
+from production_hub.core.automation.evaluator import evaluate_conditions
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
+from production_hub.core.endpoints.models import EndpointDefinition
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
 from production_hub.integrations.panasonic_awp.models import PanasonicCommand
 from production_hub.integrations.propresenter.audio_service import strip_audio_extension
@@ -366,6 +368,10 @@ def register_automation_handlers(context: ApplicationContext) -> None:
     def soft_fail(handler):
         async def _wrapped(definition: AutomationDefinition, state: AutomationRunState) -> str:
             try:
+                conditions_ok, condition_message = await evaluate_conditions(context, definition.conditions)
+                state.last_condition_result = condition_message
+                if not conditions_ok:
+                    return f"conditions_not_met:{condition_message}"
                 return await handler(definition, state)
             except Exception as exc:
                 return f"unavailable:{exc}"
@@ -387,16 +393,59 @@ def _automation_interval(context: ApplicationContext, definition: AutomationDefi
     return 0
 
 
-async def _automation_loop(
+def register_generic_automation_handler(context: ApplicationContext, definition: AutomationDefinition) -> None:
+    if context.automation_engine.has_handler(definition.key) or not definition.actions:
+        return
+
+    last_success_at = 0.0
+
+    async def generic_handler(current_definition: AutomationDefinition, state: AutomationRunState) -> str:
+        nonlocal last_success_at
+        import time
+
+        now = time.monotonic()
+        if current_definition.cooldown_seconds and (now - last_success_at) < current_definition.cooldown_seconds:
+            return "cooldown"
+
+        conditions_ok, condition_message = await evaluate_conditions(context, current_definition.conditions)
+        state.last_condition_result = condition_message
+        if not conditions_ok:
+            return f"conditions_not_met:{condition_message}"
+
+        endpoint = EndpointDefinition(
+            key=f"automation:{current_definition.key}",
+            name=current_definition.name,
+            route=f"/__automation/{current_definition.key}",
+            actions=current_definition.actions,
+            enabled=True,
+        )
+        result = await context.endpoint_executor.execute(endpoint, {"automation_key": current_definition.key})
+        if result.ok:
+            last_success_at = now
+            return "actions_complete"
+        raise RuntimeError(result.error or "automation actions failed")
+
+    context.automation_engine.register_handler(definition.key, generic_handler)
+
+
+async def _run_due_automations(
     context: ApplicationContext,
-    definition: AutomationDefinition,
-    interval_seconds: float,
-    stop_event: threading.Event,
+    next_due: dict[str, float],
 ) -> None:
-    while not stop_event.is_set():
-        await asyncio.sleep(interval_seconds)
-        if stop_event.is_set():
-            break
+    import time
+
+    now = time.monotonic()
+    for definition in list(context.automation_engine.definitions.values()):
+        register_generic_automation_handler(context, definition)
+        interval = _automation_interval(context, definition)
+        if interval <= 0:
+            continue
+        if definition.key not in next_due:
+            next_due[definition.key] = now + interval
+            continue
+        if now < next_due[definition.key]:
+            continue
+        next_due[definition.key] = now + interval
         await context.automation_engine.run_once(definition.key)
 
 
@@ -405,20 +454,13 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     loop = asyncio.get_running_loop()
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
-    tasks: list[asyncio.Task[None]] = []
-    for definition in context.automation_engine.definitions.values():
-        interval = _automation_interval(context, definition)
-        if interval > 0:
-            tasks.append(asyncio.create_task(_automation_loop(context, definition, interval, stop_event)))
+    next_due: dict[str, float] = {}
 
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
+            await _run_due_automations(context, next_due)
     finally:
-        for task in tasks:
-            task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
         if clicker_listener:
             clicker_listener.stop()
         if listener:

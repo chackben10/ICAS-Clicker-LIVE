@@ -198,6 +198,13 @@ def build_default_automations() -> list[AutomationDefinition]:
             enabled=True,
             interval_seconds=0.75,
             cooldown_seconds=2.5,
+            conditions=[
+                {
+                    "condition_type": "propresenter.current_look",
+                    "params": {"look_name": "Bible", "matches": False},
+                }
+            ],
+            actions=[ActionDefinition("propresenter.trigger_macro", {"macro_name": "Bible Macro"})],
             description="Trigger Bible Macro when a one-group colon-titled active presentation is not using the Bible look.",
         ),
         AutomationDefinition(
@@ -206,6 +213,8 @@ def build_default_automations() -> list[AutomationDefinition]:
             trigger="look_changed_or_poll",
             enabled=True,
             debounce_seconds=0.20,
+            conditions=[{"condition_type": "always", "params": {}}],
+            actions=[ActionDefinition("obs.apply_look_rule", {"look_name": "{{current_look}}"})],
             description="Apply OBS source visibility rules when the current ProPresenter look matches a configured rule.",
         ),
         AutomationDefinition(
@@ -214,6 +223,8 @@ def build_default_automations() -> list[AutomationDefinition]:
             trigger="active_slide_changed",
             enabled=True,
             debounce_seconds=0.5,
+            conditions=[{"condition_type": "always", "params": {}}],
+            actions=[ActionDefinition("propresenter.audio_trigger", {"playlist": "{{playlist}}", "track": "{{slide_label}}"})],
             description="Trigger matching pad audio from active slide labels.",
         ),
         AutomationDefinition(
@@ -221,6 +232,11 @@ def build_default_automations() -> list[AutomationDefinition]:
             name="Auto Show Slides",
             trigger="presentation_state_changed",
             enabled=True,
+            conditions=[{"condition_type": "runtime.auto_show_enabled", "params": {"enabled": True}}],
+            actions=[
+                ActionDefinition("propresenter.clear_announcements"),
+                ActionDefinition("obs.set_scene", {"scene": "ProPresenter Input", "transition_policy": True}),
+            ],
             description="Clear announcements and move OBS to the ProPresenter Input scene when Auto Show is enabled.",
         ),
         AutomationDefinition(
@@ -229,6 +245,8 @@ def build_default_automations() -> list[AutomationDefinition]:
             trigger="interval",
             enabled=True,
             interval_seconds=4.0,
+            conditions=[{"condition_type": "always", "params": {}}],
+            actions=[ActionDefinition("obs.reconnect")],
             description="Reconnect OBS safely when disconnected.",
         ),
     ]

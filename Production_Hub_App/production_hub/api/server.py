@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -120,9 +119,37 @@ def create_app(context):
     async def root_remote_page():
         return remote_file_response(page_aliases[""])
 
-    @app.get("/{page_path:path}")
-    async def remote_page_alias(page_path: str):
+    async def dynamic_context(request: Request, path_params: dict[str, object]) -> dict[str, object]:
+        data: dict[str, object] = {
+            "path": request.url.path,
+            "method": request.method,
+            **path_params,
+        }
+        for key, value in request.query_params.items():
+            data[key] = value
+        if request.method in {"POST", "PUT", "PATCH"}:
+            raw = await request.body()
+            if raw:
+                content_type = request.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    payload = json.loads(raw.decode("utf-8"))
+                    if isinstance(payload, dict):
+                        data.update(payload)
+                else:
+                    data["body"] = raw.decode("utf-8", errors="replace")
+        return data
+
+    @app.api_route("/{page_path:path}", methods=["GET", "POST"])
+    async def remote_page_alias(page_path: str, request: Request):
         normalized = page_path.strip("/")
+        dynamic_matches = context.endpoint_registry.matches("/" + normalized, request.method)
+        if dynamic_matches:
+            endpoint, path_params = dynamic_matches[0]
+            execution = await context.endpoint_executor.execute(endpoint, await dynamic_context(request, path_params))
+            return execution.to_dict()
+
+        if request.method != "GET":
+            raise HTTPException(status_code=404, detail="Not found")
         if normalized in page_aliases:
             return remote_file_response(page_aliases[normalized])
         if normalized and Path(normalized).suffix.lower() in {".html", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"}:

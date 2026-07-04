@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from production_hub.ui.pages.common import int_from_line_edit, integer_line_edit, run_background, scroll_page, title
+from production_hub.ui.pages.common import int_from_line_edit, integer_line_edit, responsive_grid, run_background, scroll_page, title
 
 
 class CameraControlPage(QWidget):
@@ -36,23 +37,24 @@ class CameraControlPage(QWidget):
         layout.addWidget(title("Camera Control", "Panasonic AWP setup, PTZ diagnostics, VISCA bridge settings, and presets."))
         layout.addWidget(self.connection_group())
 
-        middle = QWidget()
-        middle.setObjectName("GridHolder")
-        middle_layout = QGridLayout(middle)
-        middle_layout.setContentsMargins(0, 0, 0, 0)
-        middle_layout.setSpacing(14)
-        middle_layout.addWidget(self.system_group(), 0, 0)
-        middle_layout.addWidget(self.ptz_group(), 0, 1)
-        middle_layout.addWidget(self.preset_group(), 0, 2)
-        middle_layout.setColumnStretch(1, 1)
-        layout.addWidget(middle)
+        layout.addWidget(
+            responsive_grid(
+                [self.system_group(), self.ptz_group(), self.preset_group()],
+                min_column_width=300,
+                max_columns=3,
+            )
+        )
         layout.addWidget(self.status)
         layout.addStretch()
 
     def connection_group(self) -> QGroupBox:
         cfg = self.context.config.integrations
         group = QGroupBox("Network Configuration")
-        grid = QGridLayout(group)
+        form = QFormLayout(group)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(10)
         self.camera_ip = QLineEdit(cfg.panasonic.camera_ip)
         self.camera_user = QLineEdit(cfg.panasonic.username)
         self.camera_password = QLineEdit(cfg.panasonic.password)
@@ -68,21 +70,29 @@ class CameraControlPage(QWidget):
         self.reuse_port = QCheckBox("Shared port")
         self.reuse_port.setChecked(cfg.visca.reuse_port)
 
-        grid.addWidget(QLabel("Camera IP"), 0, 0)
-        grid.addWidget(self.camera_ip, 0, 1)
-        grid.addWidget(QLabel("User"), 0, 2)
-        grid.addWidget(self.camera_user, 0, 3)
-        grid.addWidget(QLabel("Password"), 0, 4)
-        grid.addWidget(self.camera_password, 0, 5)
-        grid.addWidget(show_password, 0, 6)
-        grid.addWidget(QLabel("VISCA listen IP"), 1, 0)
-        grid.addWidget(self.visca_ip, 1, 1)
-        grid.addWidget(QLabel("UDP port"), 1, 2)
-        grid.addWidget(self.visca_port, 1, 3)
-        grid.addWidget(self.reuse_port, 1, 4)
+        password_row = QWidget()
+        password_layout = QHBoxLayout(password_row)
+        password_layout.setContentsMargins(0, 0, 0, 0)
+        password_layout.setSpacing(8)
+        password_layout.addWidget(self.camera_password, 1)
+        password_layout.addWidget(show_password)
+
+        visca_row = QWidget()
+        visca_layout = QHBoxLayout(visca_row)
+        visca_layout.setContentsMargins(0, 0, 0, 0)
+        visca_layout.setSpacing(8)
+        visca_layout.addWidget(self.visca_port)
+        visca_layout.addWidget(self.reuse_port)
+        visca_layout.addStretch()
+
+        form.addRow("Camera IP", self.camera_ip)
+        form.addRow("User", self.camera_user)
+        form.addRow("Password", password_row)
+        form.addRow("VISCA listen IP", self.visca_ip)
+        form.addRow("UDP port", visca_row)
         save = QPushButton("Save Settings")
         save.clicked.connect(self.save_settings)
-        grid.addWidget(save, 1, 6)
+        form.addRow("", save)
         return group
 
     def system_group(self) -> QGroupBox:

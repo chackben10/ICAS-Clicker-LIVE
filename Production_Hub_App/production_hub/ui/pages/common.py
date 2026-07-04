@@ -17,12 +17,20 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QBoxLayout,
     QVBoxLayout,
     QWidget,
 )
+
+
+MAX_WIDGET_WIDTH = 16777215
+PAGE_MARGIN = 24
+SECTION_GAP = 16
+PANE_GAP = 18
 
 
 def scroll_page() -> tuple[QScrollArea, QWidget, QVBoxLayout]:
@@ -32,8 +40,8 @@ def scroll_page() -> tuple[QScrollArea, QWidget, QVBoxLayout]:
     body = QWidget()
     body.setObjectName("PageBody")
     layout = QVBoxLayout(body)
-    layout.setContentsMargins(24, 20, 24, 24)
-    layout.setSpacing(16)
+    layout.setContentsMargins(PAGE_MARGIN, 20, PAGE_MARGIN, PAGE_MARGIN)
+    layout.setSpacing(SECTION_GAP)
     scroll.setWidget(body)
     return scroll, body, layout
 
@@ -85,6 +93,153 @@ def card(title_text: str, rows: list[tuple[str, str]], buttons: list[str] | None
 
 
 def two_column_grid(widgets: list[QWidget]) -> QWidget:
+    return responsive_grid(widgets, min_column_width=340, max_columns=2)
+
+
+def responsive_grid(widgets: list[QWidget], min_column_width: int = 340, max_columns: int = 2) -> QWidget:
+    return ResponsiveGrid(widgets, min_column_width=min_column_width, max_columns=max_columns)
+
+
+def responsive_two_pane(
+    left: QWidget,
+    right: QWidget,
+    collapse_width: int = 980,
+    left_min_width: int = 360,
+    left_max_width: int = 520,
+    spacing: int = PANE_GAP,
+) -> QWidget:
+    return ResponsiveTwoPane(
+        left,
+        right,
+        collapse_width=collapse_width,
+        left_min_width=left_min_width,
+        left_max_width=left_max_width,
+        spacing=spacing,
+    )
+
+
+class ResponsiveGrid(QWidget):
+    def __init__(self, widgets: list[QWidget], min_column_width: int = 340, max_columns: int = 2) -> None:
+        super().__init__()
+        self.widgets = widgets
+        self.min_column_width = max(160, min_column_width)
+        self.max_columns = max(1, max_columns)
+        self._current_columns = 0
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(SECTION_GAP)
+        self.setObjectName("GridHolder")
+        for widget in self.widgets:
+            widget.setSizePolicy(QSizePolicy.Expanding, widget.sizePolicy().verticalPolicy())
+        self.reflow()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.reflow()
+
+    def reflow(self) -> None:
+        width = max(self.width(), self.min_column_width)
+        columns = max(1, min(self.max_columns, width // self.min_column_width))
+        if columns == self._current_columns and self.grid.count() == len(self.widgets):
+            return
+        while self.grid.count():
+            self.grid.takeAt(0)
+        for index, widget in enumerate(self.widgets):
+            self.grid.addWidget(widget, index // columns, index % columns)
+        for column in range(self.max_columns):
+            self.grid.setColumnStretch(column, 1 if column < columns else 0)
+        self._current_columns = columns
+
+
+class ResponsiveTwoPane(QWidget):
+    def __init__(
+        self,
+        left: QWidget,
+        right: QWidget,
+        collapse_width: int = 980,
+        left_min_width: int = 360,
+        left_max_width: int = 520,
+        spacing: int = PANE_GAP,
+    ) -> None:
+        super().__init__()
+        self.left = left
+        self.right = right
+        self.collapse_width = collapse_width
+        self.left_min_width = left_min_width
+        self.left_max_width = max(left_min_width, left_max_width)
+        self.spacing = spacing
+        self._stacked: bool | None = None
+        self.layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(self.spacing)
+        self.setObjectName("ResponsiveTwoPane")
+        self.reflow()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.reflow()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.reflow()
+
+    def reflow(self) -> None:
+        stacked = self.width() < self.collapse_width
+        if stacked == self._stacked and self.layout.count() == 2:
+            return
+
+        while self.layout.count():
+            self.layout.takeAt(0)
+
+        if stacked:
+            self.layout.setDirection(QBoxLayout.Direction.TopToBottom)
+            self.left.setMinimumWidth(0)
+            self.left.setMaximumWidth(MAX_WIDGET_WIDTH)
+            self.right.setMinimumWidth(0)
+            self.layout.addWidget(self.left)
+            self.layout.addWidget(self.right)
+        else:
+            self.layout.setDirection(QBoxLayout.Direction.LeftToRight)
+            self.left.setMinimumWidth(self.left_min_width)
+            self.left.setMaximumWidth(self.left_max_width)
+            self.right.setMinimumWidth(0)
+            self.layout.addWidget(self.left, 0)
+            self.layout.addWidget(self.right, 1)
+
+        self._stacked = stacked
+
+
+class ResponsiveSplitter(QSplitter):
+    def __init__(
+        self,
+        collapse_width: int = 900,
+        wide_sizes: list[int] | None = None,
+        stacked_sizes: list[int] | None = None,
+    ) -> None:
+        super().__init__(Qt.Orientation.Horizontal)
+        self.collapse_width = collapse_width
+        self.wide_sizes = wide_sizes or [420, 760]
+        self.stacked_sizes = stacked_sizes or [260, 620]
+        self._responsive_orientation = self.orientation()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.update_responsive_orientation()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.update_responsive_orientation()
+
+    def update_responsive_orientation(self) -> None:
+        orientation = Qt.Orientation.Vertical if self.width() < self.collapse_width else Qt.Orientation.Horizontal
+        if orientation == self._responsive_orientation:
+            return
+        self.setOrientation(orientation)
+        self.setSizes(self.stacked_sizes if orientation == Qt.Orientation.Vertical else self.wide_sizes)
+        self._responsive_orientation = orientation
+
+
+def fixed_two_column_grid(widgets: list[QWidget]) -> QWidget:
     holder = QWidget()
     holder.setObjectName("GridHolder")
     layout = QGridLayout(holder)

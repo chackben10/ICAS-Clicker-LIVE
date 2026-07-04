@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QPushButton, QWidget
 
-from production_hub.ui.pages.common import card, scroll_page, title, two_column_grid
+from production_hub.ui.pages.common import card, responsive_grid, scroll_page, title, two_column_grid
 
 
 def build_page(context) -> QWidget:
@@ -44,15 +44,9 @@ def build_page(context) -> QWidget:
     ]
     layout.addWidget(two_column_grid(integration_cards))
 
-    row = QHBoxLayout()
     pause = QPushButton("Pause All Automations")
     restart = QPushButton("Restart Background Services")
     diagnostics = QPushButton("Open Diagnostics")
-    row.addWidget(pause)
-    row.addWidget(restart)
-    row.addWidget(diagnostics)
-    row.addStretch()
-    layout.addLayout(row)
+    layout.addWidget(responsive_grid([pause, restart, diagnostics], min_column_width=190, max_columns=3))
     layout.addStretch()
     return scroll
-

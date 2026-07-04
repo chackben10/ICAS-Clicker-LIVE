@@ -7,7 +7,6 @@ from uuid import uuid4
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -109,44 +108,45 @@ class ScoreboardPage(QWidget):
 
     def queue_group(self) -> QGroupBox:
         group = QGroupBox("Queue")
-        layout = QGridLayout(group)
-        layout.setHorizontalSpacing(10)
-        layout.setVerticalSpacing(10)
+        layout = QVBoxLayout(group)
+        layout.setSpacing(10)
 
         self.queue_total_label.setObjectName("QueueTotal")
-        layout.addWidget(QLabel("Total"), 0, 0)
-        layout.addWidget(self.queue_total_label, 0, 1)
+        total_row = QHBoxLayout()
+        total_row.addWidget(QLabel("Total"))
+        total_row.addWidget(self.queue_total_label)
 
         plus = QPushButton("+1")
         minus = QPushButton("-1")
         clear = QPushButton("Clear")
-        for button, width in ((plus, 58), (minus, 58), (clear, 78)):
-            button.setFixedWidth(width)
         plus.clicked.connect(lambda: self.queue_add(1))
         minus.clicked.connect(lambda: self.queue_add(-1))
         clear.clicked.connect(self.queue_clear)
-        layout.addWidget(plus, 0, 2)
-        layout.addWidget(minus, 0, 3)
-        layout.addWidget(clear, 0, 4)
+        total_row.addWidget(plus)
+        total_row.addWidget(minus)
+        total_row.addWidget(clear)
+        total_row.addStretch()
+        layout.addLayout(total_row)
 
-        self.queue_custom.setFixedWidth(128)
+        custom_row = QHBoxLayout()
         add_custom = QPushButton("Add Custom")
-        add_custom.setFixedWidth(112)
         add_custom.clicked.connect(self.queue_apply_custom)
         self.queue_custom.returnPressed.connect(self.queue_apply_custom)
-        layout.addWidget(QLabel("Custom"), 1, 0)
-        layout.addWidget(self.queue_custom, 1, 1)
-        layout.addWidget(add_custom, 1, 2)
+        custom_row.addWidget(QLabel("Custom"))
+        custom_row.addWidget(self.queue_custom)
+        custom_row.addWidget(add_custom)
+        custom_row.addStretch()
+        layout.addLayout(custom_row)
 
         self.queue_target.setObjectName("TargetList")
         self.queue_target.setMaximumHeight(130)
         self.queue_target.itemSelectionChanged.connect(self.update_queue_ui)
-        self.apply_queue_btn.setFixedWidth(112)
         self.apply_queue_btn.clicked.connect(self.apply_queue)
-        layout.addWidget(QLabel("Apply to"), 2, 0)
-        layout.addWidget(self.queue_target, 2, 1, 1, 3)
-        layout.addWidget(self.apply_queue_btn, 2, 4)
-        layout.setColumnStretch(5, 1)
+        target_row = QHBoxLayout()
+        target_row.addWidget(QLabel("Apply to"))
+        target_row.addWidget(self.queue_target, 1)
+        target_row.addWidget(self.apply_queue_btn)
+        layout.addLayout(target_row)
         return group
 
     def history_group(self) -> QGroupBox:
