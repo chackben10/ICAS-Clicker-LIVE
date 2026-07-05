@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App/build/macos/remote_pages', 'remote_pages'), ('/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns', 'assets')]
+datas = [('/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/build/macos/remote_pages', 'remote_pages'), ('/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns', 'assets')]
 binaries = []
 hiddenimports = ['uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan.on']
 tmp_ret = collect_all('PySide6')
@@ -9,8 +9,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App/main.py'],
-    pathex=['/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App'],
+    ['/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/main.py'],
+    pathex=['/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -39,7 +39,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns'],
+    icon=['/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns'],
 )
 coll = COLLECT(
     exe,
@@ -53,6 +53,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Production Hub.app',
-    icon='/Users/benitochacko/ICAS-Production/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns',
+    icon='/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns',
     bundle_identifier='org.icas.productionhub',
 )
