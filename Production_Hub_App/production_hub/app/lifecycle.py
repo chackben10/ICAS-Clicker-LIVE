@@ -15,17 +15,23 @@ from production_hub.core.endpoints.models import EndpointDefinition
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
 from production_hub.integrations.panasonic_awp.models import PanasonicCommand
 from production_hub.integrations.propresenter.audio_service import strip_audio_extension
+from production_hub.integrations.obs.service import ObsTemporarilyNotReady
 from production_hub.integrations.visca.udp_listener import ViscaUdpListener
 
 
 @dataclass
 class ApiServerHandle:
-    thread: threading.Thread
-    server: object
+    threads: list[threading.Thread]
+    servers: list[object]
 
     def stop(self) -> None:
-        setattr(self.server, "should_exit", True)
-        self.thread.join(timeout=5)
+        for server in self.servers:
+            setattr(server, "should_exit", True)
+        for thread in self.threads:
+            thread.join(timeout=5)
+
+
+LEGACY_API_PORTS = (17777, 5000)
 
 
 @dataclass
@@ -48,26 +54,22 @@ class ClickerListenerHandle:
         self.thread.join(timeout=3)
 
 
-def start_api_server(context: ApplicationContext) -> ApiServerHandle:
-    try:
-        import uvicorn
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError("Uvicorn is required to run the embedded API server. Install requirements.txt.") from exc
-
+def _bind_probe(host: str, port: int) -> None:
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        probe.bind((context.config.api.bind_host, context.config.api.port))
-    except OSError as exc:
-        raise RuntimeError(f"API server cannot bind {context.config.api.base_url}: {exc}") from exc
+        probe.bind((host, port))
     finally:
         probe.close()
 
-    app = create_app(context)
+
+def _start_uvicorn_thread(app, host: str, port: int) -> tuple[threading.Thread, object]:
+    import uvicorn
+
     config = uvicorn.Config(
         app,
-        host=context.config.api.bind_host,
-        port=context.config.api.port,
+        host=host,
+        port=port,
         log_level="info",
         access_log=False,
     )
@@ -76,10 +78,54 @@ def start_api_server(context: ApplicationContext) -> ApiServerHandle:
     def _run() -> None:
         asyncio.run(server.serve())
 
-    thread = threading.Thread(target=_run, name="production-hub-api", daemon=True)
+    thread = threading.Thread(target=_run, name=f"production-hub-api-{port}", daemon=True)
     thread.start()
+    return thread, server
+
+
+def start_api_server(context: ApplicationContext) -> ApiServerHandle:
+    try:
+        import uvicorn
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("Uvicorn is required to run the embedded API server. Install requirements.txt.") from exc
+
+    try:
+        _bind_probe(context.config.api.bind_host, context.config.api.port)
+    except OSError as exc:
+        raise RuntimeError(f"API server cannot bind {context.config.api.base_url}: {exc}") from exc
+
+    app = create_app(context)
+    threads: list[threading.Thread] = []
+    servers: list[object] = []
+
+    thread, server = _start_uvicorn_thread(app, context.config.api.bind_host, context.config.api.port)
+    threads.append(thread)
+    servers.append(server)
+
+    for legacy_port in LEGACY_API_PORTS:
+        if legacy_port == context.config.api.port:
+            continue
+        try:
+            _bind_probe(context.config.api.bind_host, legacy_port)
+        except OSError as exc:
+            context.logger.warning(
+                "legacy_api_port_unavailable",
+                "Legacy compatibility API port is unavailable",
+                port=legacy_port,
+                error=str(exc),
+            )
+            continue
+        legacy_thread, legacy_server = _start_uvicorn_thread(app, context.config.api.bind_host, legacy_port)
+        threads.append(legacy_thread)
+        servers.append(legacy_server)
+        context.logger.info(
+            "legacy_api_port_started",
+            "Legacy compatibility API port started",
+            url=f"http://{context.config.api.bind_host}:{legacy_port}",
+        )
+
     context.health_monitor.update(IntegrationHealth("Remote API Server", STATUS_CONNECTED, context.config.api.base_url))
-    return ApiServerHandle(thread=thread, server=server)
+    return ApiServerHandle(threads=threads, servers=servers)
 
 
 async def startup_checks(context: ApplicationContext) -> None:
@@ -293,7 +339,10 @@ def register_automation_handlers(context: ApplicationContext) -> None:
         if runtime.current_propresenter_look != look_name:
             runtime.current_propresenter_look = look_name
             context.runtime_state_repo.save(runtime)
-        result = await context.obs.apply_look_rule(look_name)
+        try:
+            result = await context.obs.apply_look_rule(look_name)
+        except ObsTemporarilyNotReady:
+            return "obs_not_ready"
         if not result:
             return f"no_rule:{look_name}"
         return "visibility_skipped" if result.get("skipped") else "visibility_applied"

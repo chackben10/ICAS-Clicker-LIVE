@@ -8,6 +8,15 @@ from production_hub.integrations.obs.models import ObsSceneItem
 from production_hub.integrations.obs.scene_mapping import find_rule, rule_payload, rule_signature, transition_for_scene
 
 
+class ObsTemporarilyNotReady(RuntimeError):
+    pass
+
+
+def _is_obs_not_ready(exc: Exception) -> bool:
+    message = str(exc)
+    return "code 207" in message or "OBS is not ready to perform the request" in message
+
+
 class ObsService:
     def __init__(self, config: ObsConfig) -> None:
         self.config = config
@@ -75,7 +84,12 @@ class ObsService:
         return items
 
     async def set_scene_item_enabled(self, scene_name: str, scene_item_id: int, enabled: bool) -> None:
-        await self.client.call("set_scene_item_enabled", scene_name, int(scene_item_id), bool(enabled))
+        try:
+            await self.client.call("set_scene_item_enabled", scene_name, int(scene_item_id), bool(enabled))
+        except Exception as exc:
+            if _is_obs_not_ready(exc):
+                raise ObsTemporarilyNotReady(str(exc)) from exc
+            raise
 
     async def apply_scene_item_visibility(self, scene_name: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         operations: list[dict[str, Any]] = []
@@ -87,9 +101,11 @@ class ObsService:
             scene_item_id = int(item.get("sceneItemId") or item.get("id") or item.get("scene_item_id"))
             operations.append({"sceneItemId": scene_item_id, "enabled": bool(item.get("enabled", item.get("sceneItemEnabled")))})
 
+        applied: list[dict[str, Any]] = []
         for operation in operations:
             await self.set_scene_item_enabled(scene_name, operation["sceneItemId"], operation["enabled"])
-        return operations
+            applied.append(operation)
+        return applied
 
     async def apply_look_rule(self, look_name: str, force: bool = False) -> dict[str, Any] | None:
         rule = find_rule(self.config, look_name)
@@ -102,4 +118,3 @@ class ObsService:
         applied = await self.apply_scene_item_visibility(str(payload["sceneName"]), payload)
         self.last_visibility_signature = signature
         return {"ok": True, "signature": signature, "applied": applied}
-

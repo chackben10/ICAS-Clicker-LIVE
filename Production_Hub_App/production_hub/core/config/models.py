@@ -83,7 +83,16 @@ class ApiServerConfig(JsonModel):
     bind_host: str = "127.0.0.1"
     port: int = 1337
     lan_access_enabled: bool = False
-    cors_allow_origins: list[str] = field(default_factory=lambda: ["http://localhost", "http://127.0.0.1"])
+    cors_allow_origins: list[str] = field(
+        default_factory=lambda: [
+            "http://localhost",
+            "http://127.0.0.1",
+            "https://icas-clicker.work",
+            "https://www.icas-clicker.work",
+            "https://control.icas-clicker.work",
+            "https://slides.icas-clicker.work",
+        ]
+    )
     require_token_for_privileged: bool = True
     read_only_public: bool = True
     access_token: str = ""

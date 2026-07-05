@@ -24,7 +24,13 @@ def create_app(context):
         allow_origins=context.config.api.cors_allow_origins or ["*"],
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Production-Hub-Token"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Production-Hub-Token",
+            "Access-Control-Request-Private-Network",
+        ],
+        allow_private_network=True,
     )
 
     @app.middleware("http")
@@ -37,6 +43,10 @@ def create_app(context):
             response = await call_next(request)
             status_code = response.status_code
             response.headers["X-Request-ID"] = request_id
+            allowed_origins = context.config.api.cors_allow_origins or []
+            origin = request.headers.get("origin", "")
+            if "*" in allowed_origins or origin in allowed_origins:
+                response.headers["Access-Control-Allow-Private-Network"] = "true"
             return response
         except Exception as exc:
             error = str(exc)

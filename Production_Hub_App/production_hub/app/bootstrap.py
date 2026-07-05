@@ -76,6 +76,8 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     paths = AppPaths(data_dir or default_app_root())
     config_repository = ConfigRepository(paths)
     config = config_repository.load_app_config()
+    if ensure_api_cors_origins(config):
+        config_repository.save_app_config(config)
     loaded_endpoints = config_repository.load_endpoints()
     endpoints = ensure_required_endpoints(loaded_endpoints)
     if not any(item.key == "audio_clear" for item in loaded_endpoints):
@@ -140,6 +142,24 @@ def ensure_required_endpoints(endpoints: list[EndpointDefinition]) -> list[Endpo
     defaults = {item.key: item for item in build_default_endpoints()}
     audio_clear = defaults.get("audio_clear")
     return [*endpoints, audio_clear] if audio_clear else endpoints
+
+
+def ensure_api_cors_origins(config: Any) -> bool:
+    required = [
+        "https://icas-clicker.work",
+        "https://www.icas-clicker.work",
+        "https://control.icas-clicker.work",
+        "https://slides.icas-clicker.work",
+    ]
+    origins = list(config.api.cors_allow_origins or [])
+    changed = False
+    for origin in required:
+        if origin not in origins:
+            origins.append(origin)
+            changed = True
+    if changed:
+        config.api.cors_allow_origins = origins
+    return changed
 
 
 def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:

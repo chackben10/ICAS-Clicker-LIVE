@@ -25,6 +25,12 @@ class ViscaTests(unittest.TestCase):
         commands = map_packet_to_panasonic(packets[0])
         self.assertEqual(commands[0].command, "#Z99")
 
+    def test_coalesced_raw_packets_get_per_command_responses(self) -> None:
+        data = bytes.fromhex("810104072FFF8101060118140201FF")
+        self.assertEqual(len(build_ack_completion(data)), 4)
+        packets = parse_visca_packets(data)
+        self.assertEqual(len(packets), 2)
+
     def test_preset_and_tenveo_mapping(self) -> None:
         recall = parse_visca_packets(bytes.fromhex("8101043F020AFF"))[0]
         self.assertEqual(map_packet_to_panasonic(recall)[0].command, "#R10")
@@ -36,4 +42,3 @@ class ViscaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
