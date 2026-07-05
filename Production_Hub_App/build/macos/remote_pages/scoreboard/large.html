@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ICAS Scoreboard – Full Page Grid</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Antonio -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700;800&display=swap" rel="stylesheet">
+
+  <!-- Norwester (CDN) -->
+  <style>
+    @font-face {
+      font-family: 'Norwester';
+      src: url("https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/Norwester/Norwester-Regular.otf")
+           format("opentype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --gap: 18px;
+      --radius: 14px;
+
+      /* inner padding for each tile */
+      --pad: 18px;
+
+      /* visual constraints */
+      --min-score: 48px;   /* minimum score font */
+      --min-name: 22px;    /* minimum name font */
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      background: transparent;
+      overflow: hidden; /* OBS-friendly */
+    }
+
+    #grid {
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      display: grid;
+      gap: var(--gap);
+      padding: var(--gap);
+      background: transparent;
+    }
+
+    .tile {
+      background: #ffffff;
+      color: #000000;
+      border-radius: var(--radius);
+      box-sizing: border-box;
+      overflow: hidden;
+
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: var(--pad);
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .tile-inner {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .name {
+      font-family: 'Norwester', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+
+      /* allow 2 lines if needed */
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      width: 100%;
+      line-height: 1.05;
+      word-break: break-word;
+    }
+
+    .score {
+      font-family: 'Antonio', sans-serif;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      line-height: 1.0;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* subtle polish for broadcast */
+    .tile { box-shadow: 0 10px 28px rgba(0,0,0,0.20); }
+  </style>
+</head>
+
+<body>
+  <div id="grid"></div>
+
+  <script>
+    function getScoreApi() {
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        return window.location.origin + "/score";
+      }
+      return "https://score.icas-clicker.work/score";
+    }
+
+    const SCORE_API = getScoreApi();
+
+    const gridEl = document.getElementById("grid");
+
+    function pickLayout(n) {
+      // returns { cols, rows, holes: [indices to skip] }
+      // indices are in row-major order for the grid slots
+      if (n <= 1) return { cols: 1, rows: 1, holes: [] };
+      if (n === 2) return { cols: 2, rows: 1, holes: [] };
+
+      // For 3: 2x2 with bottom-right missing
+      if (n === 3) return { cols: 2, rows: 2, holes: [3] };
+
+      // For 4: 2x2
+      if (n === 4) return { cols: 2, rows: 2, holes: [] };
+
+      // 5-6: 3x2
+      if (n <= 6) return { cols: 3, rows: 2, holes: [] };
+
+      // 7-9: 3x3 with last slots unused naturally
+      if (n <= 9) return { cols: 3, rows: 3, holes: [] };
+
+      // 10: 5x2 (fills nicely full page)
+      return { cols: 5, rows: 2, holes: [] };
+    }
+
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    function applyGridTemplate(n) {
+      const { cols, rows } = pickLayout(n);
+      gridEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      gridEl.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+      return { cols, rows };
+    }
+
+    function setTileFont(tileInner, nameEl, scoreEl) {
+      // Fit text by iteratively shrinking fonts until both fit.
+      // Start big based on tile height.
+      const css = getComputedStyle(document.documentElement);
+      const minScore = parseInt(css.getPropertyValue("--min-score")) || 48;
+      const minName  = parseInt(css.getPropertyValue("--min-name")) || 22;
+
+      const tile = tileInner.parentElement;
+      const pad = parseInt(getComputedStyle(tile).paddingTop) || 18;
+
+      const w = tile.clientWidth - pad * 2;
+      const h = tile.clientHeight - pad * 2;
+
+      // baseline guesses
+      let scoreSize = Math.floor(h * 0.55);
+      let nameSize  = Math.floor(h * 0.18);
+
+      // clamp initial sizes so they don't get absurd
+      scoreSize = clamp(scoreSize, minScore, 220);
+      nameSize  = clamp(nameSize, minName, 96);
+
+      // apply first
+      nameEl.style.fontSize = nameSize + "px";
+      scoreEl.style.fontSize = scoreSize + "px";
+
+      // Fit loop
+      let guard = 220;
+      while (guard-- > 0) {
+        // Reflow measurements
+        const innerH = tileInner.scrollHeight;
+        const innerW = tileInner.scrollWidth;
+
+        const fitsH = innerH <= h;
+        const fitsW = innerW <= w;
+
+        if (fitsH && fitsW) break;
+
+        // shrink score a bit more aggressively, name slightly
+        if (scoreSize > minScore) scoreSize -= 2;
+        if (nameSize > minName) nameSize -= 1;
+
+        // if both hit minimums, stop
+        if (scoreSize <= minScore && nameSize <= minName) break;
+
+        nameEl.style.fontSize = nameSize + "px";
+        scoreEl.style.fontSize = scoreSize + "px";
+      }
+    }
+
+    function buildTiles(teams) {
+      const n = teams.length;
+      const layout = pickLayout(n);
+
+      // Apply template
+      applyGridTemplate(n);
+
+      // Clear
+      gridEl.innerHTML = "";
+
+      // Create slot count
+      const slotCount = layout.cols * layout.rows;
+
+      // Place teams into slots, skipping holes if any
+      let teamIdx = 0;
+      for (let slot = 0; slot < slotCount; slot++) {
+        if (layout.holes.includes(slot)) {
+          // add an empty invisible placeholder to preserve geometry
+          const ph = document.createElement("div");
+          ph.style.visibility = "hidden";
+          ph.style.pointerEvents = "none";
+          gridEl.appendChild(ph);
+          continue;
+        }
+
+        if (teamIdx >= n) {
+          // no more teams; add invisible placeholder to keep grid stable
+          const ph = document.createElement("div");
+          ph.style.visibility = "hidden";
+          ph.style.pointerEvents = "none";
+          gridEl.appendChild(ph);
+          continue;
+        }
+
+        const [teamName, score] = teams[teamIdx++];
+
+        const tile = document.createElement("div");
+        tile.className = "tile";
+
+        const inner = document.createElement("div");
+        inner.className = "tile-inner";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "name";
+        nameEl.textContent = teamName ?? "";
+
+        const scoreEl = document.createElement("div");
+        scoreEl.className = "score";
+        scoreEl.textContent = (score ?? 0).toString();
+
+        inner.appendChild(nameEl);
+        inner.appendChild(scoreEl);
+        tile.appendChild(inner);
+        gridEl.appendChild(tile);
+      }
+
+      // Fit fonts after layout
+      requestAnimationFrame(() => {
+        const tiles = gridEl.querySelectorAll(".tile");
+        tiles.forEach(t => {
+          const inner = t.querySelector(".tile-inner");
+          const nameEl = t.querySelector(".name");
+          const scoreEl = t.querySelector(".score");
+          if (inner && nameEl && scoreEl) setTileFont(inner, nameEl, scoreEl);
+        });
+      });
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch(SCORE_API, { cache: "no-cache" });
+        if (!res.ok) throw new Error("Bad response");
+
+        const data = await res.json();
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+
+        const teams = rows
+          .filter(r => r.name && Number.isFinite(Number(r.score)))
+          .map(r => [String(r.name), Number(r.score)])
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+
+        buildTiles(teams);
+      } catch {
+        // silent fail for OBS
+      }
+    }
+
+    window.addEventListener("resize", () => refresh());
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Current Audio</title>
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    #audioText {
+      display: block;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+      line-height: 1;
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+      text-transform: uppercase;
+      transform-origin: center center;
+    }
+  </style>
+</head>
+<body>
+  <div id="audioText"></div>
+  <script>
+    (function () {
+      const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+      const POLL_INTERVAL_MS = 1000;
+      const audioText = document.getElementById("audioText");
+      function normalizeBase(url) {
+        return String(url || "").replace(/\/+$/, "");
+      }
+      function getAudioEndpoint() {
+        if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+          return window.location.origin + "/audio/active";
+        }
+        return normalizeBase(DEFAULT_API_BASE) + "/audio/active";
+      }
+      function parseItemName(text) {
+        const raw = String(text || "").trim();
+        if (!raw) return "";
+        const itemMatch = raw.match(/^item:\s*(.+)$/im);
+        if (itemMatch && itemMatch[1]) {
+          return itemMatch[1].trim();
+        }
+        return "";
+      }
+      function fitText() {
+        const text = audioText.textContent.trim();
+        if (!text) {
+          audioText.style.fontSize = "1px";
+          return;
+        }
+        const windowWidth = Math.max(1, window.innerWidth);
+        const windowHeight = Math.max(1, window.innerHeight);
+        let low = 1;
+        let high = 300;
+        let best = 1;
+        audioText.style.transform = "none";
+        for (let i = 0; i < 20; i++) {
+          const mid = Math.floor((low + high) / 2);
+          audioText.style.fontSize = mid + "px";
+          const rect = audioText.getBoundingClientRect();
+          if (rect.width <= windowWidth && rect.height <= windowHeight) {
+            best = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+        audioText.style.fontSize = best + "px";
+      }
+      function setText(value) {
+        const clean = String(value || "").trim().toUpperCase();
+        if (audioText.textContent !== clean) {
+          audioText.textContent = clean;
+          fitText();
+        }
+      }
+      async function refreshAudio() {
+        try {
+          const response = await fetch(getAudioEndpoint(), {
+            cache: "no-cache"
+          });
+          if (!response.ok) {
+            setText("");
+            return;
+          }
+          const text = await response.text();
+          const itemName = parseItemName(text);
+          setText(itemName);
+        } catch (err) {
+          setText("");
+        }
+      }
+      window.addEventListener("resize", fitText);
+      refreshAudio();
+      setInterval(refreshAudio, POLL_INTERVAL_MS);
+    })();
+  </script>
+</body>
+</html>

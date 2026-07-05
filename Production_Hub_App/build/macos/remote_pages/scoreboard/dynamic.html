@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ICAS Scoreboard – Dynamic</title>
+
+  <!-- Antonio -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700;800&display=swap" rel="stylesheet">
+
+  <!-- Norwester -->
+  <style>
+    @font-face {
+      font-family: 'Norwester';
+      src: url("https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/Norwester/Norwester-Regular.otf")
+           format("opentype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root{
+      --gap: 16px;
+      --pad-x: 18px;
+      --radius: 10px;
+
+      --min-rows: 5;
+      --row-min: 100px;
+      --row-max: 150px;
+
+      --min-font: 40px;
+      --min-col-w: 350px;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      background: #0b0b0b;
+      overflow: hidden;
+    }
+
+    #scoreboard {
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      display: grid;
+      gap: var(--gap);
+      padding: var(--gap);
+      grid-auto-flow: row;
+    }
+
+    .team {
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--pad-x);
+      background: #ffffff;
+      color: #000000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .name {
+      font-family: 'Norwester', sans-serif;
+      font-weight: 700;
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.4px;
+    }
+
+    .score {
+      font-family: 'Antonio', sans-serif;
+      font-weight: 800;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      margin-left: 12px;
+      letter-spacing: 0.4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="scoreboard"></div>
+
+  <script>
+    function getScoreApi() {
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        return window.location.origin + "/score";
+      }
+      return "https://score.icas-clicker.work/score";
+    }
+
+    const SCORE_API = getScoreApi();
+
+    async function refreshScoreboard() {
+      try {
+        const res = await fetch(SCORE_API, { cache: "no-cache" });
+        if (!res.ok) throw new Error("Bad response");
+
+        const data = await res.json();
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+
+        // Convert to [name, score] pairs, sorted descending
+        const teams = rows
+          .filter(r => r.name && Number.isFinite(r.score))
+          .sort((a, b) => b.score - a.score)
+          .map(r => [r.name, r.score]);
+
+        updateScoreboard(teams);
+      } catch {
+        /* silent fail for OBS */
+      }
+    }
+
+    function updateScoreboard(teams) {
+      const css = getComputedStyle(document.documentElement);
+      const GAP       = parseInt(css.getPropertyValue('--gap'))       || 16;
+      const PADX      = parseInt(css.getPropertyValue('--pad-x'))     || 18;
+      const MINROWS   = parseInt(css.getPropertyValue('--min-rows'))  || 5;
+      const ROW_MIN   = parseInt(css.getPropertyValue('--row-min'))   || 100;
+      const ROW_MAX   = parseInt(css.getPropertyValue('--row-max'))   || 150;
+      const MIN_FONT  = parseInt(css.getPropertyValue('--min-font'))  || 40;
+      const MIN_COL_W = parseInt(css.getPropertyValue('--min-col-w')) || 350;
+
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
+      /* Columns */
+      const aspect = W / Math.max(1, H);
+      const colsByAspect = Math.max(1, Math.ceil(aspect));
+      const availW = W - 2 * GAP;
+      const maxColsByWidth = Math.max(
+        1,
+        Math.floor((availW + GAP) / (MIN_COL_W + GAP))
+      );
+      const cols = Math.max(1, Math.min(colsByAspect, maxColsByWidth));
+
+      /* Rows */
+      const teamsCount = teams.length;
+      const rowsNeededForTeams = Math.max(1, Math.ceil(teamsCount / cols));
+
+      const availH = H - 2 * GAP;
+      const rowsMaxGivenRowMin = Math.max(
+        1,
+        Math.floor((availH + GAP) / (ROW_MIN + GAP))
+      );
+      const rowsMinGivenRowMax = Math.max(
+        1,
+        Math.floor((availH + GAP) / (ROW_MAX + GAP))
+      );
+
+      const rowsCandidate = Math.max(MINROWS, rowsNeededForTeams);
+      const rowsVisible = Math.max(
+        rowsMinGivenRowMax,
+        Math.min(rowsCandidate, rowsMaxGivenRowMin)
+      );
+
+      const rowH = Math.max(
+        ROW_MIN,
+        Math.min(
+          ROW_MAX,
+          (availH - GAP * (rowsVisible - 1)) / rowsVisible
+        )
+      );
+
+      const baseFont = Math.max(
+        MIN_FONT,
+        Math.min(rowH * 0.80, rowH * 0.60)
+      );
+      const lineH = `${rowH}px`;
+
+      const board = document.getElementById('scoreboard');
+      board.innerHTML = '';
+      board.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      board.style.gridAutoRows = `${rowH}px`;
+
+      teams.forEach(([teamName, score]) => {
+        const row = document.createElement('div');
+        row.className = 'team';
+
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = teamName;
+        name.style.fontSize = `${baseFont}px`;
+        name.style.lineHeight = lineH;
+
+        const sc = document.createElement('div');
+        sc.className = 'score';
+        sc.textContent = score;
+        sc.style.fontSize = `${baseFont}px`;
+        sc.style.lineHeight = lineH;
+
+        row.appendChild(name);
+        row.appendChild(sc);
+        board.appendChild(row);
+      });
+    }
+
+    window.addEventListener('resize', refreshScoreboard);
+    refreshScoreboard();
+    setInterval(refreshScoreboard, 1000);
+  </script>
+</body>
+</html>

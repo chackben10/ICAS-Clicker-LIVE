@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import importlib.metadata
 import plistlib
 import shutil
 import subprocess
@@ -26,7 +27,35 @@ class BuildError(RuntimeError):
     pass
 
 
-def run(command: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def log(message: str) -> None:
+    print(message, flush=True)
+
+
+def run(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    stream_output: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    if stream_output:
+        process = subprocess.Popen(
+            command,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        output: list[str] = []
+        assert process.stdout is not None
+        for line in process.stdout:
+            output.append(line)
+            print(line, end="", flush=True)
+        returncode = process.wait()
+        stdout = "".join(output)
+        if returncode != 0:
+            raise BuildError(f"Command failed: {' '.join(command)}\n{stdout.strip()}")
+        return subprocess.CompletedProcess(command, returncode, stdout, "")
+
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
     if result.returncode != 0:
         details = "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part)
@@ -35,6 +64,7 @@ def run(command: list[str], *, cwd: Path | None = None) -> subprocess.CompletedP
 
 
 def install_dependencies() -> None:
+    log("Installing Python dependencies...")
     run(
         [
             sys.executable,
@@ -45,7 +75,8 @@ def install_dependencies() -> None:
             str(APP_ROOT / "requirements.txt"),
             "-r",
             str(APP_ROOT / "requirements-build.txt"),
-        ]
+        ],
+        stream_output=True,
     )
 
 
@@ -59,8 +90,28 @@ def require_pyinstaller() -> None:
         )
 
 
+def reject_obsolete_pathlib_backport() -> None:
+    try:
+        distribution = importlib.metadata.distribution("pathlib")
+    except importlib.metadata.PackageNotFoundError:
+        return
+    location = distribution.locate_file("")
+    raise BuildError(
+        "The active Python environment has the obsolete 'pathlib' backport installed. "
+        "PyInstaller cannot build with this package present because pathlib is already "
+        "part of Python 3.\n\n"
+        f"Python executable: {sys.executable}\n"
+        f"pathlib package location: {location}\n\n"
+        "Remove it from this Python environment, then rerun the build:\n"
+        f"  {sys.executable} -m pip uninstall pathlib\n\n"
+        "Alternatively, build from a clean virtual environment so PyInstaller does not see "
+        "global site-packages."
+    )
+
+
 def ensure_icon() -> Path:
     if ICON_OUTPUT.exists():
+        log(f"Using existing icon: {ICON_OUTPUT}")
         return ICON_OUTPUT
     if not ICON_SOURCE.exists():
         raise BuildError(f"Missing Icon Composer source: {ICON_SOURCE}")
@@ -71,6 +122,7 @@ def ensure_icon() -> Path:
         )
     ICON_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     try:
+        log("Rendering app icon...")
         render_icns_from_icon(ICON_SOURCE, ICON_OUTPUT)
     except BuildError as exc:
         raise BuildError(
@@ -123,6 +175,7 @@ def render_icns_from_icon(source: Path, output: Path) -> None:
 
 
 def stage_remote_pages() -> Path:
+    log("Packaging remote HTML pages...")
     staging = BUILD_ROOT / "remote_pages"
     if staging.exists():
         shutil.rmtree(staging)
@@ -138,11 +191,14 @@ def stage_remote_pages() -> Path:
         copied += 1
     if copied == 0:
         raise BuildError("No remote HTML pages were found to package.")
+    log(f"Packaged {copied} remote HTML page(s).")
     return staging
 
 
 def build_app(icon_path: Path, remote_pages: Path) -> Path:
+    log("Checking build environment...")
     require_pyinstaller()
+    reject_obsolete_pathlib_backport()
     pyinstaller_work = BUILD_ROOT / "pyinstaller"
     spec_path = BUILD_ROOT / "spec"
     for directory in (pyinstaller_work, spec_path):
@@ -186,10 +242,12 @@ def build_app(icon_path: Path, remote_pages: Path) -> Path:
         "uvicorn.lifespan.on",
         str(APP_ROOT / "main.py"),
     ]
-    run(command, cwd=APP_ROOT)
+    log("Building Production Hub.app with PyInstaller...")
+    run(command, cwd=APP_ROOT, stream_output=True)
     app_path = DIST_ROOT / f"{APP_NAME}.app"
     if not app_path.exists():
         raise BuildError(f"PyInstaller finished, but {app_path} was not created.")
+    log("Finalizing app bundle...")
     finalize_bundle_icon(app_path, icon_path)
     return app_path
 
@@ -217,6 +275,7 @@ def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
 
 
 def install_app(app_path: Path, destination_root: Path) -> Path:
+    log(f"Installing app to {destination_root}...")
     target = destination_root / app_path.name
     destination_root.mkdir(parents=True, exist_ok=True)
     if target.exists():

@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ICAS Score</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <style>
+    :root {
+      --bg: #000000;
+      --btn-next-bg: #00c853;
+      --btn-next-text: #ffffff;
+      --title-color: #ff5252;
+      --status-grey: #888888;
+
+      --card-bg: #ffffff;
+      --card-text: #000000;
+      --border: #e6e6e6;
+      --pill-border: #cfcfcf;
+
+      --danger: #ff5252;
+      --danger-bg: rgba(255, 82, 82, 0.10);
+      --panel-bg: #111;
+      --panel-border: #2a2a2a;
+      --panel-inner: #0b0b0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      background: var(--bg);
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+      /* allow page to grow with content */
+      min-height: 100vh;
+      height: auto;
+
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 12px;
+
+      touch-action: manipulation;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .wrapper { width: 100%; max-width: 480px; padding: 16px; }
+
+    /* Top bar */
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .page-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--status-grey);
+    }
+
+    .top-buttons { display: flex; gap: 8px; }
+
+    .top-btn {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #ffffff;
+      opacity: 0.85;
+      border-radius: 999px;
+      border: 1px solid #444;
+      padding: 6px 12px;
+      background: transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .top-btn:hover { opacity: 1; background: #222; }
+    .top-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Section label */
+    .presentation-name {
+      text-align: left;
+      color: var(--title-color);
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 4px 0 10px;
+    }
+
+    /* Score box (NOW AUTO-HEIGHT: no max-height / no internal scrolling) */
+    .score-box {
+      background: var(--card-bg);
+      color: var(--card-text);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      /* changed */
+      max-height: none;
+      overflow: visible;
+
+      border: 1px solid var(--border);
+    }
+
+    .empty-state { color: #777; padding: 6px 4px 10px; font-size: 0.95rem; }
+
+    /* Row card */
+    .row-card {
+      background: #f7f7f7;
+      border: 1px solid #e9e9e9;
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .row-top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .name-input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid var(--pill-border);
+      padding: 10px 12px;
+      font-size: 16px;
+      outline: none;
+      background: #fff;
+      -webkit-appearance: none;
+    }
+
+    .score-display {
+      min-width: 64px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #111;
+      padding: 0 2px;
+      user-select: none;
+    }
+
+    .row-bottom { display: grid; grid-template-columns: 1fr; gap: 8px; }
+
+    .seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr 0.9fr 0.9fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .seg-btn {
+      border-radius: 999px;
+      border: 1px solid #bbbbbb;
+      background: #ffffff;
+      font-size: 0.9rem;
+      padding: 10px 10px;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+      transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .seg-btn:active { transform: scale(0.97); filter: brightness(0.92); }
+    .seg-btn:hover { background: #eeeeee; }
+
+    .seg-input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid #cccccc;
+      padding: 10px 12px;
+      font-size: 16px;
+      outline: none;
+      background: #fff;
+      -webkit-appearance: none;
+    }
+
+    .seg-danger {
+      border-color: rgba(255, 82, 82, 0.55);
+      color: var(--danger);
+      background: var(--danger-bg);
+    }
+    .seg-danger:hover { background: rgba(255, 82, 82, 0.16); }
+
+    /* Add row button */
+    .buttons-single { margin-top: 10px; }
+
+    button.btn-add {
+      width: 100%;
+      background: var(--btn-next-bg);
+      color: var(--btn-next-text);
+      border: none;
+      border-radius: 12px;
+      padding: 16px 12px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    button.btn-add:active { transform: scale(0.97); filter: brightness(0.9); }
+
+    /* Collapsible panels */
+    .panel {
+      margin-top: 10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-toggle {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: #fff;
+      padding: 12px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      opacity: 0.94;
+    }
+    .panel-toggle:hover { background: #222; opacity: 1; }
+
+    .panel-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+    }
+
+    .panel-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+      color: #fff;
+    }
+
+    .caret {
+      display: inline-block;
+      transition: transform 0.12s ease;
+      font-weight: 900;
+      opacity: 0.9;
+    }
+    .caret.open { transform: rotate(180deg); }
+
+    .panel-body {
+      display: none; /* default collapsed */
+      padding: 12px;
+      border-top: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+    }
+
+    /* Queue controls (inside panel body) */
+    .queue-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      color: var(--status-grey);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .queue-row1 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .queue-row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .queue-btn {
+      border: 1px solid #444;
+      background: transparent;
+      color: #fff;
+      border-radius: 999px;
+      padding: 12px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      opacity: 0.92;
+      transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .queue-btn:hover { opacity: 1; background: #222; }
+    .queue-btn:active { transform: scale(0.98); filter: brightness(0.95); }
+
+    .queue-input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid #444;
+      padding: 12px 12px;
+      font-size: 16px;
+      outline: none;
+      background: var(--panel-inner);
+      color: #fff;
+      -webkit-appearance: none;
+    }
+
+    .select-wrap { position: relative; width: 100%; }
+
+    .apply-select {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid #666;
+      background: var(--panel-inner);
+      color: #fff;
+      padding: 12px 40px 12px 14px;
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .select-wrap::after {
+      content: "▾";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #ffffff;
+      opacity: 0.85;
+      pointer-events: none;
+      font-size: 1.05rem;
+      font-weight: 900;
+    }
+
+    .queue-apply {
+      width: 100%;
+      background: var(--btn-next-bg);
+      color: var(--btn-next-text);
+      border: none;
+      border-radius: 12px;
+      padding: 14px 12px;
+      font-size: 1.05rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform 0.07s ease, filter 0.07s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .queue-apply:active { transform: scale(0.98); filter: brightness(0.92); }
+    .queue-apply:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* History list (inside panel body) */
+    .history-list {
+      max-height: 220px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: var(--panel-inner);
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .hist-item {
+      padding: 10px 12px;
+      border-top: 1px solid #1f1f1f;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: var(--panel-inner);
+    }
+    .hist-item:first-child { border-top: none; }
+
+    .hist-main {
+      color: #fff;
+      font-weight: 900;
+      font-size: 0.95rem;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .hist-sub {
+      color: var(--status-grey);
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hist-empty {
+      padding: 12px;
+      color: var(--status-grey);
+      font-size: 0.9rem;
+      background: var(--panel-inner);
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 10px;
+      opacity: 0.8;
+      min-height: 1.1em;
+    }
+
+    @media (max-width: 420px) {
+      .seg { grid-template-columns: 1fr 1fr 1.1fr 0.9fr 0.9fr; }
+      .score-display { font-size: 1.18rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <!-- Top bar -->
+    <div class="top-row">
+      <div class="page-title">ICAS Score</div>
+      <div class="top-buttons">
+        <button class="top-btn" id="undoBtn">Undo</button>
+        <button class="top-btn" id="clearBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="presentation-name">Scoreboard</div>
+
+    <!-- Score container -->
+    <div class="score-box">
+      <div id="scoreRows"></div>
+      <div id="emptyState" class="empty-state">No rows yet. Add one below.</div>
+    </div>
+
+    <!-- Add row button -->
+    <div class="buttons-single">
+      <button id="addRowBtn" class="btn-add">Add Row</button>
+    </div>
+
+    <!-- Queue (collapsed by default) -->
+    <div class="panel" id="queuePanel">
+      <button type="button" class="panel-toggle" id="queueToggle">
+        <span class="panel-left">
+          <span>Queue</span>
+        </span>
+        <span class="panel-right">
+          <span id="queueTotalInline">+ 0</span>
+          <span class="caret" id="queueCaret">▾</span>
+        </span>
+      </button>
+
+      <div class="panel-body" id="queueBody">
+        <div class="queue-title-row">
+          <div>Queue controls</div>
+          <div style="font-variant-numeric: tabular-nums; font-weight: 900;">Total: <span id="queueTotalBody">+ 0</span></div>
+        </div>
+
+        <div class="queue-row1">
+          <button type="button" class="queue-btn" id="queuePlus">+1</button>
+          <button type="button" class="queue-btn" id="queueMinus">-1</button>
+          <button type="button" class="queue-btn" id="queueClear">Clear</button>
+        </div>
+
+        <div class="queue-row2">
+          <input type="number" class="queue-input" id="queueCustom" placeholder="±N (adds to queue)" step="1" />
+          <div class="select-wrap">
+            <select id="applySelect" class="apply-select"></select>
+          </div>
+        </div>
+
+        <button type="button" class="queue-apply" id="queueApply">Apply</button>
+      </div>
+    </div>
+
+    <!-- History (collapsed by default, UNDER queue) -->
+    <div class="panel" id="historyPanelWrap">
+      <button type="button" class="panel-toggle" id="historyToggle">
+        <span class="panel-left">
+          <span>History</span>
+        </span>
+        <span class="panel-right">
+          <span class="caret" id="historyCaret">▾</span>
+        </span>
+      </button>
+
+      <div class="panel-body" id="historyBody">
+        <div id="historyEmpty" class="hist-empty">No history yet.</div>
+        <div id="historyList" class="history-list" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div id="statusText" class="status">Ready</div>
+  </div>
+
+<script>
+(function () {
+  const HOSTED_API_BASE = "https://score.icas-clicker.work";
+
+  function getApiBase() {
+    const params = new URLSearchParams(window.location.search || "");
+    const override = params.get("api") || localStorage.getItem("icas-score-api-base") || "";
+    if (override.trim()) return override.trim().replace(/\/+$/, "");
+    if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+      return window.location.origin;
+    }
+    return HOSTED_API_BASE;
+  }
+
+  const API_BASE = getApiBase();
+  const SCORE_GET  = `${API_BASE}/score`;
+  const SCORE_POST = `${API_BASE}/score`;
+
+  let state = { rows: [], history: [] };
+
+  let lastRemoteJson = "";
+  let pendingRemote = null;
+  let isPosting = false;
+
+  // Local-only queue + local-only action history
+  let queue = 0;
+  let actionHistory = [];     // [{ts:number, text:string}]
+  const HISTORY_CAP = 60;
+
+  const scoreRowsEl = document.getElementById("scoreRows");
+  const emptyStateEl = document.getElementById("emptyState");
+  const undoBtn = document.getElementById("undoBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const addRowBtn = document.getElementById("addRowBtn");
+  const statusText = document.getElementById("statusText");
+
+  // Queue panel
+  const queueToggle = document.getElementById("queueToggle");
+  const queueBody = document.getElementById("queueBody");
+  const queueCaret = document.getElementById("queueCaret");
+  const queueTotalInline = document.getElementById("queueTotalInline");
+  const queueTotalBody = document.getElementById("queueTotalBody");
+  const queuePlusBtn = document.getElementById("queuePlus");
+  const queueMinusBtn = document.getElementById("queueMinus");
+  const queueCustomEl = document.getElementById("queueCustom");
+  const queueClearBtn = document.getElementById("queueClear");
+  const queueApplyBtn = document.getElementById("queueApply");
+  const applySelect = document.getElementById("applySelect");
+
+  // History panel
+  const historyToggle = document.getElementById("historyToggle");
+  const historyBody = document.getElementById("historyBody");
+  const historyCaret = document.getElementById("historyCaret");
+  const historyList = document.getElementById("historyList");
+  const historyEmpty = document.getElementById("historyEmpty");
+
+  function setStatus(msg, timeoutMs = 900) {
+    statusText.textContent = msg;
+    if (timeoutMs) {
+      setTimeout(() => {
+        if (statusText.textContent === msg) statusText.textContent = "Ready";
+      }, timeoutMs);
+    }
+  }
+
+  function normalizeIncoming(obj) {
+    const safe = { rows: [], history: [] };
+    if (obj && Array.isArray(obj.rows)) {
+      safe.rows = obj.rows.map(r => ({
+        id: String(r.id ?? ""),
+        name: String(r.name ?? ""),
+        score: Number.isFinite(Number(r.score)) ? Number(r.score) : 0
+      })).filter(r => r.id);
+    }
+    if (obj && Array.isArray(obj.history)) {
+      safe.history = obj.history.filter(h => Array.isArray(h)).slice(-100);
+    }
+    return safe;
+  }
+
+  function isUserEditing() {
+    const el = document.activeElement;
+    if (!el) return false;
+    return el.classList?.contains("name-input") ||
+           el.classList?.contains("seg-input") ||
+           el.classList?.contains("queue-input") ||
+           el.classList?.contains("apply-select");
+  }
+
+  function formatQueue(q) {
+    const sign = q >= 0 ? "+" : "-";
+    return `${sign} ${Math.abs(q)}`;
+  }
+
+  function formatTime(ts) {
+    return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function rowLabelById(id) {
+    const r = state.rows.find(x => x.id === id);
+    return r ? (r.name ? r.name : "(Unnamed)") : "(Unknown)";
+  }
+
+  function addHistory(text) {
+    actionHistory.push({ ts: Date.now(), text: String(text || "") });
+    if (actionHistory.length > HISTORY_CAP) actionHistory = actionHistory.slice(-HISTORY_CAP);
+    renderHistory();
+  }
+
+  function clearHistory() {
+    actionHistory = [];
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = "";
+    if (!actionHistory.length) {
+      historyEmpty.style.display = "block";
+      historyList.style.display = "none";
+      return;
+    }
+    historyEmpty.style.display = "none";
+    historyList.style.display = "block";
+
+    const items = [...actionHistory].reverse();
+    items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "hist-item";
+
+      const main = document.createElement("div");
+      main.className = "hist-main";
+      main.textContent = it.text;
+
+      const sub = document.createElement("div");
+      sub.className = "hist-sub";
+      sub.textContent = formatTime(it.ts);
+
+      div.appendChild(main);
+      div.appendChild(sub);
+      historyList.appendChild(div);
+    });
+  }
+
+  function setPanelOpen(bodyEl, caretEl, open) {
+    bodyEl.style.display = open ? "block" : "none";
+    caretEl.classList.toggle("open", open);
+  }
+
+  function togglePanel(bodyEl, caretEl) {
+    const open = bodyEl.style.display === "block";
+    setPanelOpen(bodyEl, caretEl, !open);
+  }
+
+  function updateQueueUI() {
+    const txt = formatQueue(queue);
+    queueTotalInline.textContent = txt;
+    queueTotalBody.textContent = txt;
+
+    const hasTarget = !!applySelect.value;
+    queueApplyBtn.disabled = (queue === 0) || (state.rows.length === 0) || !hasTarget;
+  }
+
+  function updateApplySelect() {
+    const prev = applySelect.value;
+    applySelect.innerHTML = "";
+
+    if (!state.rows.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No teams yet";
+      applySelect.appendChild(opt);
+      applySelect.value = "";
+      return;
+    }
+
+    state.rows.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.id;
+      opt.textContent = r.name ? r.name : "(Unnamed)";
+      applySelect.appendChild(opt);
+    });
+
+    if (prev && state.rows.some(r => r.id === prev)) applySelect.value = prev;
+    else applySelect.value = state.rows[0].id;
+  }
+
+  function pushHistory() {
+    state.history = Array.isArray(state.history) ? state.history : [];
+    state.history.push(JSON.parse(JSON.stringify(state.rows)));
+    if (state.history.length > 100) state.history = state.history.slice(-100);
+    updateUndoButton();
+  }
+
+  function updateUndoButton() {
+    const canUndo = Array.isArray(state.history) && state.history.length > 0;
+    undoBtn.disabled = !canUndo;
+    undoBtn.style.opacity = canUndo ? 0.85 : 0.5;
+  }
+
+  async function fetchRemoteState() {
+    try {
+      const res = await fetch(SCORE_GET, { cache: "no-cache" });
+      if (!res.ok) throw new Error("Bad response");
+      return normalizeIncoming(await res.json());
+    } catch {
+      return null;
+    }
+  }
+
+  async function postState() {
+    if (isPosting) return;
+    isPosting = true;
+    try {
+      const body = JSON.stringify(state);
+      const res = await fetch(SCORE_POST, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+      if (!res.ok) throw new Error("Bad response");
+      lastRemoteJson = body;
+    } catch {
+      setStatus("Sync error", 1200);
+    } finally {
+      isPosting = false;
+    }
+  }
+
+  async function pollLoop() {
+    const remote = await fetchRemoteState();
+    if (!remote) return;
+
+    const remoteJson = JSON.stringify(remote);
+    if (remoteJson === lastRemoteJson) return;
+
+    if (isUserEditing()) {
+      pendingRemote = remote;
+      return;
+    }
+    applyRemote(remote);
+  }
+
+  function applyRemote(remote) {
+    state = normalizeIncoming(remote);
+    lastRemoteJson = JSON.stringify(state);
+    pendingRemote = null;
+    render();
+    updateApplySelect();
+    updateQueueUI();
+  }
+
+  function applyPendingRemoteIfAny() {
+    if (pendingRemote && !isUserEditing()) applyRemote(pendingRemote);
+  }
+
+  // ====== MUTATIONS ======
+  function undo() {
+    if (!state.history || !state.history.length) return;
+
+    // remove last history item (best-effort) and don't show "undo"
+    if (actionHistory.length) actionHistory.pop();
+    renderHistory();
+
+    state.rows = state.history.pop() || [];
+    updateUndoButton();
+    render();
+    postState();
+    setStatus("Undo");
+    updateApplySelect();
+    updateQueueUI();
+  }
+
+  function clearAll() {
+    if (!state.rows.length) return;
+    pushHistory();
+    state.rows = [];
+    render();
+    postState();
+    setStatus("Cleared");
+    updateApplySelect();
+    updateQueueUI();
+
+    clearHistory();
+    addHistory("Cleared all rows");
+  }
+
+  function addRow() {
+    pushHistory();
+    state.rows.push({
+      id: Date.now().toString(36) + Math.random().toString(16).slice(2),
+      name: "",
+      score: 0
+    });
+    render();
+    postState();
+    setStatus("Added row");
+    updateApplySelect();
+    updateQueueUI();
+
+    addHistory("Added row");
+
+    requestAnimationFrame(() => {
+      const last = state.rows[state.rows.length - 1];
+      const input = scoreRowsEl.querySelector(`.row-card[data-id="${last.id}"] .name-input`);
+      if (input) { input.focus(); input.select(); }
+    });
+  }
+
+  function updateName(id, newName) {
+    const row = state.rows.find(r => r.id === id);
+    if (!row) return;
+    const cleaned = String(newName ?? "").trim();
+    if (row.name === cleaned) return;
+
+    pushHistory();
+    const prevLabel = row.name ? row.name : "(Unnamed)";
+    row.name = cleaned;
+    render();
+    postState();
+    setStatus("Name updated");
+    updateApplySelect();
+    updateQueueUI();
+
+    const nextLabel = cleaned ? cleaned : "(Unnamed)";
+    addHistory(`Renamed: ${prevLabel} → ${nextLabel}`);
+  }
+
+  function updateScore(id, delta, metaText) {
+    const row = state.rows.find(r => r.id === id);
+    if (!row) return;
+
+    const d = Number(delta);
+    if (!Number.isFinite(d) || d === 0) return;
+
+    pushHistory();
+    row.score = (Number(row.score) || 0) + d;
+    render();
+    postState();
+    setStatus(d > 0 ? `+${d}` : `${d}`);
+
+    if (metaText) addHistory(metaText);
+  }
+
+  function applyCustom(id, inputEl) {
+    const val = Number(inputEl.value);
+    if (!Number.isFinite(val) || val === 0) { inputEl.value = ""; return; }
+    const label = rowLabelById(id);
+    updateScore(id, val, `Set ${label}: ${val > 0 ? "+" : ""}${val}`);
+    inputEl.value = "";
+  }
+
+  function clearRow(id) {
+    const row = state.rows.find(r => r.id === id);
+    if (!row) return;
+    if ((Number(row.score) || 0) === 0) return;
+
+    pushHistory();
+    row.score = 0;
+    render();
+    postState();
+    setStatus("Row cleared");
+
+    addHistory(`Cleared ${rowLabelById(id)}`);
+  }
+
+  function deleteRow(id) {
+    const label = rowLabelById(id);
+    const row = state.rows.find(r => r.id === id);
+    if (!row) return;
+
+    pushHistory();
+    state.rows = state.rows.filter(r => r.id !== id);
+    render();
+    postState();
+    setStatus("Row deleted");
+    updateApplySelect();
+    updateQueueUI();
+
+    addHistory(`Deleted ${label}`);
+  }
+
+  // ====== QUEUE (LOCAL ONLY) ======
+  function queueAdd(n) {
+    const d = Number(n);
+    if (!Number.isFinite(d) || d === 0) return;
+    queue += d;
+    updateQueueUI();
+    setStatus(d > 0 ? `Queue +${d}` : `Queue ${d}`);
+    addHistory(`Queue ${d > 0 ? "+" : ""}${d}`);
+  }
+
+  function queueApplyCustom() {
+    const val = Number(queueCustomEl.value);
+    queueCustomEl.value = "";
+    if (!Number.isFinite(val) || val === 0) return;
+    queueAdd(val);
+  }
+
+  function applyQueue() {
+    const id = applySelect.value;
+    if (!id || queue === 0) return;
+    const label = rowLabelById(id);
+    const amt = queue;
+
+    updateScore(id, amt, `Applied ${amt > 0 ? "+" : ""}${amt} → ${label}`);
+    queue = 0;
+    updateQueueUI();
+    setStatus("Applied");
+  }
+
+  // ====== RENDER ======
+  function render() {
+    scoreRowsEl.innerHTML = "";
+
+    if (!state.rows.length) emptyStateEl.style.display = "block";
+    else emptyStateEl.style.display = "none";
+
+    state.rows.forEach(row => {
+      const card = document.createElement("div");
+      card.className = "row-card";
+      card.dataset.id = row.id;
+
+      const top = document.createElement("div");
+      top.className = "row-top";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "name-input";
+      nameInput.value = row.name || "";
+      nameInput.placeholder = "Name";
+
+      nameInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); nameInput.blur(); }
+      });
+      nameInput.addEventListener("blur", () => {
+        updateName(row.id, nameInput.value);
+        applyPendingRemoteIfAny();
+      });
+
+      const scoreDisplay = document.createElement("div");
+      scoreDisplay.className = "score-display";
+      scoreDisplay.textContent = String(row.score ?? 0);
+
+      top.appendChild(nameInput);
+      top.appendChild(scoreDisplay);
+
+      const bottom = document.createElement("div");
+      bottom.className = "row-bottom";
+
+      const seg = document.createElement("div");
+      seg.className = "seg";
+
+      const minusBtn = document.createElement("button");
+      minusBtn.type = "button";
+      minusBtn.className = "seg-btn";
+      minusBtn.textContent = "-1";
+      minusBtn.onclick = () => updateScore(row.id, -1, `-1 → ${rowLabelById(row.id)}`);
+
+      const plusBtn = document.createElement("button");
+      plusBtn.type = "button";
+      plusBtn.className = "seg-btn";
+      plusBtn.textContent = "+1";
+      plusBtn.onclick = () => updateScore(row.id, 1, `+1 → ${rowLabelById(row.id)}`);
+
+      const custom = document.createElement("input");
+      custom.type = "number";
+      custom.className = "seg-input";
+      custom.placeholder = "±N";
+      custom.step = "1";
+      custom.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); custom.blur(); }
+      });
+      custom.addEventListener("blur", () => {
+        applyCustom(row.id, custom);
+        applyPendingRemoteIfAny();
+      });
+
+      const clr = document.createElement("button");
+      clr.type = "button";
+      clr.className = "seg-btn";
+      clr.textContent = "Clear";
+      clr.onclick = () => clearRow(row.id);
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "seg-btn seg-danger";
+      del.textContent = "Delete";
+      del.onclick = () => deleteRow(row.id);
+
+      seg.appendChild(minusBtn);
+      seg.appendChild(plusBtn);
+      seg.appendChild(custom);
+      seg.appendChild(clr);
+      seg.appendChild(del);
+
+      bottom.appendChild(seg);
+
+      card.appendChild(top);
+      card.appendChild(bottom);
+      scoreRowsEl.appendChild(card);
+    });
+
+    updateUndoButton();
+  }
+
+  // ====== INIT ======
+  async function init() {
+    undoBtn.onclick = undo;
+    clearBtn.onclick = clearAll;
+    addRowBtn.onclick = addRow;
+
+    // Collapsibles default closed
+    setPanelOpen(queueBody, queueCaret, false);
+    setPanelOpen(historyBody, historyCaret, false);
+
+    queueToggle.onclick = () => togglePanel(queueBody, queueCaret);
+    historyToggle.onclick = () => togglePanel(historyBody, historyCaret);
+
+    queuePlusBtn.onclick = () => queueAdd(1);
+    queueMinusBtn.onclick = () => queueAdd(-1);
+    queueClearBtn.onclick = () => {
+      if (queue === 0) return;
+      queue = 0;
+      updateQueueUI();
+      setStatus("Queue cleared");
+      addHistory("Queue cleared");
+    };
+
+    queueCustomEl.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); queueCustomEl.blur(); }
+    });
+    queueCustomEl.addEventListener("blur", () => queueApplyCustom());
+
+    applySelect.addEventListener("change", updateQueueUI);
+    queueApplyBtn.onclick = applyQueue;
+
+    undoBtn.disabled = true;
+    undoBtn.style.opacity = 0.5;
+
+    setStatus("Connecting…", 0);
+
+    const remote = await fetchRemoteState();
+    if (remote) {
+      applyRemote(remote);
+      setStatus("Connected ✔");
+    } else {
+      state = { rows: [], history: [] };
+      lastRemoteJson = JSON.stringify(state);
+      render();
+      updateApplySelect();
+      updateQueueUI();
+      setStatus("Backend offline", 1200);
+    }
+
+    renderHistory();
+    updateQueueUI();
+
+    setInterval(pollLoop, 800);
+
+    document.addEventListener("focusout", () => {
+      setTimeout(applyPendingRemoteIfAny, 0);
+    });
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>

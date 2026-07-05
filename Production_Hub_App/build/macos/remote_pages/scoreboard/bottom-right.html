@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ICAS Scoreboard – Bottom Right</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Antonio (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Norwester (self-hosted via CDN) -->
+  <style>
+    @font-face {
+      font-family: "Norwester";
+      src: url("https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/Norwester/Norwester-Regular.otf")
+           format("opentype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'Antonio', sans-serif;
+    }
+
+    .scoreboard {
+      position: absolute;
+      bottom: 3%;
+      right: 2.5%;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    .team-container {
+      width: 25vw;
+      max-width: 420px;
+      min-width: 220px;
+    }
+
+    .team {
+      background: #ffffff;
+      color: #000000;
+      border-radius: 6px;
+      width: 100%;
+      padding: 12.5px 25px;
+      margin-bottom: 12.5px;
+      font-size: 2.5vw;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    .team .name {
+      font-family: 'Norwester', 'Antonio', sans-serif;
+      flex-grow: 1;
+      text-align: left;
+      margin-right: 12.5px;
+      line-height: 1.25em;
+      letter-spacing: 0.04em;
+    }
+
+    .team .score {
+      font-family: 'Antonio', sans-serif;
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .team.multiline .name {
+      white-space: pre-wrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: 3.125em;
+      line-height: 1.56em;
+    }
+
+    @media (min-width: 1600px) {
+      .team { font-size: 40px; }
+    }
+
+    @media (max-width: 800px) {
+      .team { font-size: 18px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="scoreboard">
+    <div id="scoreboard" class="team-container"></div>
+  </div>
+
+  <script>
+    function getScoreApi() {
+      if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+        return window.location.origin + "/score";
+      }
+      return "https://score.icas-clicker.work/score";
+    }
+
+    const SCORE_API = getScoreApi();
+    const MAX_TEAMS = 10;
+
+    async function refreshScoreboard() {
+      try {
+        const res = await fetch(SCORE_API, { cache: "no-cache" });
+        if (!res.ok) throw new Error("Bad response");
+
+        const data = await res.json();
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+
+        const teams = rows
+          .filter(r => r.name && Number.isFinite(r.score))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, MAX_TEAMS);
+
+        updateScoreboard(teams);
+      } catch (err) {
+        // silent fail for OBS overlays
+      }
+    }
+
+    function updateScoreboard(teams) {
+      const scoreboard = document.getElementById("scoreboard");
+      scoreboard.innerHTML = "";
+
+      teams.forEach(team => {
+        const teamDiv = document.createElement("div");
+        teamDiv.className = "team";
+
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "name";
+        nameDiv.textContent = team.name;
+
+        if (team.name.length > 20) {
+          teamDiv.classList.add("multiline");
+        }
+
+        const scoreDiv = document.createElement("div");
+        scoreDiv.className = "score";
+        scoreDiv.textContent = team.score;
+
+        teamDiv.appendChild(nameDiv);
+        teamDiv.appendChild(scoreDiv);
+        scoreboard.appendChild(teamDiv);
+      });
+    }
+
+    refreshScoreboard();
+    setInterval(refreshScoreboard, 1000);
+  </script>
+</body>
+</html>

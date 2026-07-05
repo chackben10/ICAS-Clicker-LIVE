@@ -1,0 +1,1843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ICAS Media Control Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+<style>
+:root {
+--bg: #ffffff;
+--title-color: #d32f2f;
+--status-grey: #666666;
+
+--card-bg: #f3f3f3;
+--card-text: #111111;
+--border-color: #d0d0d0;
+
+--btn-bg: #ffffff;
+--btn-text: #111111;
+--btn-border: #d0d0d0;
+
+/* Hover/press “invert” colors (light mode) */
+--btn-invert-bg: #111111;
+--btn-invert-text: #ffffff;
+
+/* Shadows (light mode) */
+--btn-hover-shadow: 0 12px 26px rgba(0,0,0,0.22);
+--btn-active-shadow: 0 8px 18px rgba(0,0,0,0.26);
+
+/* Danger base + invert behavior */
+--danger: #ff5252;
+--danger-invert-bg: #ffffff;
+--danger-invert-text: #ff5252;
+
+--modal-bg: #ffffff;
+--modal-shadow: rgba(0,0,0,0.25);
+--settings-text: #111;
+
+--ok: #00c853;
+
+/* Button scaling applies only inside preset buttons */
+--btn-scale: 1;
+--grid-gap-base: 10px;
+}
+
+body.dark {
+--bg: #000000;
+--title-color: #ff5252;
+--status-grey: #888888;
+
+--card-bg: #121212;
+--card-text: #ffffff;
+--border-color: #444444;
+
+--btn-bg: #111111;
+--btn-text: #ffffff;
+--btn-border: #444444;
+
+/* Hover/press “invert” colors (dark mode) */
+--btn-invert-bg: #ffffff;
+--btn-invert-text: #111111;
+
+/* Shadows (dark mode): grey-ish glow */
+--btn-hover-shadow: 0 0 0 2px rgba(255,255,255,0.20), 0 16px 34px rgba(255,255,255,0.18);
+--btn-active-shadow: 0 0 0 2px rgba(255,255,255,0.26), 0 12px 26px rgba(255,255,255,0.22);
+
+/* Danger invert in dark mode stays the same */
+--danger: #ff5252;
+--danger-invert-bg: #ffffff;
+--danger-invert-text: #ff5252;
+
+--modal-bg: #111111;
+--modal-shadow: rgba(0,0,0,0.6);
+--settings-text: #ffffff;
+
+--ok: #00c853;
+}
+
+* {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+
+html {
+-webkit-text-size-adjust: 100%;
+}
+
+body {
+background: var(--bg);
+color: var(--card-text);
+font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+min-height: 100vh;
+display: flex;
+justify-content: center;
+align-items: flex-start;
+padding-top: 12px;
+
+transition: background 0.25s ease, color 0.25s ease;
+-webkit-overflow-scrolling: touch;
+touch-action: manipulation;
+}
+
+.wrapper {
+width: 100%;
+max-width: 680px;
+padding: 16px;
+}
+
+/* Top bar */
+.top-row {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 4px;
+gap: 12px;
+}
+
+.page-title {
+font-size: 1.15rem;
+font-weight: 600;
+color: var(--status-grey);
+}
+
+.top-btn {
+font-size: 0.9rem;
+font-weight: 500;
+color: var(--btn-text);
+opacity: 0.9;
+padding: 6px 12px;
+border-radius: 999px;
+border: 1px solid var(--border-color);
+background: transparent;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.10s ease;
+}
+
+.top-btn:hover {
+opacity: 1;
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.top-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.panel-title {
+color: var(--title-color);
+font-size: 1.45rem;
+font-weight: 800;
+margin: 6px 0 8px;
+line-height: 1.1;
+}
+
+.desc {
+color: var(--status-grey);
+font-size: 0.98rem;
+line-height: 1.35;
+margin-bottom: 12px;
+}
+
+/* Grid */
+.grid {
+display: grid;
+grid-template-columns: 1fr;
+gap: calc(var(--grid-gap-base) * var(--btn-scale));
+margin-top: 12px;
+align-items: stretch;
+}
+
+@media (min-width: 700px) {
+.grid {
+grid-template-columns: 1fr 1fr;
+}
+}
+
+/* Preset item as a card */
+.preset-card {
+width: 100%;
+display: flex;
+flex-direction: column;
+height: 100%;
+}
+
+.preset-main,
+.preset-addon {
+width: 100%;
+text-align: left;
+border: 1px solid var(--btn-border);
+background: var(--btn-bg);
+color: var(--btn-text);
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+position: relative;
+
+touch-action: pan-y;
+user-select: none;
+-webkit-user-select: none;
+
+transition:
+transform 0.10s ease,
+background 0.15s ease,
+color 0.15s ease,
+box-shadow 0.15s ease,
+border-color 0.15s ease;
+
+box-shadow: 0 0 0 rgba(0,0,0,0);
+}
+
+.preset-main {
+padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
+border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+flex: 1 1 auto;
+
+display: flex;
+flex-direction: column;
+justify-content: flex-start;
+}
+
+/* Attached addon button */
+.preset-card.has-addon .preset-main {
+border-bottom-left-radius: 0;
+border-bottom-right-radius: 0;
+border-bottom-width: 0;
+}
+
+.preset-addon {
+flex: 0 0 auto;
+padding: calc(14px * var(--btn-scale)) calc(14px * var(--btn-scale));
+border-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+border-top-left-radius: 0;
+border-top-right-radius: 0;
+text-align: center;
+font-size: calc(1.05rem * var(--btn-scale));
+font-weight: 900;
+letter-spacing: 0.2px;
+}
+
+.preset-main:hover,
+.preset-addon:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+border-color: color-mix(in srgb, var(--btn-invert-bg) 30%, var(--btn-border));
+box-shadow: var(--btn-hover-shadow);
+}
+
+.preset-main:active,
+.preset-addon:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+border-color: color-mix(in srgb, var(--btn-invert-bg) 35%, var(--btn-border));
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.preset-main:hover .preset-sub,
+.preset-main:active .preset-sub {
+color: color-mix(in srgb, var(--btn-invert-text) 82%, transparent);
+}
+
+/* Keep dropdowns from being visually inverted */
+.selector-row,
+.select-wrap,
+.select {
+background: transparent;
+color: var(--card-text);
+}
+
+.preset-main:hover .selector-row,
+.preset-main:active .selector-row,
+.preset-main:hover .select-wrap,
+.preset-main:active .select-wrap {
+background: transparent !important;
+color: var(--card-text) !important;
+}
+
+.preset-main:hover .select,
+.preset-main:active .select {
+background-color: color-mix(in srgb, var(--bg) 92%, transparent) !important;
+color: var(--card-text) !important;
+border-color: var(--border-color) !important;
+-webkit-text-fill-color: var(--card-text) !important;
+caret-color: var(--card-text) !important;
+}
+
+.preset-main:hover .select-wrap::after,
+.preset-main:active .select-wrap::after {
+color: var(--card-text) !important;
+opacity: 0.85 !important;
+}
+
+.select option {
+color: #111111;
+background: #ffffff;
+}
+
+body.dark .select option {
+color: #ffffff;
+background: #111111;
+}
+
+.preset-main:disabled,
+.preset-addon:disabled {
+opacity: 0.55;
+cursor: not-allowed;
+box-shadow: none;
+}
+
+.preset-title {
+font-size: calc(1.15rem * var(--btn-scale));
+font-weight: 900;
+letter-spacing: 0.2px;
+margin-bottom: calc(6px * var(--btn-scale));
+line-height: 1.15;
+}
+
+.preset-sub {
+color: var(--status-grey);
+font-size: calc(0.95rem * var(--btn-scale));
+line-height: 1.25;
+}
+
+.selector-row {
+margin-top: calc(10px * var(--btn-scale));
+display: flex;
+gap: calc(10px * var(--btn-scale));
+align-items: center;
+}
+
+.select-wrap {
+position: relative;
+width: 100%;
+}
+
+.select-wrap::after {
+content: "▾";
+position: absolute;
+right: calc(14px * var(--btn-scale));
+top: 50%;
+transform: translateY(-50%);
+color: var(--card-text);
+opacity: 0.8;
+pointer-events: none;
+font-weight: 900;
+font-size: calc(1rem * var(--btn-scale));
+}
+
+.select {
+width: 100%;
+border: 1px solid var(--border-color);
+background-color: color-mix(in srgb, var(--bg) 92%, transparent);
+color: var(--card-text);
+outline: none;
+-webkit-appearance: none;
+appearance: none;
+font-weight: 800;
+
+border-radius: clamp(8px, calc(11px * var(--btn-scale)), 14px);
+font-size: calc(16px * var(--btn-scale));
+padding:
+calc(12px * var(--btn-scale))
+calc(40px * var(--btn-scale))
+calc(12px * var(--btn-scale))
+calc(12px * var(--btn-scale));
+
+touch-action: pan-y;
+}
+
+/* Red filled button style */
+.danger-fill {
+background: var(--danger);
+color: #ffffff;
+border-color: color-mix(in srgb, var(--danger) 70%, var(--btn-border));
+}
+
+.danger-fill .preset-sub {
+color: rgba(255,255,255,0.92);
+}
+
+.danger-fill:hover {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
+box-shadow: var(--btn-hover-shadow);
+}
+
+.danger-fill:active {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.danger-fill:hover .preset-sub,
+.danger-fill:active .preset-sub {
+color: color-mix(in srgb, var(--danger-invert-text) 80%, transparent);
+}
+
+.preset-addon.danger-fill:hover {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
+box-shadow: var(--btn-hover-shadow);
+}
+
+.preset-addon.danger-fill:active {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+/* Modals */
+.settings-overlay {
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.65);
+display: none;
+align-items: center;
+justify-content: center;
+z-index: 999;
+padding: 18px;
+}
+
+.settings-card {
+width: 100%;
+max-width: 480px;
+background: var(--modal-bg);
+color: var(--settings-text);
+border-radius: 12px;
+padding: 16px;
+box-shadow: 0 18px 40px var(--modal-shadow);
+border: 1px solid var(--border-color);
+transition: background 0.2s ease, color 0.2s ease;
+}
+
+.settings-title {
+font-size: 1.1rem;
+font-weight: 900;
+margin-bottom: 12px;
+}
+
+.settings-section {
+border: 1px solid var(--border-color);
+border-radius: 12px;
+padding: 12px;
+margin-top: 12px;
+background: transparent;
+}
+
+.settings-label {
+font-weight: 900;
+margin-bottom: 6px;
+}
+
+.settings-muted {
+color: var(--status-grey);
+font-size: 0.92rem;
+line-height: 1.35;
+}
+
+.pill-row {
+display: flex;
+gap: 8px;
+align-items: center;
+margin-top: 10px;
+flex-wrap: wrap;
+}
+
+.pill {
+display: inline-flex;
+align-items: center;
+gap: 8px;
+border: 1px solid var(--border-color);
+border-radius: 999px;
+padding: 8px 12px;
+color: var(--status-grey);
+font-size: 0.92rem;
+background: transparent;
+}
+
+.status-dot {
+width: 10px;
+height: 10px;
+border-radius: 999px;
+background: var(--danger);
+}
+
+.status-dot.ok {
+background: var(--ok);
+}
+
+.status-text {
+font-variant-numeric: tabular-nums;
+font-weight: 900;
+color: var(--settings-text);
+}
+
+.mini-row {
+display: flex;
+gap: 10px;
+margin-top: 10px;
+}
+
+.mini-btn {
+flex: 1;
+border: 1px solid var(--border-color);
+border-radius: 999px;
+background: transparent;
+color: var(--settings-text);
+font-weight: 900;
+font-size: 0.92rem;
+padding: 10px 12px;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.mini-btn:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.mini-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+.mini-btn:disabled {
+opacity: 0.55;
+cursor: not-allowed;
+box-shadow: none;
+}
+
+.segment {
+display: flex;
+width: 100%;
+border: 1px solid var(--border-color);
+border-radius: 10px;
+overflow: hidden;
+margin-top: 8px;
+}
+
+.segment button {
+flex: 1;
+padding: 10px 0;
+background: transparent;
+border: none;
+color: var(--settings-text);
+cursor: pointer;
+font-size: 0.9rem;
+transition: background 0.15s, color 0.15s;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+}
+
+.segment button:hover {
+background: rgba(128,128,128,0.12);
+}
+
+.segment button.active {
+background: #ff5252;
+color: white;
+font-weight: 900;
+}
+
+.settings-close-btn {
+width: 100%;
+border: 1px solid var(--border-color);
+border-radius: 999px;
+background: transparent;
+color: var(--settings-text);
+font-size: 0.95rem;
+padding: 12px 0;
+margin-top: 14px;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.settings-close-btn:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.settings-close-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+
+/* Hide Presets heading + description when toggled off */
+.presets-header[hidden] {
+display: none !important;
+}
+
+/* Audio Pads UI Elements */
+.audio-now-playing {
+margin-top: 10px;
+margin-bottom: 12px;
+padding: 10px 12px;
+border: 1px solid var(--border-color);
+border-radius: 10px;
+background: color-mix(in srgb, var(--bg) 92%, transparent);
+color: var(--card-text);
+font-size: 1rem;
+font-weight: 900;
+line-height: 1.25;
+text-align: center;
+min-height: 42px;
+
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.audio-now-playing span {
+color: var(--title-color);
+}
+
+.audio-grid {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 10px;
+margin-bottom: 20px;
+margin-top: 15px;
+}
+
+.audio-btn {
+padding: 15px 5px;
+border: 1px solid var(--border-color);
+border-radius: 8px;
+background: var(--btn-bg);
+color: var(--btn-text);
+font-weight: 900;
+font-size: 1.0rem;
+text-align: center;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.audio-btn:hover {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-hover-shadow);
+}
+
+.audio-btn:active {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.95);
+}
+
+.audio-clear-btn {
+width: 100%;
+border: 1px solid color-mix(in srgb, var(--danger) 70%, var(--btn-border));
+border-radius: 999px;
+background: var(--danger);
+color: #ffffff;
+font-size: 0.95rem;
+padding: 12px 0;
+margin-bottom: 10px;
+cursor: pointer;
+-webkit-tap-highlight-color: transparent;
+font-weight: 900;
+touch-action: manipulation;
+transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.10s ease;
+}
+
+.audio-clear-btn:hover {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 45%, var(--btn-border));
+box-shadow: var(--btn-hover-shadow);
+}
+
+.audio-clear-btn:active {
+background: var(--danger-invert-bg);
+color: var(--danger-invert-text);
+border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border));
+box-shadow: var(--btn-active-shadow);
+transform: translateY(1px) scale(0.995);
+}
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+<div class="top-row">
+<div class="page-title">ICAS Media Control Panel</div>
+
+<div style="display: flex; gap: 12px; align-items: center;">
+<label style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; user-select: none; color: var(--card-text);">
+<input type="checkbox" id="autoShowToggle" style="transform: scale(1.2);">
+Auto Show
+</label>
+
+<button class="top-btn" id="settingsButton" type="button">Settings</button>
+</div>
+</div>
+
+<div class="presets-header" id="presetsHeader">
+<div class="panel-title">Presets</div>
+<div class="desc">
+These buttons are presets that trigger multiple actions at once (ProPresenter + OBS).
+You can still control ProPresenter and OBS manually on their own screens anytime.
+</div>
+</div>
+
+<div class="grid">
+<div class="preset-card" id="cardStreamBeginning">
+<button class="preset-main" id="btnStreamBeginning" type="button">
+<div class="preset-title">Stream Beginning</div>
+<div class="preset-sub">
+Sets ProPresenter to <b>Starting Announcements</b> and sets OBS scene to <b>Stream Start</b>.
+</div>
+</button>
+</div>
+
+<div class="preset-card has-addon" id="cardCamera">
+<button class="preset-main" id="btnCamera" type="button">
+<div class="preset-title">Camera</div>
+<div class="preset-sub">
+Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
+</div>
+</button>
+<button class="preset-addon danger-fill" id="btnCameraClearSlide" type="button">Camera + Clear Slide</button>
+</div>
+
+<div class="preset-card has-addon" id="cardServiceLogo">
+<button class="preset-main" id="btnServiceLogo" type="button">
+<div class="preset-title">Service Logo</div>
+<div class="preset-sub" id="serviceLogoDesc">
+Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</b> on OBS.
+</div>
+
+<div class="selector-row" aria-label="Service Logo selector">
+<div class="select-wrap" style="flex: 1;">
+<select id="serviceLogoSelect" class="select" title="Default Service Logo"></select>
+</div>
+</div>
+</button>
+<button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
+</div>
+
+<div class="preset-card" id="cardShowSlides">
+<button class="preset-main" id="btnShowSlides" type="button">
+<div class="preset-title">Show Slides</div>
+<div class="preset-sub">
+Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b>.
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardTestimonies">
+<button class="preset-main" id="btnTestimonies" type="button">
+<div class="preset-title">Testimonies</div>
+<div class="preset-sub" id="testimoniesDesc">
+Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonies</b>.
+</div>
+
+<div class="selector-row" aria-label="Testimonies selector">
+<div class="select-wrap" style="flex: 1;">
+<select id="testimoniesLogoSelect" class="select" title="Testimonies Service Logo"></select>
+</div>
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardEndingStream">
+<button class="preset-main" id="btnEndingStream" type="button">
+<div class="preset-title">Ending Stream</div>
+<div class="preset-sub">
+Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks Screen</b>.
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardSetMacro">
+<button class="preset-main" id="btnSetMacro" type="button">
+<div class="preset-title">Set Macro</div>
+<div class="preset-sub" id="macroDesc">
+Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
+</div>
+
+<div class="selector-row" aria-label="Macro selector">
+<div class="select-wrap" style="flex: 1;">
+<select id="macroSelect" class="select" title="Control Macro"></select>
+</div>
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardClearSlide">
+<button class="preset-main danger-fill" id="btnClearSlide" type="button">
+<div class="preset-title">Clear Slide</div>
+<div class="preset-sub">
+Clears only the ProPresenter slide layer. OBS scenes and camera feeds stay unchanged.
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardAudioControl">
+<button class="preset-main" id="btnAudioControl" type="button">
+<div class="preset-title">Control Background Pads Audio</div>
+<div class="preset-sub">
+Open pad controller to play ambient drones.
+</div>
+</button>
+</div>
+
+<div class="preset-card" id="cardNSCSetup">
+<button class="preset-main" id="btnNSCSetup" type="button">
+<div class="preset-title">NSC setup</div>
+<div class="preset-sub">
+Setup ProPresenter to display iMac screen on all in-house TVs.
+</div>
+</button>
+</div>
+</div>
+</div>
+
+<div id="audioOverlay" class="settings-overlay">
+<div class="settings-card">
+<div class="settings-title" style="margin-bottom: 0;">Ambient Pads</div>
+
+<div id="audioNowPlaying" class="audio-now-playing">
+Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
+</div>
+
+<div class="segment" id="audioPlaylistSegment"></div>
+<div id="audioGrid" class="audio-grid"></div>
+<button id="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
+<button id="audioCloseButton" class="settings-close-btn" type="button">Close</button>
+</div>
+</div>
+
+<div id="settingsOverlay" class="settings-overlay">
+<div class="settings-card">
+<div class="settings-title">Settings</div>
+
+<div class="settings-section">
+<div class="settings-label">Backend Status</div>
+
+<div class="pill-row" aria-live="polite">
+<span class="pill" title="Cloudflare Tunnel backend status">
+<span id="backendDot" class="status-dot"></span>
+<span class="status-text" id="backendStatus">Backend: Checking…</span>
+</span>
+
+<span class="pill" title="Most recent action run from this page">
+<span class="status-text" id="lastAction">Last action: —</span>
+</span>
+</div>
+
+<div class="mini-row">
+<button class="mini-btn" id="refreshLogosBtn" type="button">Refresh List</button>
+<button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
+</div>
+
+<div class="settings-muted" style="margin-top: 10px;">
+Backend: <b>local Production Hub when served locally; hosted fallback otherwise</b>
+</div>
+</div>
+
+<div class="settings-section">
+<div class="settings-label">Show Description</div>
+<div class="settings-muted">Hide/show the “Presets” header and description on the main page.</div>
+
+<div class="pill-row" style="margin-top: 10px;">
+<label class="pill" style="cursor:pointer; user-select:none;">
+<input id="showDescToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
+<span class="status-text" style="font-weight:900;">Enabled</span>
+</label>
+</div>
+</div>
+
+<div class="settings-section">
+<div class="settings-label">Button Size</div>
+<div class="settings-muted" style="margin-bottom: 10px;">Adjust preset button text and spacing.</div>
+<input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
+</div>
+
+<div class="settings-section">
+<div class="settings-label">Display Theme</div>
+<div class="segment" id="themeSegment">
+<button data-mode="light" type="button">Light</button>
+<button data-mode="dark" type="button">Dark</button>
+<button data-mode="system" type="button">System</button>
+</div>
+</div>
+
+<button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+</div>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+// ====== CONFIG ======
+const DEFAULT_API_BASE = "https://control.icas-clicker.work";
+
+const THEME_KEY = "icas-theme-mode";
+
+// Persisted selections
+const SERVICE_LOGO_UUID_KEY = "icas-service-logo-uuid";
+const TESTIMONIES_LOGO_UUID_KEY = "icas-testimonies-logo-uuid";
+const MACRO_NAME_KEY = "icas-macro-name";
+
+// Settings
+const BTN_SCALE_KEY = "icas-control-btn-scale";
+const SHOW_DESC_KEY = "icas-control-show-description";
+
+function normalizeBase(u) {
+u = String(u || "").trim();
+return (u || DEFAULT_API_BASE).replace(/\/+$/, "");
+}
+
+function getApiBase() {
+if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+return window.location.origin;
+}
+return normalizeBase(DEFAULT_API_BASE);
+}
+
+function endpoints() {
+const base = getApiBase();
+
+return {
+health: `${base}/health`,
+serviceLogos: `${base}/service_logos`,
+macros: `${base}/macros`,
+macro: `${base}/macro`,
+preset: `${base}/preset`,
+audioPlaylists: `${base}/audio/playlists`,
+audioTracks: `${base}/audio/tracks`,
+audioTrigger: `${base}/audio/trigger`,
+audioClear: `${base}/audio/clear`,
+audioActive: `${base}/audio/active`,
+autoShow: `${base}/auto-show`
+};
+}
+
+// ====== THEME ======
+function applyTheme(mode) {
+if (mode === "light") {
+document.body.classList.remove("dark");
+} else if (mode === "dark") {
+document.body.classList.add("dark");
+} else {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+document.body.classList.add("dark");
+} else {
+document.body.classList.remove("dark");
+}
+}
+
+updateThemeSegmentUI(mode);
+}
+
+function updateThemeSegmentUI(mode) {
+document.querySelectorAll("#themeSegment button").forEach(btn => {
+btn.classList.toggle("active", btn.dataset.mode === mode);
+});
+}
+
+function loadTheme() {
+const stored = localStorage.getItem(THEME_KEY);
+applyTheme(stored || "system");
+}
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+const stored = localStorage.getItem(THEME_KEY) || "system";
+if (stored === "system") applyTheme("system");
+});
+
+// ====== Button scale ======
+function clamp(n, lo, hi) {
+return Math.max(lo, Math.min(hi, n));
+}
+
+function getBtnScalePercent() {
+const raw = parseInt(localStorage.getItem(BTN_SCALE_KEY), 10);
+if (Number.isNaN(raw)) return 100;
+return clamp(raw, 40, 200);
+}
+
+function setBtnScalePercent(v) {
+const n = clamp(parseInt(v, 10) || 100, 40, 200);
+localStorage.setItem(BTN_SCALE_KEY, String(n));
+applyBtnScale(n);
+}
+
+function applyBtnScale(percent) {
+const s = clamp((percent || 100) / 100, 0.4, 2.0);
+document.documentElement.style.setProperty("--btn-scale", String(s));
+}
+
+// ====== Show Description toggle ======
+const presetsHeader = document.getElementById("presetsHeader");
+const showDescToggle = document.getElementById("showDescToggle");
+
+function getShowDesc() {
+const raw = localStorage.getItem(SHOW_DESC_KEY);
+if (raw === null) return true;
+return raw === "1";
+}
+
+function setShowDesc(v) {
+localStorage.setItem(SHOW_DESC_KEY, v ? "1" : "0");
+applyShowDesc(v);
+}
+
+function applyShowDesc(enabled) {
+if (presetsHeader) presetsHeader.hidden = !enabled;
+if (showDescToggle) showDescToggle.checked = !!enabled;
+}
+
+// ====== UI refs ======
+const backendDot = document.getElementById("backendDot");
+const backendStatus = document.getElementById("backendStatus");
+const lastAction = document.getElementById("lastAction");
+
+const refreshLogosBtn = document.getElementById("refreshLogosBtn");
+const testBackendBtn = document.getElementById("testBackendBtn");
+
+const serviceLogoSelect = document.getElementById("serviceLogoSelect");
+const testimoniesLogoSelect = document.getElementById("testimoniesLogoSelect");
+const macroSelect = document.getElementById("macroSelect");
+
+const serviceLogoDesc = document.getElementById("serviceLogoDesc");
+const testimoniesDesc = document.getElementById("testimoniesDesc");
+const macroDesc = document.getElementById("macroDesc");
+
+// Preset buttons
+const btnStreamBeginning = document.getElementById("btnStreamBeginning");
+const btnCamera = document.getElementById("btnCamera");
+const btnServiceLogo = document.getElementById("btnServiceLogo");
+const btnShowSlides = document.getElementById("btnShowSlides");
+const btnTestimonies = document.getElementById("btnTestimonies");
+const btnEndingStream = document.getElementById("btnEndingStream");
+const btnSetMacro = document.getElementById("btnSetMacro");
+const btnAudioControl = document.getElementById("btnAudioControl");
+const btnCameraClearSlide = document.getElementById("btnCameraClearSlide");
+const btnServiceLogoClearSlide = document.getElementById("btnServiceLogoClearSlide");
+const btnClearSlide = document.getElementById("btnClearSlide");
+const btnNSCSetup = document.getElementById("btnNSCSetup");
+
+// Audio UI
+const audioOverlay = document.getElementById("audioOverlay");
+const audioPlaylistSegment = document.getElementById("audioPlaylistSegment");
+const audioGrid = document.getElementById("audioGrid");
+const btnClearAudio = document.getElementById("btnClearAudio");
+const audioCloseButton = document.getElementById("audioCloseButton");
+const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
+
+// Settings UI
+const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
+const autoShowToggle = document.getElementById("autoShowToggle");
+const settingsOverlay = document.getElementById("settingsOverlay");
+const settingsButton = document.getElementById("settingsButton");
+const settingsCloseButton = document.getElementById("settingsCloseButton");
+
+// Prevent select taps from triggering the main button
+function stopBtnClickWhenSelecting(selectEl) {
+if (!selectEl) return;
+
+["click", "pointerdown", "touchstart", "mousedown"].forEach(evt => {
+selectEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
+});
+}
+
+stopBtnClickWhenSelecting(serviceLogoSelect);
+stopBtnClickWhenSelecting(testimoniesLogoSelect);
+stopBtnClickWhenSelecting(macroSelect);
+
+function setBackendStatus(ok, text) {
+if (!backendDot || !backendStatus) return;
+
+backendDot.classList.toggle("ok", !!ok);
+backendStatus.textContent = text || (ok ? "Backend: Connected" : "Backend: Offline");
+}
+
+function setLastAction(text) {
+if (!lastAction) return;
+lastAction.textContent = `Last action: ${text || "—"}`;
+}
+
+function setButtonsEnabled(enabled) {
+[
+btnStreamBeginning,
+btnCamera,
+btnServiceLogo,
+btnShowSlides,
+btnTestimonies,
+btnEndingStream,
+btnCameraClearSlide,
+btnServiceLogoClearSlide,
+btnClearSlide,
+btnNSCSetup,
+btnSetMacro,
+btnAudioControl
+].forEach(button => {
+if (button) button.disabled = !enabled;
+});
+
+if (macroSelect) macroSelect.disabled = !enabled;
+if (refreshLogosBtn) refreshLogosBtn.disabled = !enabled;
+if (testBackendBtn) testBackendBtn.disabled = false;
+if (serviceLogoSelect) serviceLogoSelect.disabled = !enabled;
+if (testimoniesLogoSelect) testimoniesLogoSelect.disabled = !enabled;
+if (autoShowToggle) autoShowToggle.disabled = !enabled;
+}
+
+function escapeHtml(s) {
+return String(s || "").replace(/[&<>"']/g, c => ({
+"&": "&amp;",
+"<": "&lt;",
+">": "&gt;",
+'"': "&quot;",
+"'": "&#39;"
+}[c]));
+}
+
+function getStored(key) {
+return (localStorage.getItem(key) || "").trim();
+}
+
+function setStored(key, val) {
+localStorage.setItem(key, String(val || "").trim());
+}
+
+function selectedName(selectEl) {
+if (!selectEl) return "—";
+
+const opt = selectEl.options[selectEl.selectedIndex];
+return opt ? (opt.textContent || "—") : "—";
+}
+
+function syncDescriptions() {
+const sName = selectedName(serviceLogoSelect);
+const tName = selectedName(testimoniesLogoSelect);
+const mName = selectedName(macroSelect);
+
+if (serviceLogoDesc) {
+serviceLogoDesc.innerHTML =
+`Sets ProPresenter Announcement to <b>${escapeHtml(sName)}</b>, and shows the <b>Audience Camera</b> on OBS.`;
+}
+
+if (testimoniesDesc) {
+testimoniesDesc.innerHTML =
+`Sets ProPresenter Announcement to <b>${escapeHtml(tName)}</b> and sets OBS scene to <b>Testimonies</b>.`;
+}
+
+if (macroDesc) {
+macroDesc.innerHTML =
+`Triggers ProPresenter Macro: <b>${escapeHtml(mName)}</b> (sets look for In-House TVs + OBS).`;
+}
+}
+
+async function testBackend() {
+const { health } = endpoints();
+
+try {
+const res = await fetch(health, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+setBackendStatus(true, "Backend: Connected ✔");
+setButtonsEnabled(true);
+return true;
+} catch {
+setBackendStatus(false, "Backend: Offline");
+setButtonsEnabled(false);
+return false;
+}
+}
+
+function fillSelect(selectEl, items, storageKey, preferBasic) {
+if (!selectEl) return;
+
+const prev = getStored(storageKey);
+selectEl.innerHTML = "";
+
+if (!Array.isArray(items) || items.length === 0) {
+const opt = document.createElement("option");
+opt.value = "";
+opt.textContent = "No service logos found";
+selectEl.appendChild(opt);
+selectEl.value = "";
+return;
+}
+
+items.forEach(it => {
+const opt = document.createElement("option");
+opt.value = String(it.uuid || "");
+opt.textContent = String(it.name || "(Unnamed)");
+selectEl.appendChild(opt);
+});
+
+if (prev && items.some(x => String(x.uuid) === prev)) {
+selectEl.value = prev;
+} else if (preferBasic) {
+const basic = items.find(x => String(x.name) === "Basic Service Logo");
+
+if (basic) {
+selectEl.value = String(basic.uuid || "");
+} else {
+selectEl.value = String(items[0].uuid || "");
+}
+
+setStored(storageKey, selectEl.value);
+} else {
+selectEl.value = String(items[0].uuid || "");
+setStored(storageKey, selectEl.value);
+}
+}
+
+function fillMacroSelect(selectEl, names, storageKey) {
+if (!selectEl) return;
+
+const prev = getStored(storageKey);
+selectEl.innerHTML = "";
+
+const list = Array.isArray(names) ? names.filter(Boolean).map(String) : [];
+
+if (list.length === 0) {
+const opt = document.createElement("option");
+opt.value = "";
+opt.textContent = "No macros found";
+selectEl.appendChild(opt);
+selectEl.value = "";
+return;
+}
+
+list.forEach(name => {
+const opt = document.createElement("option");
+opt.value = name;
+opt.textContent = name;
+selectEl.appendChild(opt);
+});
+
+if (prev && list.includes(prev)) {
+selectEl.value = prev;
+} else {
+selectEl.value = list[0];
+setStored(storageKey, selectEl.value);
+}
+}
+
+async function refreshServiceLogos() {
+const { serviceLogos } = endpoints();
+
+try {
+const res = await fetch(serviceLogos, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const data = await res.json();
+const items = Array.isArray(data?.items) ? data.items : [];
+
+fillSelect(serviceLogoSelect, items, SERVICE_LOGO_UUID_KEY, true);
+fillSelect(testimoniesLogoSelect, items, TESTIMONIES_LOGO_UUID_KEY, true);
+
+if (!getStored(SERVICE_LOGO_UUID_KEY) && serviceLogoSelect) {
+setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
+}
+
+if (!getStored(TESTIMONIES_LOGO_UUID_KEY) && testimoniesLogoSelect) {
+setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
+}
+
+syncDescriptions();
+} catch {
+fillSelect(serviceLogoSelect, [], SERVICE_LOGO_UUID_KEY, true);
+fillSelect(testimoniesLogoSelect, [], TESTIMONIES_LOGO_UUID_KEY, true);
+syncDescriptions();
+}
+}
+
+async function refreshMacros() {
+if (!macroSelect) return;
+
+const { macros } = endpoints();
+
+try {
+const res = await fetch(macros, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const data = await res.json();
+const items = Array.isArray(data?.items) ? data.items : [];
+const names = items.map(x => x?.name).filter(Boolean);
+
+fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
+
+const hasAny = names.length > 0;
+if (btnSetMacro) btnSetMacro.disabled = !hasAny;
+macroSelect.disabled = !hasAny;
+} catch {
+fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
+
+if (btnSetMacro) btnSetMacro.disabled = true;
+macroSelect.disabled = true;
+} finally {
+syncDescriptions();
+}
+}
+
+async function refreshAutoShow() {
+if (!autoShowToggle) return;
+
+const { autoShow } = endpoints();
+
+try {
+const res = await fetch(autoShow, { cache: "no-cache" });
+
+if (res.ok) {
+const data = await res.json();
+autoShowToggle.checked = !!data.enabled;
+}
+} catch {}
+}
+
+if (autoShowToggle) {
+autoShowToggle.addEventListener("change", async e => {
+const { autoShow } = endpoints();
+const enabled = e.target.checked;
+
+try {
+const res = await fetch(autoShow, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ enabled })
+});
+
+if (!res.ok) throw new Error("Failed to update auto show");
+
+setLastAction(enabled ? "Auto Show Slides Enabled" : "Auto Show Slides Disabled");
+} catch {
+e.target.checked = !enabled;
+setLastAction("Failed to update Auto Show Slides");
+}
+});
+}
+
+if (serviceLogoSelect) {
+serviceLogoSelect.addEventListener("change", () => {
+setStored(SERVICE_LOGO_UUID_KEY, serviceLogoSelect.value);
+syncDescriptions();
+});
+}
+
+if (testimoniesLogoSelect) {
+testimoniesLogoSelect.addEventListener("change", () => {
+setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
+syncDescriptions();
+});
+}
+
+if (macroSelect) {
+macroSelect.addEventListener("change", () => {
+setStored(MACRO_NAME_KEY, macroSelect.value);
+syncDescriptions();
+});
+}
+
+// ====== Fix accidental presses during scroll on touch devices ======
+function attachTapHandler(el, handler) {
+if (!el || typeof handler !== "function") return;
+
+let startX = 0;
+let startY = 0;
+let moved = false;
+let activePointerId = null;
+
+const MOVE_PX = 10;
+
+el.addEventListener("pointerdown", e => {
+if (el.disabled) return;
+if (e.isPrimary === false) return;
+
+activePointerId = e.pointerId;
+moved = false;
+startX = e.clientX;
+startY = e.clientY;
+
+try {
+el.setPointerCapture(e.pointerId);
+} catch {}
+});
+
+el.addEventListener("pointermove", e => {
+if (activePointerId === null || e.pointerId !== activePointerId) return;
+
+const dx = Math.abs(e.clientX - startX);
+const dy = Math.abs(e.clientY - startY);
+
+if (dx > MOVE_PX || dy > MOVE_PX) moved = true;
+});
+
+function finish(e) {
+if (activePointerId === null || e.pointerId !== activePointerId) return;
+
+try {
+el.releasePointerCapture(e.pointerId);
+} catch {}
+
+const shouldFire = !moved;
+activePointerId = null;
+
+if (shouldFire) handler();
+}
+
+el.addEventListener("pointerup", finish);
+
+el.addEventListener("pointercancel", () => {
+activePointerId = null;
+moved = false;
+});
+
+el.addEventListener("click", e => {
+e.preventDefault();
+e.stopPropagation();
+}, true);
+}
+
+// ====== Actions ======
+async function runPreset(presetName) {
+const ok = await testBackend();
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
+
+const { preset } = endpoints();
+const payload = { preset: presetName };
+
+if (presetName === "service_logo") {
+const uuid = getStored(SERVICE_LOGO_UUID_KEY) || (serviceLogoSelect ? serviceLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Service Logo selected)");
+return;
+}
+
+payload.service_logo_uuid = uuid;
+}
+
+if (presetName === "testimonies") {
+const uuid = getStored(TESTIMONIES_LOGO_UUID_KEY) || (testimoniesLogoSelect ? testimoniesLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Testimonies logo selected)");
+return;
+}
+
+payload.service_logo_uuid = uuid;
+}
+
+setLastAction(`Running: ${presetName}`);
+
+try {
+const res = await fetch(preset, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify(payload)
+});
+
+if (!res.ok) throw new Error("Bad response");
+
+setLastAction(`Done: ${presetName}`);
+} catch {
+setLastAction(`Failed: ${presetName}`);
+}
+}
+
+async function runPresetClearSlide(presetName) {
+const ok = await testBackend();
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
+
+const { preset } = endpoints();
+const url = `${preset}?clearslide=true`;
+const payload = { preset: presetName };
+
+if (presetName === "service_logo") {
+const uuid = getStored(SERVICE_LOGO_UUID_KEY) || (serviceLogoSelect ? serviceLogoSelect.value : "");
+
+if (!uuid) {
+setLastAction("Failed (no Service Logo selected)");
+return;
+}
+
+payload.service_logo_uuid = uuid;
+}
+
+setLastAction(`Running: ${presetName} + clear slide`);
+
+try {
+const res = await fetch(url, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify(payload)
+});
+
+if (!res.ok) throw new Error("Bad response");
+
+setLastAction(`Done: ${presetName} + clear slide`);
+} catch {
+setLastAction(`Failed: ${presetName} + clear slide`);
+}
+}
+
+async function runMacro() {
+const ok = await testBackend();
+
+if (!ok) {
+setLastAction("Failed (backend offline)");
+return;
+}
+
+const { macro } = endpoints();
+const name = getStored(MACRO_NAME_KEY) || (macroSelect ? macroSelect.value : "");
+
+if (!name) {
+setLastAction("Failed (no macro selected)");
+return;
+}
+
+setLastAction(`Running macro: ${name}`);
+
+try {
+const res = await fetch(macro, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ name })
+});
+
+if (!res.ok) throw new Error("Bad response");
+
+setLastAction(`Done macro: ${name}`);
+} catch {
+setLastAction(`Failed macro: ${name}`);
+}
+}
+
+// ====== Audio Functions ======
+function parseActiveAudioItem(text) {
+const raw = String(text || "").trim();
+
+if (!raw) return "";
+
+const itemMatch = raw.match(/^item:\s*(.+)$/im);
+
+if (itemMatch && itemMatch[1]) {
+return itemMatch[1].trim();
+}
+
+return "";
+}
+
+async function refreshNowPlayingAudio() {
+if (!audioNowPlayingItem) return;
+
+const { audioActive } = endpoints();
+
+try {
+const res = await fetch(audioActive, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+
+const text = await res.text();
+const item = parseActiveAudioItem(text);
+
+audioNowPlayingItem.textContent = item || "—";
+} catch {
+audioNowPlayingItem.textContent = "—";
+}
+}
+
+window.loadTracks = async name => {
+const { audioTracks } = endpoints();
+
+try {
+const res = await fetch(`${audioTracks}?playlist=${encodeURIComponent(name)}`);
+const data = await res.json();
+const items = Array.isArray(data?.items) ? data.items : [];
+
+audioGrid.innerHTML = "";
+
+items.forEach(trackName => {
+const clean = String(trackName)
+.replace(/\.[^/.]+$/, "")
+.replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "")
+.trim();
+
+const btn = document.createElement("div");
+btn.className = "audio-btn";
+btn.textContent = clean;
+
+attachTapHandler(btn, () => window.triggerAudio(name, trackName));
+audioGrid.appendChild(btn);
+});
+} catch {
+audioGrid.innerHTML = "<div style='grid-column: span 3; color: var(--status-grey); text-align: center; margin-top: 10px;'>Failed to load tracks</div>";
+}
+};
+
+window.triggerAudio = async (playlistName, trackName) => {
+setLastAction(`Playing Pad: ${trackName}`);
+
+const { audioTrigger } = endpoints();
+
+try {
+await fetch(audioTrigger, {
+method: "POST",
+body: JSON.stringify({
+playlist: playlistName,
+track: trackName
+}),
+headers: {
+"Content-Type": "application/json"
+}
+});
+
+setTimeout(refreshNowPlayingAudio, 300);
+} catch (err) {
+console.error(err);
+}
+};
+
+function openAudioModal() {
+if (!audioOverlay) return;
+
+audioOverlay.style.display = "flex";
+refreshNowPlayingAudio();
+
+const { audioPlaylists } = endpoints();
+
+fetch(audioPlaylists)
+.then(res => res.json())
+.then(data => {
+const items = Array.isArray(data?.items) ? data.items : [];
+
+audioPlaylistSegment.innerHTML = "";
+
+items.forEach((name, i) => {
+const btn = document.createElement("button");
+btn.type = "button";
+
+if (i === 0) btn.className = "active";
+
+btn.textContent = name;
+
+attachTapHandler(btn, () => {
+audioPlaylistSegment.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+btn.classList.add("active");
+window.loadTracks(name);
+});
+
+audioPlaylistSegment.appendChild(btn);
+});
+
+if (items[0]) window.loadTracks(items[0]);
+})
+.catch(() => {
+audioPlaylistSegment.innerHTML = "<div style='padding: 10px; color: var(--status-grey);'>Failed to load playlists</div>";
+});
+}
+
+// Attach preset interactions
+attachTapHandler(btnStreamBeginning, () => runPreset("stream_beginning"));
+attachTapHandler(btnCamera, () => runPreset("camera"));
+attachTapHandler(btnServiceLogo, () => runPreset("service_logo"));
+attachTapHandler(btnShowSlides, () => runPreset("show_slides"));
+attachTapHandler(btnTestimonies, () => runPreset("testimonies"));
+attachTapHandler(btnEndingStream, () => runPreset("ending_stream"));
+attachTapHandler(btnSetMacro, () => runMacro());
+attachTapHandler(btnCameraClearSlide, () => runPresetClearSlide("camera"));
+attachTapHandler(btnServiceLogoClearSlide, () => runPresetClearSlide("service_logo"));
+attachTapHandler(btnClearSlide, () => runPreset("clear_slide"));
+attachTapHandler(btnNSCSetup, () => runPreset("nsc_setup"));
+
+// Attach audio interactions
+attachTapHandler(btnAudioControl, () => openAudioModal());
+
+attachTapHandler(btnClearAudio, async () => {
+setLastAction("Cleared Ambient Audio");
+
+const { audioClear } = endpoints();
+
+try {
+await fetch(audioClear, { method: "POST" });
+setTimeout(refreshNowPlayingAudio, 300);
+} catch (err) {
+console.error(err);
+}
+});
+
+if (audioCloseButton) {
+audioCloseButton.onclick = () => {
+audioOverlay.style.display = "none";
+};
+}
+
+if (audioOverlay) {
+audioOverlay.addEventListener("click", e => {
+if (e.target === audioOverlay) audioOverlay.style.display = "none";
+});
+}
+
+// Settings interactions
+function openModal() {
+if (settingsOverlay) settingsOverlay.style.display = "flex";
+}
+
+function closeModal() {
+if (settingsOverlay) settingsOverlay.style.display = "none";
+}
+
+if (settingsButton) settingsButton.onclick = () => openModal();
+if (settingsCloseButton) settingsCloseButton.onclick = () => closeModal();
+
+if (settingsOverlay) {
+settingsOverlay.addEventListener("click", e => {
+if (e.target === settingsOverlay) closeModal();
+});
+}
+
+document.querySelectorAll("#themeSegment button").forEach(btn => {
+btn.addEventListener("click", () => {
+const mode = btn.dataset.mode;
+localStorage.setItem(THEME_KEY, mode);
+applyTheme(mode);
+});
+});
+
+if (refreshLogosBtn) {
+refreshLogosBtn.onclick = async () => {
+await refreshServiceLogos();
+await refreshMacros();
+};
+}
+
+if (testBackendBtn) {
+testBackendBtn.onclick = async () => {
+const ok = await testBackend();
+
+if (ok) {
+await refreshServiceLogos();
+await refreshMacros();
+await refreshAutoShow();
+}
+};
+}
+
+function syncBtnSliderUI() {
+const pct = getBtnScalePercent();
+
+if (btnTextSizeSlider) {
+btnTextSizeSlider.value = pct;
+}
+
+applyBtnScale(pct);
+}
+
+if (btnTextSizeSlider) {
+btnTextSizeSlider.addEventListener("input", () => {
+applyBtnScale(parseInt(btnTextSizeSlider.value, 10));
+});
+
+btnTextSizeSlider.addEventListener("change", () => {
+setBtnScalePercent(btnTextSizeSlider.value);
+});
+}
+
+if (showDescToggle) {
+showDescToggle.addEventListener("change", () => {
+setShowDesc(showDescToggle.checked);
+});
+}
+
+async function init() {
+loadTheme();
+updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
+applyShowDesc(getShowDesc());
+syncBtnSliderUI();
+
+setButtonsEnabled(false);
+setBackendStatus(false, "Backend: Checking…");
+setLastAction("—");
+syncDescriptions();
+
+const fullRefresh = async () => {
+const ok = await testBackend();
+
+if (ok) {
+await refreshServiceLogos();
+await refreshMacros();
+await refreshAutoShow();
+}
+};
+
+await fullRefresh();
+
+setInterval(fullRefresh, 10000);
+
+setInterval(() => {
+if (audioOverlay && audioOverlay.style.display === "flex") {
+refreshNowPlayingAudio();
+}
+}, 1000);
+}
+
+init();
+})();
+</script>
+</body>
+</html>

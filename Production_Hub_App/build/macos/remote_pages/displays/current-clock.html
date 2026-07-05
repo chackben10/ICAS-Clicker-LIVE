@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Centered Clock – 12 Hour</title>
+
+  <!-- Antonio -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    @font-face {
+      font-family: 'Norwester';
+      src: url("https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/Norwester/Norwester-Regular.otf")
+           format("opentype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root{
+      /* Base design size (16:9) */
+      --base-w: 1920;
+      --base-h: 1080;
+
+      /* Computed by JS */
+      --fit-scale: 1;
+
+      /* Visuals */
+      --bg: transparent;
+      --fg: #fff;
+      --panel: rgba(255,255,255,0.15);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body{
+      margin: 0;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    /* Viewport stage */
+    .stage{
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+
+    /* 16:9 bounding box that fits inside ANY viewport */
+    .bbox{
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      /* Optional: uncomment to debug bounding box
+      outline: 1px dashed rgba(255,255,255,0.15);
+      */
+    }
+
+    /* Designed at 1920x1080, then scaled uniformly to fit bbox */
+    .design{
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: calc(var(--base-w) * 1px);
+      height: calc(var(--base-h) * 1px);
+      transform: translate(-50%, -50%) scale(var(--fit-scale));
+      transform-origin: center;
+      display: grid;
+      place-items: center;
+      color: var(--fg);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "lnum" 1;
+    }
+
+    /* Content layout (all in base px so scaling stays perfect) */
+    .wrap{
+      display: grid;
+      gap: 32px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .topline{
+      font-family: "Antonio", system-ui, sans-serif;
+      font-weight: 700;
+      font-size: 56px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--fg);
+      opacity: 0.90;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .timeRow{
+      display: grid;
+      grid-auto-flow: column;
+      gap: 32px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .panel{
+      height: 260px;
+      border-radius: 24px;
+      background: var(--panel);
+      display: grid;
+      place-items: center;
+      padding: 36px;
+    }
+
+    .mainTime{
+      width: 860px;
+      font-family: "Norwester", "Antonio", system-ui, sans-serif;
+      font-size: 180px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      white-space: nowrap;
+      position: relative;
+      color: var(--fg);
+    }
+
+    .seconds{
+      width: 220px;
+      font-family: "Norwester", "Antonio", system-ui, sans-serif;
+      font-size: 120px;
+      line-height: 1;
+      white-space: nowrap;
+      color: var(--fg);
+    }
+
+    .ampmBadge{
+      position: absolute;
+      top: 18px;
+      right: 22px;
+      font-family: "Antonio", system-ui, sans-serif;
+      font-weight: 800;
+      font-size: 34px;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: var(--fg);
+      opacity: 0.85;
+      line-height: 1;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <div class="bbox" id="bbox">
+      <div class="design" id="design">
+        <div class="wrap">
+          <div id="topline" class="topline">—</div>
+
+          <div class="timeRow">
+            <div class="panel mainTime">
+              <span id="hm">--:--</span>
+              <span id="ampm" class="ampmBadge">—</span>
+            </div>
+            <div class="panel seconds" id="ss">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------
+    // Fit-to-viewport scaling:
+    // If viewport isn't 16:9, we compute a 16:9 bounding box
+    // that fits, then scale the entire 1920x1080 design to it.
+    // This keeps text + spacing proportional at ANY window size
+    // (including tiny sizes like 302x170).
+    // ---------------------------------------------------------
+    function updateFitScale() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // 16:9 bounding box that fits inside viewport
+      const bboxW = Math.min(vw, vh * 16 / 9);
+      const bboxH = Math.min(vh, vw * 9 / 16);
+
+      // Base design size
+      const baseW = 1920;
+      const baseH = 1080;
+
+      // Uniform scale to fit inside bbox
+      const scale = Math.min(bboxW / baseW, bboxH / baseH);
+
+      document.documentElement.style.setProperty("--fit-scale", String(scale));
+    }
+
+    window.addEventListener("resize", updateFitScale);
+    updateFitScale();
+
+    // ---------------------------------------------------------
+    // Optional URL param:
+    //   ?tint=2596be  (hex, with/without #)
+    // Requested behavior:
+    // - Text becomes EXACT tint color
+    // - Panels become tinted with that color (transparent)
+    // - If tint missing/invalid: keep original white styling
+    // ---------------------------------------------------------
+    const params = new URLSearchParams(window.location.search);
+
+    function normalizeHex(hex) {
+      if (!hex) return null;
+      let h = String(hex).trim();
+      if (h.startsWith("#")) h = h.slice(1);
+      if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split("").map(ch => ch + ch).join("");
+      if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+      return h.toLowerCase();
+    }
+
+    function hexToRgb(hex6) {
+      return {
+        r: parseInt(hex6.slice(0, 2), 16),
+        g: parseInt(hex6.slice(2, 4), 16),
+        b: parseInt(hex6.slice(4, 6), 16),
+      };
+    }
+
+    function applyTint(hex6) {
+      const root = document.documentElement;
+      const { r, g, b } = hexToRgb(hex6);
+
+      // Text = exact tint
+      root.style.setProperty("--fg", `#${hex6}`);
+
+      // Panels = tinted @ same alpha feel
+      root.style.setProperty("--panel", `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    const tintParam = normalizeHex(params.get("tint"));
+    if (tintParam) applyTint(tintParam);
+
+    // ---------------------------------------------------------
+    // Clock logic (unchanged)
+    // ---------------------------------------------------------
+    const toplineEl = document.getElementById("topline");
+    const hmEl      = document.getElementById("hm");
+    const ssEl      = document.getElementById("ss");
+    const ampmEl    = document.getElementById("ampm");
+
+    const fmtParts = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "2-digit",
+      year: "numeric"
+    });
+
+    function pad2(n){ return String(n).padStart(2, "0"); }
+
+    function tick(){
+      const d = new Date();
+      const parts = fmtParts.formatToParts(d);
+      const get = t => (parts.find(p => p.type === t)?.value || "").toUpperCase();
+
+      toplineEl.textContent =
+        `${get("weekday")} \u2022 ${get("month")} ${get("day")} ${get("year")}`;
+
+      let h = d.getHours();
+      ampmEl.textContent = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+
+      hmEl.textContent = `${pad2(h)}:${pad2(d.getMinutes())}`;
+      ssEl.textContent = pad2(d.getSeconds());
+    }
+
+    tick();
+    setTimeout(() => {
+      tick();
+      setInterval(tick, 1000);
+    }, 1000 - new Date().getMilliseconds());
+  </script>
+</body>
+</html>

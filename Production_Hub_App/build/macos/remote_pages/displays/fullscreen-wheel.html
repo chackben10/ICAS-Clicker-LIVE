@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Prize Wheel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+Malayalam:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-light: #1a1a1a;
+            --gold: #D4AF37;
+            --dark-grey: #333333;
+            --light-grey: #E0E0E0;
+            --accent-blue: #00A8FF;
+            --text-dark: #111111;
+            --text-light: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle, var(--bg-light) 0%, var(--bg-dark) 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            color: var(--text-light);
+        }
+
+        #app-container {
+            position: relative;
+            display: flex;
+            flex-direction: column; 
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            justify-content: center;
+            gap: 6vmin;
+        }
+
+        @media (orientation: landscape) {
+            #app-container {
+                flex-direction: row;
+                gap: 10vmin;
+            }
+        }
+
+        #wheel-wrapper {
+            position: relative;
+            width: 80vmin; 
+            height: 80vmin;
+            max-width: 800px;
+            max-height: 800px;
+            filter: drop-shadow(0 2vmin 4vmin rgba(0,0,0,0.8));
+        }
+
+        #wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 0.8vmin solid #555; 
+        }
+
+        #wheel-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8%;
+            height: 8%;
+            background: #555;
+            border-radius: 50%;
+            border: 0.4vmin solid var(--bg-dark);
+            box-shadow: inset 0 0.3vmin 0.5vmin rgba(0,0,0,0.5);
+        }
+
+        .flapper {
+            position: absolute;
+            top: -3vmin;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 2.5vmin solid transparent;
+            border-right: 2.5vmin solid transparent;
+            border-top: 5.5vmin solid var(--accent-blue);
+            z-index: 10;
+            filter: drop-shadow(0 0.4vmin 0.6vmin rgba(0,0,0,0.5));
+            transform-origin: top center;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #spin-btn {
+            padding: 2vmin 6vmin;
+            font-size: max(24px, 3vmin);
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background-color: var(--accent-blue);
+            color: var(--text-light);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 168, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #spin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(0, 168, 255, 0.4);
+        }
+
+        #spin-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 5px 10px rgba(0, 168, 255, 0.3);
+        }
+
+        #spin-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .utility-buttons {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 12px;
+            z-index: 50;
+        }
+
+        .utility-btn {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.5);
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .utility-btn:hover {
+            color: var(--text-light);
+            border-color: rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .utility-btn:active {
+            transform: translateY(0);
+        }
+
+        #modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 100;
+        }
+
+        #modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* CHANGED: Made the modal card significantly larger */
+        .modal-card {
+            background: #1e1e1e;
+            border: 3px solid var(--gold);
+            padding: 8vmin;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 35px 70px rgba(0,0,0,0.6);
+            max-width: 1200px;
+            width: 95%;
+            transform: scale(0.9);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        /* CHANGED: Increased font size for English text */
+        #modal-english {
+            font-size: max(42px, 6vmin);
+            font-weight: 900;
+            color: var(--gold);
+            margin-bottom: 30px;
+            line-height: 1.2;
+        }
+
+        /* CHANGED: Increased font size for Malayalam text */
+        #modal-malayalam {
+            font-family: 'Noto Sans Malayalam', sans-serif;
+            font-size: max(30px, 4.5vmin);
+            color: var(--text-light);
+            margin-bottom: 50px;
+            line-height: 1.4;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        /* CHANGED: Increased button padding and text size to match the bigger modal */
+        .btn-close, .btn-remove {
+            padding: 16px 32px;
+            border-radius: 10px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-close {
+            background: transparent;
+            border: 2px solid #555;
+            color: #aaa;
+        }
+        
+        .btn-close:hover {
+            border-color: #888;
+            color: #fff;
+        }
+
+        .btn-remove {
+            background: var(--accent-blue);
+            border: none;
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0, 168, 255, 0.3);
+        }
+
+        .btn-remove:hover {
+            background: #0088cc;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="wheel-wrapper">
+            <div class="flapper" id="flapper"></div>
+            <canvas id="wheel" width="1000" height="1000"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="spin-btn">SPIN</button>
+        </div>
+        
+        <div class="utility-buttons">
+            <button class="utility-btn" id="fullscreen-btn" title="Toggle Fullscreen">
+                <svg id="icon-maximize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+                <svg id="icon-minimize" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                </svg>
+            </button>
+
+            <button class="utility-btn" id="refresh-btn" title="Reset & Reload Data">
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div id="modal-overlay">
+            <div class="modal-card">
+                <div id="modal-english">Loading...</div>
+                <div id="modal-malayalam">ലോഡ് ചെയ്യുന്നു...</div>
+                <div class="modal-buttons">
+                    <button class="btn-close" id="btn-close">Close</button>
+                    <button class="btn-remove" id="btn-remove">Remove & Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const palette = ["#D4AF37", "#333333", "#E0E0E0"]; 
+        const textColors = ["#111111", "#FFFFFF", "#111111"]; 
+
+        let wheelItems = [];
+        
+        const WHEEL_RADIUS = 500;
+        const OUTER_RADIUS = WHEEL_RADIUS - 15;
+
+        const wheelCache = document.createElement('canvas');
+        wheelCache.width = 1000;
+        wheelCache.height = 1000;
+        const cacheCtx = wheelCache.getContext('2d', { alpha: false });
+
+        function initData() {
+            const saved = localStorage.getItem('churchWheelData');
+            if (saved) {
+                wheelItems = JSON.parse(saved);
+                updateTextCanvases();
+                renderWheelToCache(); 
+                drawWheel(); 
+            } else {
+                fetch('wheel_data.json')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.json();
+                    })
+                    .then(data => {
+                        wheelItems = data;
+                        if(wheelItems.length === 0) wheelItems = [{ id: "empty", english: "Empty Wheel", malayalam: "ചക്രം ശൂന്യമാണ്" }];
+                        saveData();
+                        updateTextCanvases();
+                        renderWheelToCache(); 
+                        drawWheel();
+                    })
+                    .catch(error => {
+                        console.error("Error loading wheel_data.json:", error);
+                        wheelItems = [{ id: "error", english: "Fetch Error! Check console.", malayalam: "ഡാറ്റ പിശക്" }];
+                        updateTextCanvases();
+                        renderWheelToCache(); 
+                        drawWheel();
+                    });
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('churchWheelData', JSON.stringify(wheelItems));
+        }
+
+        function updateTextCanvases() {
+            const numSlices = wheelItems.length;
+            if (numSlices === 0) return;
+            
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            const safeAngle = Math.min((sliceAngle / 2) * 0.80, Math.PI / 7); 
+            
+            const actualOuterX = OUTER_RADIUS * Math.cos(safeAngle);
+            const innerX = 120; 
+            
+            const idealRatio = Math.log(actualOuterX / innerX) / (2 * Math.tan(safeAngle));
+
+            for (let i = 0; i < numSlices; i++) {
+                let colorIndex = i % palette.length;
+                if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
+                    colorIndex = 1; 
+                }
+                let textColor = textColors[colorIndex];
+                
+                wheelItems[i].textData = createTextCanvas(wheelItems[i].english, textColor, idealRatio);
+                wheelItems[i].drawBounds = { innerX: innerX, outerX: actualOuterX, safeAngle: safeAngle };
+            }
+        }
+
+        function createTextCanvas(text, color, idealRatio) {
+            const c = document.createElement('canvas');
+            const targetHeight = 800;
+            const targetWidth = targetHeight * idealRatio;
+            
+            c.width = targetWidth; 
+            c.height = targetHeight;
+            const ctx = c.getContext('2d');
+            
+            ctx.fillStyle = color;
+            ctx.textAlign = 'right'; 
+            ctx.textBaseline = 'middle';
+            
+            let fontSize = 200; 
+            let lines = [];
+            
+            const maxWidth = targetWidth * 0.95; 
+            const maxHeight = targetHeight * 0.95; 
+            
+            while (fontSize > 10) {
+                ctx.font = `bold ${fontSize}px Inter`;
+                const words = text.split(' ');
+                let line = '';
+                lines = [];
+                
+                for (let i = 0; i < words.length; i++) {
+                    let testLine = line + words[i] + ' ';
+                    if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                        lines.push(line.trim());
+                        line = words[i] + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line.trim());
+                
+                let actualWidth = 0;
+                for (let i = 0; i < lines.length; i++) {
+                    let w = ctx.measureText(lines[i]).width;
+                    if (w > actualWidth) actualWidth = w;
+                }
+                
+                let totalHeight = lines.length * (fontSize * 1.15);
+                
+                if (actualWidth <= maxWidth && totalHeight <= maxHeight) {
+                    break;
+                }
+                fontSize -= 4;
+            }
+            
+            const lineHeight = fontSize * 1.15;
+            const totalHeight = lines.length * lineHeight;
+            let startY = (c.height / 2) - (totalHeight / 2) + (fontSize / 2);
+            
+            const rightPadding = targetWidth * 0.02; 
+            
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], targetWidth - rightPadding, startY + (i * lineHeight));
+            }
+            
+            return { canvas: c, width: targetWidth, height: targetHeight };
+        }
+
+        function renderWheelToCache() {
+            cacheCtx.clearRect(0, 0, wheelCache.width, wheelCache.height);
+            const numSlices = wheelItems.length;
+            if (numSlices === 0) return;
+            
+            const cX = wheelCache.width / 2;
+            const cY = wheelCache.height / 2;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+
+            for (let i = 0; i < numSlices; i++) {
+                const startAngle = i * sliceAngle;
+                const endAngle = startAngle + sliceAngle;
+
+                let colorIndex = i % palette.length;
+                if (i === numSlices - 1 && colorIndex === 0 && numSlices > 1) {
+                    colorIndex = 1; 
+                }
+
+                cacheCtx.beginPath();
+                cacheCtx.moveTo(cX, cY);
+                cacheCtx.arc(cX, cY, WHEEL_RADIUS, startAngle, endAngle);
+                cacheCtx.fillStyle = palette[colorIndex];
+                cacheCtx.fill();
+
+                if (wheelItems[i].textData && wheelItems[i].drawBounds) {
+                    cacheCtx.save();
+                    cacheCtx.translate(cX, cY);
+                    cacheCtx.rotate(startAngle + sliceAngle / 2);
+
+                    const textData = wheelItems[i].textData;
+                    const bounds = wheelItems[i].drawBounds;
+                    const img = textData.canvas;
+                    const W_s = textData.width;
+                    
+                    const logInner = Math.log(bounds.innerX);
+                    const logOuter = Math.log(bounds.outerX);
+                    const logDiff = logOuter - logInner;
+                    
+                    const drawWidth = bounds.outerX - bounds.innerX;
+                    const stripWidth = 1.5; 
+
+                    for (let dx = 0; dx < drawWidth; dx += stripWidth) {
+                        let actualX = bounds.innerX + dx;
+                        let nextActualX = Math.min(actualX + stripWidth, bounds.outerX);
+                        
+                        let wedgeHeight = 2 * actualX * Math.tan(bounds.safeAngle); 
+                        
+                        let t1 = (Math.log(actualX) - logInner) / logDiff;
+                        let t2 = (Math.log(nextActualX) - logInner) / logDiff;
+                        
+                        let sourceX = t1 * W_s;
+                        let sWidth = (t2 - t1) * W_s;
+                        
+                        if (sourceX < 0) sourceX = 0;
+                        if (sWidth <= 0) sWidth = 0.1;
+                        
+                        cacheCtx.drawImage(
+                            img, 
+                            sourceX, 0, sWidth, img.height, 
+                            actualX, -wedgeHeight / 2, (nextActualX - actualX) + 0.5, wedgeHeight 
+                        );
+                    }
+                    cacheCtx.restore();
+                }
+            }
+        }
+
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        let currentRotation = 0; 
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentRotation);
+            ctx.drawImage(wheelCache, -centerX, -centerY);
+            ctx.restore();
+        }
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const masterCompressor = audioCtx.createDynamicsCompressor();
+        masterCompressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+        masterCompressor.knee.setValueAtTime(30, audioCtx.currentTime);
+        masterCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+        masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+        masterCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+        masterCompressor.connect(audioCtx.destination);
+
+        function playTick(speedRatio) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            const inverseSpeed = 1 - speedRatio; 
+
+            const duration = 0.015 + (0.035 * inverseSpeed); 
+            const volume = 0.15 + (0.15 * inverseSpeed);
+
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(400 + (200 * speedRatio), audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(masterCompressor); 
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        // NEW: Play a triumphant C Major Arpeggio when the modal pops up
+        function playCelebrationSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const now = audioCtx.currentTime;
+            
+            // C4, E4, G4, C5 (A bright, happy major chord sequence)
+            const frequencies = [261.63, 329.63, 392.00, 523.25]; 
+            
+            frequencies.forEach((freq, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'sine'; // Smooth tone for a clean fanfare
+                
+                // Arpeggiate by staggering the start times
+                const startTime = now + (index * 0.1);
+                osc.frequency.setValueAtTime(freq, startTime);
+                
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.5);
+                
+                osc.connect(gain);
+                gain.connect(masterCompressor);
+                
+                osc.start(startTime);
+                osc.stop(startTime + 1.5);
+            });
+            
+            // Final loud chord hitting right after the sequence finishes
+            const chordStartTime = now + 0.4; 
+            frequencies.forEach(freq => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle'; // Mixed with a triangle wave for extra punch
+                osc.frequency.setValueAtTime(freq, chordStartTime);
+                
+                gain.gain.setValueAtTime(0, chordStartTime);
+                gain.gain.linearRampToValueAtTime(0.4, chordStartTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, chordStartTime + 2.0);
+                
+                osc.connect(gain);
+                gain.connect(masterCompressor);
+                
+                osc.start(chordStartTime);
+                osc.stop(chordStartTime + 2.0);
+            });
+        }
+
+        let isSpinning = false;
+        let velocity = 0;
+        let lastTickSlice = -1;
+        let animationFrame;
+        let flapperAngle = 0;
+
+        const flapper = document.getElementById('flapper');
+        const spinBtn = document.getElementById('spin-btn');
+
+        function spin() {
+            if (isSpinning || wheelItems.length === 0 || wheelItems[0].id === 'error') return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            
+            velocity = 0.4 + Math.random() * 0.3; 
+            lastTickSlice = -1;
+            animate();
+        }
+
+        function animate() {
+            velocity *= 0.993; 
+
+            let topAngle = (3 * Math.PI / 2) - currentRotation;
+            while (topAngle < 0) topAngle += 2 * Math.PI;
+            while (topAngle >= 2 * Math.PI) topAngle -= 2 * Math.PI;
+
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            const currentSliceIndex = Math.floor(topAngle / sliceAngle);
+
+            let distanceToPeg = topAngle - (currentSliceIndex * sliceAngle);
+            const engagementZone = 0.08; 
+
+            if (distanceToPeg < engagementZone) {
+                let deflection = 1 - (distanceToPeg / engagementZone);
+                flapperAngle = -40 * deflection; 
+                let springForce = 0.0007 * deflection;
+                velocity -= springForce;
+            } else {
+                flapperAngle *= 0.5; 
+            }
+
+            if (currentSliceIndex !== lastTickSlice) {
+                if (lastTickSlice !== -1 && distanceToPeg > engagementZone) {
+                    let speedRatio = Math.min(1, Math.max(0, velocity / 0.5));
+                    
+                    playTick(speedRatio);
+                    flapperAngle = 20; 
+                }
+                lastTickSlice = currentSliceIndex;
+            }
+
+            currentRotation += velocity;
+            if (currentRotation >= 2 * Math.PI) currentRotation %= 2 * Math.PI;
+
+            flapper.style.transform = `translateX(-50%) rotate(${flapperAngle}deg)`;
+
+            if (velocity < 0.0005) {
+                velocity = 0;
+                isSpinning = false;
+                spinBtn.disabled = false;
+                cancelAnimationFrame(animationFrame);
+                resolveWinner();
+                return; 
+            }
+
+            drawWheel();
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        let currentWinnerIndex = -1;
+
+        function resolveWinner() {
+            const numSlices = wheelItems.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            
+            let topAngle = (3 * Math.PI / 2) - currentRotation;
+            if (topAngle < 0) topAngle += 2 * Math.PI;
+            
+            currentWinnerIndex = Math.floor(topAngle / sliceAngle);
+            const winner = wheelItems[currentWinnerIndex];
+
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.6 },
+                colors: ['#D4AF37', '#E0E0E0', '#00A8FF'],
+                zIndex: 200
+            });
+
+            setTimeout(() => {
+                // Fire the new celebration sound exactly when the modal appears
+                playCelebrationSound();
+                
+                document.getElementById('modal-english').innerText = winner.english;
+                document.getElementById('modal-malayalam').innerText = winner.malayalam;
+                document.getElementById('modal-overlay').classList.add('active');
+            }, 500);
+        }
+
+        document.getElementById('btn-close').addEventListener('click', () => {
+            document.getElementById('modal-overlay').classList.remove('active');
+        });
+
+        document.getElementById('btn-remove').addEventListener('click', () => {
+            if (currentWinnerIndex !== -1) {
+                wheelItems.splice(currentWinnerIndex, 1);
+                saveData();
+                updateTextCanvases(); 
+                renderWheelToCache(); 
+                drawWheel();
+            }
+            document.getElementById('modal-overlay').classList.remove('active');
+        });
+
+        spinBtn.addEventListener('click', spin);
+
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            if(confirm("Are you sure you want to reset the wheel? This will re-fetch from the JSON and bring back all items.")) {
+                localStorage.removeItem('churchWheelData');
+                location.reload();
+            }
+        });
+
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const iconMaximize = document.getElementById('icon-maximize');
+        const iconMinimize = document.getElementById('icon-minimize');
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                iconMaximize.style.display = 'none';
+                iconMinimize.style.display = 'block';
+            } else {
+                iconMaximize.style.display = 'block';
+                iconMinimize.style.display = 'none';
+            }
+        });
+
+        initData();
+
+    </script>
+</body>
+</html>

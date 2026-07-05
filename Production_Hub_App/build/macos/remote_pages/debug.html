@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ICAS Clicker Debug</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root {
+      --bg: #000000;
+      --panel-bg: #121212;
+      --card-bg: #181818;
+      --card-bg-soft: #202020;
+      --border: #333333;
+      --border-strong: #4a4a4a;
+
+      --text: #ffffff;
+      --muted: #9a9a9a;
+      --muted-2: #707070;
+
+      --title-color: #ff5252;
+      --ok: #00e676;
+      --warn: #ffcc00;
+      --bad: #ff5252;
+      --info: #64b5f6;
+
+      --button-bg: #222222;
+      --button-bg-hover: #2f2f2f;
+      --button-border: #444444;
+
+      --mono: Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 12px 0 28px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1100px;
+      padding: 16px;
+    }
+
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .title {
+      color: var(--title-color);
+      font-size: 1.45rem;
+      font-weight: 750;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.35;
+      max-width: 760px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button,
+    .back-link {
+      color: var(--text);
+      background: var(--button-bg);
+      border: 1px solid var(--button-border);
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+    }
+
+    .button:hover,
+    .back-link:hover {
+      background: var(--button-bg-hover);
+      border-color: var(--border-strong);
+    }
+
+    .button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .controls-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .control-block {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 70px;
+    }
+
+    .control-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .control-value {
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .select {
+      background: var(--button-bg);
+      color: var(--text);
+      border: 1px solid var(--button-border);
+      border-radius: 999px;
+      padding: 7px 10px;
+      min-width: 120px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      user-select: none;
+    }
+
+    .toggle-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--title-color);
+    }
+
+    .section {
+      margin-top: 18px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .section-subtitle {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.3;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .endpoint-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .endpoint-card.manual {
+      border-color: #3a4f5f;
+    }
+
+    .endpoint-card.action-only {
+      border-color: #5a4930;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.015);
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .method-badge {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 3px 7px;
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      background: var(--card-bg-soft);
+    }
+
+    .method-get {
+      color: var(--info);
+    }
+
+    .method-post {
+      color: var(--warn);
+    }
+
+    .endpoint-title {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .endpoint-description {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.35;
+      margin-top: 5px;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-align: right;
+      min-width: 140px;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--muted-2);
+      flex: 0 0 auto;
+    }
+
+    .dot.ok {
+      background: var(--ok);
+    }
+
+    .dot.warn {
+      background: var(--warn);
+    }
+
+    .dot.bad {
+      background: var(--bad);
+    }
+
+    .dot.pending {
+      background: var(--info);
+    }
+
+    .card-body {
+      padding: 12px;
+    }
+
+    .summary {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .summary:empty {
+      display: none;
+    }
+
+    details {
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    summary {
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.84rem;
+      user-select: none;
+      margin-bottom: 6px;
+    }
+
+    pre {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.42;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e6e6e6;
+      background: #0c0c0c;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 10px;
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    .manual-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .manual-controls input {
+      background: var(--button-bg);
+      color: var(--text);
+      border: 1px solid var(--button-border);
+      border-radius: 999px;
+      padding: 7px 10px;
+      min-width: 120px;
+    }
+
+    .thumb-img {
+      display: block;
+      margin-top: 10px;
+      max-width: min(100%, 360px);
+      border: 1px solid #444444;
+      border-radius: 8px;
+      background: #050505;
+    }
+
+    .endpoint-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+
+    .endpoint-table th,
+    .endpoint-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .endpoint-table th {
+      color: var(--muted);
+      font-weight: 650;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .endpoint-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      background: var(--card-bg-soft);
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin: 2px 4px 2px 0;
+    }
+
+    .pill.ok {
+      color: var(--ok);
+      border-color: rgba(0,230,118,0.35);
+    }
+
+    .pill.warn {
+      color: var(--warn);
+      border-color: rgba(255,204,0,0.35);
+    }
+
+    .pill.bad {
+      color: var(--bad);
+      border-color: rgba(255,82,82,0.35);
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+      margin-top: 6px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 820px) {
+      .top-row {
+        flex-direction: column;
+      }
+
+      .top-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .controls-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .card-header {
+        flex-direction: column;
+      }
+
+      .card-meta {
+        align-items: flex-start;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .wrapper {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="top-row">
+      <div>
+        <div class="title">ICAS Clicker Debug View</div>
+        <div class="subtitle">
+          Read-only live inspection for the Hammerspoon HTTP server. Heavy endpoints are manual-only, and action endpoints are documented but not fired automatically.
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button id="refreshNowButton" class="button" type="button">Refresh Now</button>
+        <a href="index.html" class="back-link">Back</a>
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <div class="controls-grid">
+        <div class="control-block">
+          <div class="control-label">Server</div>
+          <div id="baseUrlText" class="control-value">https://slides.icas-clicker.work</div>
+        </div>
+
+        <div class="control-block">
+          <div class="control-label">Global Status</div>
+          <div id="globalStatusText" class="control-value">Initializing…</div>
+        </div>
+
+        <div class="control-block">
+          <div class="control-label">Current Base</div>
+          <div id="currentBaseText" class="control-value">Unknown</div>
+        </div>
+
+        <div class="control-block">
+          <div class="control-label">Refresh</div>
+          <div class="control-row">
+            <label class="toggle-row">
+              <input id="autoRefreshToggle" type="checkbox" checked>
+              Auto
+            </label>
+
+            <select id="refreshIntervalSelect" class="select" aria-label="Refresh interval">
+              <option value="3000">3 sec</option>
+              <option value="5000" selected>5 sec</option>
+              <option value="10000">10 sec</option>
+              <option value="30000">30 sec</option>
+            </select>
+          </div>
+          <div id="lastRefreshText" class="small-note">Not refreshed yet</div>
+        </div>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Core Live Endpoints</div>
+          <div class="section-subtitle">Safe endpoints refreshed on the selected interval, one request at a time.</div>
+        </div>
+      </div>
+      <div id="coreCards" class="cards"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Additional Read-Only Endpoints</div>
+          <div class="section-subtitle">Refreshed less aggressively to avoid unnecessary Hammerspoon and ProPresenter load.</div>
+        </div>
+      </div>
+      <div id="readOnlyCards" class="cards"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Manual / Heavier Read-Only Endpoints</div>
+          <div class="section-subtitle">These are not auto-polled. Use the buttons only when you need them.</div>
+        </div>
+      </div>
+      <div id="manualCards" class="cards"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Action Endpoints</div>
+          <div class="section-subtitle">These endpoints change ProPresenter, OBS, timers, audio, or app state. This debug page documents them but does not execute them.</div>
+        </div>
+      </div>
+      <div id="actionCards" class="cards"></div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const HOSTED_API_BASE = "https://slides.icas-clicker.work";
+
+      function getApiBase() {
+        const params = new URLSearchParams(window.location.search || "");
+        const override = params.get("api") || localStorage.getItem("icas-debug-api-base") || "";
+        if (override.trim()) return override.trim().replace(/\/+$/, "");
+        if (/^https?:$/.test(window.location.protocol) && !/\.?icas-clicker\.work$/i.test(window.location.hostname)) {
+          return window.location.origin;
+        }
+        return HOSTED_API_BASE;
+      }
+
+      const BASE_URL = getApiBase();
+
+      const REQUEST_TIMEOUT_MS = 7000;
+      const REQUEST_GAP_MS = 150;
+      const THUMBNAIL_MIN_REFRESH_MS = 15000;
+
+      const ENDPOINTS = [
+        {
+          id: "health",
+          group: "core",
+          method: "GET",
+          path: "/health",
+          responseType: "text",
+          auto: true,
+          cadence: 1,
+          description: "Basic Hammerspoon HTTP server health check."
+        },
+        {
+          id: "current-base",
+          group: "core",
+          method: "GET",
+          path: "/current-base",
+          responseType: "json",
+          auto: true,
+          cadence: 1,
+          description: "Shows whether the clicker is currently using the active or focused ProPresenter presentation base."
+        },
+        {
+          id: "slide-index",
+          group: "core",
+          method: "GET",
+          path: "/slide-index",
+          responseType: "json",
+          auto: true,
+          cadence: 1,
+          description: "Raw ProPresenter slide index payload."
+        },
+        {
+          id: "active-presentation",
+          group: "core",
+          method: "GET",
+          path: "/active-presentation",
+          responseType: "json",
+          auto: true,
+          cadence: 1,
+          description: "Full presentation JSON returned through your active/focused presentation selection logic."
+        },
+        {
+          id: "audio-playlists",
+          group: "readonly",
+          method: "GET",
+          path: "/audio/playlists",
+          responseType: "json",
+          auto: true,
+          cadence: 2,
+          description: "Configured pad/audio playlists known to Hammerspoon."
+        },
+        {
+          id: "audio-active",
+          group: "readonly",
+          method: "GET",
+          path: "/audio/active",
+          responseType: "text",
+          auto: true,
+          cadence: 2,
+          description: "Current active ProPresenter audio playlist/item text."
+        },
+        {
+          id: "service-logos",
+          group: "readonly",
+          method: "GET",
+          path: "/service_logos",
+          responseType: "json",
+          auto: true,
+          cadence: 4,
+          description: "Configured service logo presets available to the control panel."
+        },
+        {
+          id: "auto-show",
+          group: "readonly",
+          method: "GET",
+          path: "/auto-show",
+          responseType: "json",
+          auto: true,
+          cadence: 2,
+          description: "Current Auto Show Slides enabled/disabled state."
+        },
+        {
+          id: "macros",
+          group: "readonly",
+          method: "GET",
+          path: "/macros",
+          responseType: "json",
+          auto: true,
+          cadence: 4,
+          description: "Configured macro names allowed by Hammerspoon."
+        },
+        {
+          id: "audio-tracks",
+          group: "manual",
+          method: "GET",
+          path: "/audio/tracks?playlist={playlist}",
+          responseType: "json",
+          auto: false,
+          description: "Tracks inside one selected ProPresenter audio playlist. Manual-only because it can query ProPresenter playlist contents."
+        },
+        {
+          id: "thumbnail",
+          group: "manual",
+          method: "GET",
+          path: "/thumbnail?uuid={uuid}&index={index}",
+          responseType: "image",
+          auto: false,
+          description: "Current-slide thumbnail. Manual button available; also auto-loads only when the current slide key changes."
+        },
+        {
+          id: "obs-items",
+          group: "manual",
+          method: "GET",
+          path: "/obs/propresenter-input/items",
+          responseType: "json",
+          auto: false,
+          description: "OBS scene-item inspection for the ProPresenter Input scene. Manual-only because it queries the OBS bridge and prints item info in Hammerspoon."
+        }
+      ];
+
+      const ACTION_ENDPOINTS = [
+        {
+          method: "GET",
+          path: "/next",
+          description: "Triggers next slide using the currently selected active/focused presentation base."
+        },
+        {
+          method: "GET",
+          path: "/previous",
+          description: "Triggers previous slide using the currently selected active/focused presentation base."
+        },
+        {
+          method: "GET",
+          path: "/prev",
+          description: "Alias for /previous."
+        },
+        {
+          method: "GET",
+          path: "/focus?index={index}",
+          description: "Triggers a specific slide index. Example: /focus?index=3"
+        },
+        {
+          method: "POST",
+          path: "/audio/trigger",
+          description: "Triggers an audio track in a ProPresenter audio playlist.",
+          body: {
+            playlist: "Major Pads",
+            track: "D(Major)"
+          }
+        },
+        {
+          method: "GET",
+          path: "/audio/clear",
+          description: "Clears the ProPresenter audio layer."
+        },
+        {
+          method: "GET",
+          path: "/timer/start",
+          description: "Starts the Service Countdown timer."
+        },
+        {
+          method: "GET",
+          path: "/timer/stop-reset",
+          description: "Stops then resets the Service Countdown timer."
+        },
+        {
+          method: "GET",
+          path: "/obs/look/refresh",
+          description: "Forces OBS scene-item visibility to refresh from the current ProPresenter Look."
+        },
+        {
+          method: "POST",
+          path: "/auto-show",
+          description: "Sets Auto Show Slides enabled/disabled state.",
+          body: {
+            enabled: true
+          }
+        },
+        {
+          method: "POST",
+          path: "/macro",
+          description: "Triggers one configured macro by name.",
+          body: {
+            name: "Bible Macro"
+          }
+        },
+        {
+          method: "POST",
+          path: "/preset?safeclear=true",
+          description: "Triggers a preset. Supported preset values: stream_beginning, camera, show_slides, service_logo, testimonies, ending_stream, safely_clear_slide, nsc_setup. service_logo and testimonies require service_logo_uuid.",
+          body: {
+            preset: "camera"
+          }
+        }
+      ];
+
+      const dom = {};
+      const state = {
+        cards: new Map(),
+        data: new Map(),
+        results: new Map(),
+        refreshTimer: null,
+        isRefreshing: false,
+        tick: 0,
+        lastThumbnailKey: "",
+        lastThumbnailAt: 0,
+        thumbnailObjectUrl: "",
+        lastRefreshStartedAt: null
+      };
+
+      function cacheDom() {
+        dom.baseUrlText = document.getElementById("baseUrlText");
+        dom.globalStatusText = document.getElementById("globalStatusText");
+        dom.currentBaseText = document.getElementById("currentBaseText");
+        dom.lastRefreshText = document.getElementById("lastRefreshText");
+
+        dom.refreshNowButton = document.getElementById("refreshNowButton");
+        dom.autoRefreshToggle = document.getElementById("autoRefreshToggle");
+        dom.refreshIntervalSelect = document.getElementById("refreshIntervalSelect");
+
+        dom.coreCards = document.getElementById("coreCards");
+        dom.readOnlyCards = document.getElementById("readOnlyCards");
+        dom.manualCards = document.getElementById("manualCards");
+        dom.actionCards = document.getElementById("actionCards");
+      }
+
+      function nowString() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      function formatMs(value) {
+        return `${Math.round(value)} ms`;
+      }
+
+      function formatBytes(bytes) {
+        const n = Number(bytes) || 0;
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
+      function pretty(value) {
+        if (value === null || value === undefined) return String(value);
+
+        if (typeof value === "string") {
+          try {
+            return JSON.stringify(JSON.parse(value), null, 2);
+          } catch {
+            return value;
+          }
+        }
+
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch {
+          return String(value);
+        }
+      }
+
+      function methodClass(method) {
+        return method.toUpperCase() === "POST" ? "method-post" : "method-get";
+      }
+
+      function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        return fetch(url, {
+          ...options,
+          signal: controller.signal
+        }).finally(() => clearTimeout(timeoutId));
+      }
+
+      function getContainerForGroup(group) {
+        if (group === "core") return dom.coreCards;
+        if (group === "readonly") return dom.readOnlyCards;
+        return dom.manualCards;
+      }
+
+      function createEndpointCard(definition) {
+        const card = document.createElement("article");
+        card.className = "endpoint-card";
+        if (definition.group === "manual") card.classList.add("manual");
+
+        const header = document.createElement("div");
+        header.className = "card-header";
+
+        const titleWrap = document.createElement("div");
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "card-title-row";
+
+        const method = document.createElement("span");
+        method.className = `method-badge ${methodClass(definition.method)}`;
+        method.textContent = definition.method;
+
+        const title = document.createElement("div");
+        title.className = "endpoint-title";
+        title.textContent = definition.path;
+
+        titleRow.appendChild(method);
+        titleRow.appendChild(title);
+
+        const description = document.createElement("div");
+        description.className = "endpoint-description";
+        description.textContent = definition.description;
+
+        titleWrap.appendChild(titleRow);
+        titleWrap.appendChild(description);
+
+        const meta = document.createElement("div");
+        meta.className = "card-meta";
+
+        const statusLine = document.createElement("div");
+        statusLine.className = "status-line";
+
+        const dot = document.createElement("span");
+        dot.className = "dot";
+
+        const statusText = document.createElement("span");
+        statusText.textContent = "Not fetched";
+
+        statusLine.appendChild(dot);
+        statusLine.appendChild(statusText);
+
+        const timeText = document.createElement("div");
+        timeText.textContent = "—";
+
+        meta.appendChild(statusLine);
+        meta.appendChild(timeText);
+
+        header.appendChild(titleWrap);
+        header.appendChild(meta);
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        const manualControls = document.createElement("div");
+        manualControls.className = "manual-controls hidden";
+
+        const summary = document.createElement("div");
+        summary.className = "summary";
+
+        const details = document.createElement("details");
+        details.open = definition.group === "core";
+
+        const detailsSummary = document.createElement("summary");
+        detailsSummary.textContent = "Raw response";
+
+        const pre = document.createElement("pre");
+        pre.textContent = "(waiting)";
+
+        details.appendChild(detailsSummary);
+        details.appendChild(pre);
+
+        body.appendChild(manualControls);
+        body.appendChild(summary);
+        body.appendChild(details);
+
+        card.appendChild(header);
+        card.appendChild(body);
+
+        const refs = {
+          definition,
+          card,
+          meta,
+          dot,
+          statusText,
+          timeText,
+          summary,
+          pre,
+          manualControls,
+          details
+        };
+
+        configureManualControls(refs);
+        state.cards.set(definition.id, refs);
+
+        return card;
+      }
+
+      function configureManualControls(refs) {
+        const { definition, manualControls } = refs;
+
+        if (definition.group !== "manual") return;
+
+        manualControls.classList.remove("hidden");
+
+        if (definition.id === "audio-tracks") {
+          const select = document.createElement("select");
+          select.className = "select";
+          select.id = "audioPlaylistSelect";
+          select.setAttribute("aria-label", "Audio playlist");
+          select.innerHTML = `<option value="">No playlists loaded</option>`;
+
+          const button = document.createElement("button");
+          button.className = "button";
+          button.type = "button";
+          button.textContent = "Fetch Tracks";
+          button.addEventListener("click", () => fetchAudioTracks());
+
+          manualControls.appendChild(select);
+          manualControls.appendChild(button);
+          return;
+        }
+
+        if (definition.id === "thumbnail") {
+          const button = document.createElement("button");
+          button.className = "button";
+          button.type = "button";
+          button.textContent = "Load Current Thumbnail";
+          button.addEventListener("click", () => fetchThumbnail({ force: true }));
+
+          const note = document.createElement("span");
+          note.className = "small-note";
+          note.textContent = "Auto-loads only when current slide changes.";
+
+          const image = document.createElement("img");
+          image.id = "thumbnailImage";
+          image.className = "thumb-img hidden";
+          image.alt = "Current slide thumbnail";
+
+          manualControls.appendChild(button);
+          manualControls.appendChild(note);
+          refs.thumbnailImage = image;
+          refs.card.querySelector(".card-body").appendChild(image);
+          return;
+        }
+
+        const button = document.createElement("button");
+        button.className = "button";
+        button.type = "button";
+        button.textContent = "Fetch Manually";
+        button.addEventListener("click", () => fetchDefinition(definition));
+
+        manualControls.appendChild(button);
+      }
+
+      function createActionCard(endpoint) {
+        const card = document.createElement("article");
+        card.className = "endpoint-card action-only";
+
+        const header = document.createElement("div");
+        header.className = "card-header";
+
+        const titleWrap = document.createElement("div");
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "card-title-row";
+
+        const method = document.createElement("span");
+        method.className = `method-badge ${methodClass(endpoint.method)}`;
+        method.textContent = endpoint.method;
+
+        const title = document.createElement("div");
+        title.className = "endpoint-title";
+        title.textContent = endpoint.path;
+
+        titleRow.appendChild(method);
+        titleRow.appendChild(title);
+
+        const description = document.createElement("div");
+        description.className = "endpoint-description";
+        description.textContent = endpoint.description;
+
+        titleWrap.appendChild(titleRow);
+        titleWrap.appendChild(description);
+
+        const meta = document.createElement("div");
+        meta.className = "card-meta";
+        meta.textContent = "Documented only";
+
+        header.appendChild(titleWrap);
+        header.appendChild(meta);
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        const summary = document.createElement("div");
+        summary.className = "summary";
+        summary.textContent = "This endpoint changes state and is intentionally not executed by debug.html.";
+
+        body.appendChild(summary);
+
+        if (endpoint.body) {
+          const details = document.createElement("details");
+          details.open = false;
+
+          const s = document.createElement("summary");
+          s.textContent = "Example JSON body";
+
+          const pre = document.createElement("pre");
+          pre.textContent = pretty(endpoint.body);
+
+          details.appendChild(s);
+          details.appendChild(pre);
+          body.appendChild(details);
+        }
+
+        card.appendChild(header);
+        card.appendChild(body);
+
+        return card;
+      }
+
+      function renderCards() {
+        ENDPOINTS.forEach(definition => {
+          const card = createEndpointCard(definition);
+          getContainerForGroup(definition.group).appendChild(card);
+        });
+
+        ACTION_ENDPOINTS.forEach(endpoint => {
+          dom.actionCards.appendChild(createActionCard(endpoint));
+        });
+      }
+
+      function setCardPending(refs) {
+        refs.dot.className = "dot pending";
+        refs.statusText.textContent = "Fetching…";
+        refs.timeText.textContent = nowString();
+      }
+
+      function setCardResult(refs, result) {
+        const ok = result.ok === true;
+        refs.dot.className = ok ? "dot ok" : "dot bad";
+        refs.statusText.textContent = ok
+          ? `HTTP ${result.status}`
+          : result.status
+            ? `HTTP ${result.status}`
+            : "Error";
+
+        const pieces = [];
+        pieces.push(nowString());
+        if (typeof result.durationMs === "number") pieces.push(formatMs(result.durationMs));
+        if (result.sizeBytes !== undefined) pieces.push(formatBytes(result.sizeBytes));
+
+        refs.timeText.textContent = pieces.join(" · ");
+        state.results.set(refs.definition.id, ok);
+        updateGlobalStatus();
+      }
+
+      function setCardBody(refs, value) {
+        refs.pre.textContent = value;
+      }
+
+      function setCardSummary(refs, value) {
+        refs.summary.textContent = value || "";
+      }
+
+      function getCurrentSlideIndex() {
+        const data = state.data.get("slide-index");
+        const value = data?.presentation_index?.index;
+        return typeof value === "number" ? value : null;
+      }
+
+      function getCurrentPresentationUuid() {
+        const slideIndexData = state.data.get("slide-index");
+        const fromIndex = slideIndexData?.presentation_index?.presentation_id?.uuid;
+        if (typeof fromIndex === "string" && fromIndex.trim() !== "") return fromIndex;
+
+        const activeData = state.data.get("active-presentation");
+        const fromActive = activeData?.presentation?.id?.uuid;
+        if (typeof fromActive === "string" && fromActive.trim() !== "") return fromActive;
+
+        return "";
+      }
+
+      function flattenSlides(presentationData) {
+        const presentation = presentationData?.presentation;
+        const groups = Array.isArray(presentation?.groups) ? presentation.groups : [];
+        const slides = [];
+
+        groups.forEach((group, groupIndex) => {
+          const groupSlides = Array.isArray(group?.slides) ? group.slides : [];
+          groupSlides.forEach((slide, slideIndexInGroup) => {
+            slides.push({
+              ...slide,
+              groupName: group?.name || "",
+              groupIndex,
+              slideIndexInGroup,
+              absoluteIndex: slides.length
+            });
+          });
+        });
+
+        return slides;
+      }
+
+      function summarizePresentation(data) {
+        const presentation = data?.presentation;
+        if (!presentation) {
+          const reason = data?.reason ? `Reason: ${data.reason}` : "No presentation object returned.";
+          return reason;
+        }
+
+        const slides = flattenSlides(data);
+        const enabled = slides.filter(s => s.enabled !== false).length;
+        const disabled = slides.length - enabled;
+        const labels = slides.filter(s => String(s.label || "").trim() !== "").length;
+        const notes = slides.filter(s => String(s.notes || "").trim() !== "").length;
+
+        const currentIndex = getCurrentSlideIndex();
+        const currentSlide = typeof currentIndex === "number" ? slides[currentIndex] : null;
+        const currentLabel = String(currentSlide?.label || "").trim();
+        const currentText = String(currentSlide?.text || "").trim();
+
+        const lines = [
+          `Name: ${presentation.id?.name || "(unnamed)"}`,
+          `UUID: ${presentation.id?.uuid || "(missing)"}`,
+          `Destination: ${presentation.destination || "(unknown)"}`,
+          `Groups: ${Array.isArray(presentation.groups) ? presentation.groups.length : 0}`,
+          `Slides: ${slides.length} total · ${enabled} enabled · ${disabled} disabled`,
+          `Slides with labels: ${labels} · Slides with notes: ${notes}`
+        ];
+
+        if (typeof currentIndex === "number") {
+          lines.push(`Current slide index: ${currentIndex}`);
+          if (currentLabel) lines.push(`Current label: ${currentLabel}`);
+          if (currentText) lines.push(`Current text preview: ${currentText.slice(0, 140)}${currentText.length > 140 ? "…" : ""}`);
+        }
+
+        return lines.join("\n");
+      }
+
+      function summarizeSlideIndex(data) {
+        const index = data?.presentation_index?.index;
+        const uuid = data?.presentation_index?.presentation_id?.uuid;
+        const name = data?.presentation_index?.presentation_id?.name;
+
+        if (typeof index !== "number") {
+          return "No active slide index returned. The clicker may be in focused mode or ProPresenter may not have an active presentation.";
+        }
+
+        return [
+          `Index: ${index}`,
+          `Slide number: ${index + 1}`,
+          `Presentation: ${name || "(unknown)"}`,
+          `UUID: ${uuid || "(missing)"}`
+        ].join("\n");
+      }
+
+      function summarizeCurrentBase(data) {
+        const mode = data?.mode || "unknown";
+        const base = data?.base_url || "(missing)";
+
+        dom.currentBaseText.textContent = `${mode.toUpperCase()} base`;
+        return `Mode: ${mode}\nBase URL: ${base}`;
+      }
+
+      function summarizeItems(data, itemName = "items") {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        return `${items.length} ${itemName}`;
+      }
+
+      function summarizeAutoShow(data) {
+        return `Auto Show Slides: ${data?.enabled ? "Enabled" : "Disabled"}`;
+      }
+
+      function summarizeObsItems(data) {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const enabled = items.filter(item => item.sceneItemEnabled === true).length;
+        const disabled = items.length - enabled;
+        return `Scene items: ${items.length} total · ${enabled} enabled · ${disabled} disabled`;
+      }
+
+      function summarizeAudioActive(text) {
+        const cleaned = String(text || "").trim();
+        return cleaned || "No audio playing";
+      }
+
+      function updateSummaryForDefinition(definition, payload) {
+        const refs = state.cards.get(definition.id);
+        if (!refs) return;
+
+        if (definition.id === "active-presentation") {
+          setCardSummary(refs, summarizePresentation(payload));
+        } else if (definition.id === "slide-index") {
+          setCardSummary(refs, summarizeSlideIndex(payload));
+        } else if (definition.id === "current-base") {
+          setCardSummary(refs, summarizeCurrentBase(payload));
+        } else if (definition.id === "audio-playlists") {
+          setCardSummary(refs, summarizeItems(payload, "playlists"));
+          populateAudioPlaylistSelect(payload);
+        } else if (definition.id === "audio-active") {
+          setCardSummary(refs, summarizeAudioActive(payload));
+        } else if (definition.id === "service-logos") {
+          setCardSummary(refs, summarizeItems(payload, "service logos"));
+        } else if (definition.id === "auto-show") {
+          setCardSummary(refs, summarizeAutoShow(payload));
+        } else if (definition.id === "macros") {
+          setCardSummary(refs, summarizeItems(payload, "macros"));
+        } else if (definition.id === "obs-items") {
+          setCardSummary(refs, summarizeObsItems(payload));
+        } else if (definition.id === "health") {
+          setCardSummary(refs, String(payload || "").trim() === "OK" ? "Hammerspoon server responded OK." : "");
+        }
+      }
+
+      async function fetchDefinition(definition) {
+        const refs = state.cards.get(definition.id);
+        if (!refs) return null;
+
+        if (definition.id === "audio-tracks") return fetchAudioTracks();
+        if (definition.id === "thumbnail") return fetchThumbnail({ force: true });
+
+        setCardPending(refs);
+
+        const startedAt = performance.now();
+        const url = `${BASE_URL}${definition.path}`;
+
+        try {
+          const response = await fetchWithTimeout(url, {
+            method: definition.method,
+            cache: "no-cache",
+            headers: {
+              "Accept": definition.responseType === "json" ? "application/json" : "*/*"
+            }
+          });
+
+          const durationMs = performance.now() - startedAt;
+          const rawText = await response.text();
+
+          let payload = rawText;
+
+          if (definition.responseType === "json") {
+            try {
+              payload = rawText.trim() === "" ? {} : JSON.parse(rawText);
+            } catch (error) {
+              payload = {
+                parse_error: String(error),
+                raw: rawText
+              };
+            }
+          }
+
+          state.data.set(definition.id, payload);
+
+          setCardBody(refs, pretty(payload));
+          setCardResult(refs, {
+            ok: response.ok,
+            status: response.status,
+            durationMs,
+            sizeBytes: rawText.length
+          });
+
+          updateSummaryForDefinition(definition, payload);
+
+          if (definition.id === "slide-index" || definition.id === "active-presentation") {
+            maybeAutoFetchThumbnail();
+          }
+
+          return payload;
+        } catch (error) {
+          setCardBody(refs, String(error));
+          setCardSummary(refs, "");
+          setCardResult(refs, {
+            ok: false,
+            status: 0,
+            durationMs: performance.now() - startedAt
+          });
+          return null;
+        }
+      }
+
+      function populateAudioPlaylistSelect(data) {
+        const select = document.getElementById("audioPlaylistSelect");
+        if (!select) return;
+
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const previousValue = select.value;
+
+        select.replaceChildren();
+
+        if (items.length === 0) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No playlists loaded";
+          select.appendChild(option);
+          return;
+        }
+
+        items.forEach(name => {
+          const option = document.createElement("option");
+          option.value = String(name);
+          option.textContent = String(name);
+          select.appendChild(option);
+        });
+
+        if (items.map(String).includes(previousValue)) {
+          select.value = previousValue;
+        }
+      }
+
+      async function fetchAudioTracks() {
+        const refs = state.cards.get("audio-tracks");
+        const select = document.getElementById("audioPlaylistSelect");
+        const playlist = select?.value || "";
+
+        if (!playlist) {
+          setCardSummary(refs, "No playlist selected.");
+          setCardBody(refs, "(choose a playlist first)");
+          setCardResult(refs, { ok: false, status: 0 });
+          return null;
+        }
+
+        const definition = refs.definition;
+        setCardPending(refs);
+
+        const startedAt = performance.now();
+        const path = `/audio/tracks?playlist=${encodeURIComponent(playlist)}`;
+        const url = `${BASE_URL}${path}`;
+
+        try {
+          const response = await fetchWithTimeout(url, {
+            method: "GET",
+            cache: "no-cache",
+            headers: { "Accept": "application/json" }
+          });
+
+          const text = await response.text();
+          let payload;
+
+          try {
+            payload = text.trim() === "" ? {} : JSON.parse(text);
+          } catch (error) {
+            payload = {
+              parse_error: String(error),
+              raw: text
+            };
+          }
+
+          state.data.set(definition.id, payload);
+
+          setCardSummary(refs, `${summarizeItems(payload, "tracks")} in "${playlist}"`);
+          setCardBody(refs, pretty(payload));
+          setCardResult(refs, {
+            ok: response.ok,
+            status: response.status,
+            durationMs: performance.now() - startedAt,
+            sizeBytes: text.length
+          });
+
+          return payload;
+        } catch (error) {
+          setCardSummary(refs, "");
+          setCardBody(refs, String(error));
+          setCardResult(refs, {
+            ok: false,
+            status: 0,
+            durationMs: performance.now() - startedAt
+          });
+          return null;
+        }
+      }
+
+      function maybeAutoFetchThumbnail() {
+        const uuid = getCurrentPresentationUuid();
+        const index = getCurrentSlideIndex();
+
+        if (!uuid || typeof index !== "number") return;
+
+        const key = `${uuid}:${index}`;
+        const now = Date.now();
+
+        if (key === state.lastThumbnailKey && now - state.lastThumbnailAt < THUMBNAIL_MIN_REFRESH_MS) {
+          return;
+        }
+
+        fetchThumbnail({ force: false });
+      }
+
+      async function fetchThumbnail(options = {}) {
+        const force = options.force === true;
+        const refs = state.cards.get("thumbnail");
+        const uuid = getCurrentPresentationUuid();
+        const index = getCurrentSlideIndex();
+
+        if (!uuid || typeof index !== "number") {
+          setCardSummary(refs, "Missing presentation UUID or current slide index.");
+          setCardBody(refs, "(Cannot request thumbnail yet)");
+          refs.thumbnailImage?.classList.add("hidden");
+          setCardResult(refs, { ok: false, status: 0 });
+          return null;
+        }
+
+        const key = `${uuid}:${index}`;
+        const now = Date.now();
+
+        if (!force && key === state.lastThumbnailKey && now - state.lastThumbnailAt < THUMBNAIL_MIN_REFRESH_MS) {
+          return null;
+        }
+
+        state.lastThumbnailKey = key;
+        state.lastThumbnailAt = now;
+
+        setCardPending(refs);
+
+        const path = `/thumbnail?uuid=${encodeURIComponent(uuid)}&index=${encodeURIComponent(index)}`;
+        const url = `${BASE_URL}${path}`;
+        const startedAt = performance.now();
+
+        try {
+          const response = await fetchWithTimeout(url, {
+            method: "GET",
+            cache: "no-cache",
+            headers: { "Accept": "image/png,image/*,*/*" }
+          });
+
+          const blob = await response.blob();
+
+          if (state.thumbnailObjectUrl) {
+            try {
+              URL.revokeObjectURL(state.thumbnailObjectUrl);
+            } catch {}
+            state.thumbnailObjectUrl = "";
+          }
+
+          state.thumbnailObjectUrl = URL.createObjectURL(blob);
+
+          if (refs.thumbnailImage) {
+            refs.thumbnailImage.src = state.thumbnailObjectUrl;
+            refs.thumbnailImage.classList.remove("hidden");
+          }
+
+          setCardSummary(refs, [
+            `UUID: ${uuid}`,
+            `Index: ${index}`,
+            `Bytes: ${formatBytes(blob.size)}`,
+            blob.size <= 100 ? "Likely transparent placeholder; thumbnail may still be warming in cache." : "Thumbnail image received."
+          ].join("\n"));
+
+          setCardBody(refs, [
+            `GET ${path}`,
+            `Status: ${response.status}`,
+            `Content-Type: ${blob.type || "(unknown)"}`,
+            `Size: ${formatBytes(blob.size)}`
+          ].join("\n"));
+
+          setCardResult(refs, {
+            ok: response.ok,
+            status: response.status,
+            durationMs: performance.now() - startedAt,
+            sizeBytes: blob.size
+          });
+
+          return blob;
+        } catch (error) {
+          setCardSummary(refs, "");
+          setCardBody(refs, String(error));
+          refs.thumbnailImage?.classList.add("hidden");
+          setCardResult(refs, {
+            ok: false,
+            status: 0,
+            durationMs: performance.now() - startedAt
+          });
+          return null;
+        }
+      }
+
+      async function refreshAutoEndpoints() {
+        if (state.isRefreshing) return;
+        if (document.hidden) return;
+
+        state.isRefreshing = true;
+        state.tick += 1;
+        state.lastRefreshStartedAt = Date.now();
+
+        dom.refreshNowButton.disabled = true;
+        dom.globalStatusText.textContent = "Refreshing…";
+
+        const endpoints = ENDPOINTS.filter(definition => {
+          if (!definition.auto) return false;
+          return state.tick % (definition.cadence || 1) === 0;
+        });
+
+        for (const definition of endpoints) {
+          await fetchDefinition(definition);
+          await delay(REQUEST_GAP_MS);
+        }
+
+        dom.lastRefreshText.textContent = `Last refresh: ${nowString()}`;
+        dom.refreshNowButton.disabled = false;
+        state.isRefreshing = false;
+        updateGlobalStatus();
+      }
+
+      function updateGlobalStatus() {
+        const autoEndpoints = ENDPOINTS.filter(definition => definition.auto);
+        const knownResults = autoEndpoints
+          .map(definition => state.results.get(definition.id))
+          .filter(value => typeof value === "boolean");
+
+        if (knownResults.length === 0) {
+          dom.globalStatusText.textContent = "Waiting for first refresh…";
+          return;
+        }
+
+        const okCount = knownResults.filter(Boolean).length;
+        const failCount = knownResults.length - okCount;
+
+        if (failCount === 0 && knownResults.length === autoEndpoints.length) {
+          dom.globalStatusText.textContent = `OK · ${okCount}/${autoEndpoints.length} live endpoints`;
+        } else if (failCount === 0) {
+          dom.globalStatusText.textContent = `Partial OK · ${okCount}/${autoEndpoints.length} checked`;
+        } else {
+          dom.globalStatusText.textContent = `Issues · ${okCount}/${autoEndpoints.length} OK · ${failCount} failed`;
+        }
+      }
+
+      function restartAutoRefreshTimer() {
+        if (state.refreshTimer) {
+          clearInterval(state.refreshTimer);
+          state.refreshTimer = null;
+        }
+
+        if (!dom.autoRefreshToggle.checked) {
+          dom.lastRefreshText.textContent = "Auto refresh paused";
+          return;
+        }
+
+        const interval = Number(dom.refreshIntervalSelect.value) || 5000;
+        state.refreshTimer = setInterval(refreshAutoEndpoints, interval);
+      }
+
+      function bindEvents() {
+        dom.refreshNowButton.addEventListener("click", refreshAutoEndpoints);
+
+        dom.autoRefreshToggle.addEventListener("change", () => {
+          restartAutoRefreshTimer();
+          if (dom.autoRefreshToggle.checked) refreshAutoEndpoints();
+        });
+
+        dom.refreshIntervalSelect.addEventListener("change", restartAutoRefreshTimer);
+
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden && dom.autoRefreshToggle.checked) {
+            refreshAutoEndpoints();
+          }
+        });
+
+        window.addEventListener("beforeunload", () => {
+          if (state.thumbnailObjectUrl) {
+            try {
+              URL.revokeObjectURL(state.thumbnailObjectUrl);
+            } catch {}
+          }
+        });
+      }
+
+      function init() {
+        cacheDom();
+        dom.baseUrlText.textContent = BASE_URL;
+
+        renderCards();
+        bindEvents();
+        restartAutoRefreshTimer();
+        refreshAutoEndpoints();
+      }
+
+      document.addEventListener("DOMContentLoaded", init);
+    })();
+  </script>
+</body>
+</html>
