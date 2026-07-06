@@ -11,7 +11,7 @@ from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
 from production_hub.core.automation.evaluator import evaluate_conditions
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
-from production_hub.core.endpoints.models import EndpointDefinition
+from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
 from production_hub.integrations.panasonic_awp.models import PanasonicCommand
 from production_hub.integrations.propresenter.audio_service import strip_audio_extension
@@ -171,6 +171,69 @@ async def start_visca_listener(context: ApplicationContext) -> ViscaUdpListener 
         context.health_monitor.update(IntegrationHealth("VISCA Bridge", STATUS_OFFLINE, target, last_error=str(exc)))
         context.logger.warning("visca_unavailable", "VISCA bridge did not start", error=str(exc))
         return None
+
+
+def start_midi_receiver(context: ApplicationContext, loop: asyncio.AbstractEventLoop):
+    if not context.config.integrations.midi.enabled:
+        context.health_monitor.update(context.midi.health())
+        return None
+
+    def schedule_midi_action(action: ActionDefinition, action_context: dict[str, Any]) -> None:
+        async def _run() -> None:
+            context.logger.info(
+                "midi_action_received",
+                (
+                    f"MIDI note {action_context.get('midi_note')} velocity {action_context.get('midi_velocity')} "
+                    f"mapped to {action.action_type} {action.params}"
+                ),
+                action=action.to_dict(),
+                midi=action_context,
+            )
+            endpoint = EndpointDefinition(
+                key="midi:pad_trigger",
+                name="MIDI Pad Trigger",
+                route="/__midi/pad-trigger",
+                actions=[action],
+                enabled=True,
+            )
+            result = await context.endpoint_executor.execute(endpoint, action_context)
+            if not result.ok:
+                raise RuntimeError(result.error or "MIDI action failed")
+            context.logger.info(
+                "midi_action_complete",
+                f"MIDI note {action_context.get('midi_note')} action complete",
+                action_results=[item.to_dict() for item in result.action_results],
+                midi=action_context,
+            )
+
+        future = asyncio.run_coroutine_threadsafe(_run(), loop)
+
+        def _done(done_future) -> None:
+            try:
+                done_future.result()
+                context.health_monitor.update(context.midi.health())
+            except Exception as exc:
+                context.logger.warning(
+                    "midi_action_failed",
+                    (
+                        f"MIDI note {action_context.get('midi_note')} failed for "
+                        f"{action.action_type} {action.params}: {exc}"
+                    ),
+                    action=action.to_dict(),
+                    midi=action_context,
+                    error=str(exc),
+                )
+
+        future.add_done_callback(_done)
+
+    context.midi.set_handler(schedule_midi_action)
+    started = context.midi.start()
+    context.health_monitor.update(context.midi.health())
+    if not started:
+        context.logger.warning("midi_unavailable", "MIDI receiver did not start", error=context.midi.health().last_error)
+        return None
+    context.logger.info("midi_receiver_started", "MIDI receiver started", input=context.midi.input_name)
+    return context.midi
 
 
 def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEventLoop) -> ClickerListenerHandle | None:
@@ -371,8 +434,8 @@ def register_automation_handlers(context: ApplicationContext) -> None:
         if not track:
             return "no_matching_audio_track"
         await asyncio.sleep(config.trigger_delay_seconds)
-        await context.propresenter.audio.trigger(track.playlist, track.track)
-        return f"audio_triggered:{track.playlist}/{track.track}"
+        await context.propresenter.audio.trigger(track.playlist, track.name)
+        return f"audio_triggered:{track.playlist}/{track.name}"
 
     async def auto_show_slides(definition: AutomationDefinition, state: AutomationRunState) -> str:
         runtime = context.runtime_state_repo.load()
@@ -503,6 +566,7 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     loop = asyncio.get_running_loop()
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
+    midi_receiver = start_midi_receiver(context, loop)
     next_due: dict[str, float] = {}
 
     try:
@@ -512,6 +576,8 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     finally:
         if clicker_listener:
             clicker_listener.stop()
+        if midi_receiver:
+            midi_receiver.stop()
         if listener:
             await listener.stop()
 

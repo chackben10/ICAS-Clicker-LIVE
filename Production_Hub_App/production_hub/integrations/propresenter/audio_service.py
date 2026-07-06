@@ -19,6 +19,13 @@ def normalize_audio_name(name: str) -> str:
     return re.sub(r"\s+", "", strip_audio_extension(name)).lower()
 
 
+def normalize_pad_key(name: str) -> str:
+    value = strip_audio_extension(name)
+    value = re.sub(r"\s*\((major|minor|nuetral|neutral)\)\s*", " ", value, flags=re.IGNORECASE)
+    value = re.sub(r"\b(major|minor|nuetral|neutral|pads?)\b", " ", value, flags=re.IGNORECASE)
+    return re.sub(r"\s+", "", value).lower()
+
+
 class ProPresenterAudioService:
     def __init__(self, client: ProPresenterClient, config: AudioConfig) -> None:
         self.client = client
@@ -56,6 +63,20 @@ class ProPresenterAudioService:
         for playlist in self.config.playlists:
             for track in await self.playlist_tracks(playlist):
                 if normalize_audio_name(track) == wanted:
+                    return AudioTrack(playlist, track)
+        return None
+
+    async def find_track_in_playlist(self, playlist: str, label: str) -> AudioTrack | None:
+        wanted = normalize_audio_name(label)
+        wanted_pad_key = normalize_pad_key(label)
+        if not playlist or not wanted:
+            return None
+        for track in await self.playlist_tracks(playlist):
+            if normalize_audio_name(track) == wanted:
+                return AudioTrack(playlist, track)
+        if wanted_pad_key:
+            for track in await self.playlist_tracks(playlist):
+                if normalize_pad_key(track) == wanted_pad_key:
                     return AudioTrack(playlist, track)
         return None
 

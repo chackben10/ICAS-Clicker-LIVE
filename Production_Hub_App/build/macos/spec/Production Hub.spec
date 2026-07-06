@@ -3,8 +3,12 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/build/macos/remote_pages', 'remote_pages'), ('/Users/icas/Github/ICAS-Clicker-LIVE/Production_Hub_App/assets/ProductionHub.icns', 'assets')]
 binaries = []
-hiddenimports = ['uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan.on']
+hiddenimports = ['mido.backends.rtmidi', 'rtmidi', 'rtmidi._rtmidi', 'uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan.on']
 tmp_ret = collect_all('PySide6')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('mido')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('rtmidi')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

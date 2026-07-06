@@ -94,6 +94,18 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "Apply a configured OBS source visibility rule by look name.",
         (FieldSpec("look_name", "Look name", "select", "", context_options="obs_looks"),),
     ),
+    ActionSpec(
+        "obs.set_scene_item_enabled",
+        "Set OBS Source Visibility",
+        "OBS",
+        "Show or hide a source in an OBS scene by scene item id or source name.",
+        (
+            FieldSpec("scene", "Scene", "select", "", context_options="obs_scenes"),
+            FieldSpec("scene_item_id", "Scene item id", "text", "", "Preferred when known."),
+            FieldSpec("source_name", "Source name", "text", "", "Used when scene item id is blank."),
+            FieldSpec("enabled", "Visible", "bool", True),
+        ),
+    ),
     ActionSpec("obs.reconnect", "Reconnect OBS", "OBS", "Reconnect OBS and refresh its health status."),
     ActionSpec(
         "panasonic.recall_preset",
@@ -141,6 +153,10 @@ def action_spec(action_type: str) -> ActionSpec:
         if spec.action_type == action_type:
             return spec
     return ActionSpec(action_type, action_type, "Custom", "Custom action type.", ())
+
+
+def default_action_params(action_type: str) -> dict[str, Any]:
+    return {field.name: field.default for field in action_spec(action_type).fields}
 
 
 def action_options(context: Any, field: FieldSpec) -> list[str]:

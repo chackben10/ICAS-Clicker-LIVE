@@ -1,0 +1,6 @@
+
+--- MIDI listener started 2026-07-05T18:57:16 input=IAC Driver Production Hub MIDI ---
+2026-07-05T18:57:41.824 input=IAC Driver Production Hub MIDI type=note_on channel=0 note=9 velocity=1 raw=note_on channel=0 note=9 velocity=1 time=0
+2026-07-05T18:57:42.885 input=IAC Driver Production Hub MIDI type=note_on channel=0 note=9 velocity=1 raw=note_on channel=0 note=9 velocity=1 time=0
+2026-07-05T18:57:43.730 input=IAC Driver Production Hub MIDI type=note_on channel=0 note=9 velocity=1 raw=note_on channel=0 note=9 velocity=1 time=0
+2026-07-05T18:57:44.672 input=IAC Driver Production Hub MIDI type=note_on channel=0 note=10 velocity=1 raw=note_on channel=0 note=10 velocity=1 time=0

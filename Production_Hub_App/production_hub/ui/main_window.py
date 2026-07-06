@@ -30,6 +30,7 @@ from production_hub.ui.pages import (
     diagnostics_page,
     endpoints_page,
     integrations_page,
+    midi_page,
     overview_page,
     remote_pages_page,
     scoreboard_page,
@@ -96,6 +97,7 @@ class MainWindow(QMainWindow):
             ("Endpoints", endpoints_page.build_page(context)),
             ("Automations", automations_page.build_page(context)),
             ("Integrations", integrations_page.build_page(context)),
+            ("MIDI", midi_page.build_page(context)),
             ("Camera Control", camera_control_page.build_page(context)),
             ("Scoreboard", scoreboard_page.build_page(context)),
             ("Remote Pages", remote_pages_page.build_page(context)),
@@ -374,6 +376,14 @@ def nav_icon(name: str) -> QIcon:
         painter.drawLine(8, 8, 8, 11)
         painter.drawLine(14, 8, 14, 11)
         painter.drawLine(21, 10, 21, 18)
+    elif name == "MIDI":
+        painter.drawLine(6, 20, 6, 8)
+        painter.drawLine(10, 20, 10, 11)
+        painter.drawLine(14, 20, 14, 7)
+        painter.drawLine(18, 20, 18, 12)
+        painter.drawLine(22, 20, 22, 9)
+        for x, y in [(4, 6), (8, 9), (12, 5), (16, 10), (20, 7)]:
+            painter.drawEllipse(QRectF(x, y, 4, 4))
     elif name == "Camera Control":
         painter.drawRoundedRect(QRectF(5, 9, 18, 12), 2, 2)
         painter.drawRoundedRect(QRectF(8, 6, 6, 4), 1, 1)

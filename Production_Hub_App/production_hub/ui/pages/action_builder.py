@@ -20,7 +20,14 @@ from PySide6.QtWidgets import (
 )
 
 from production_hub.core.automation.catalog import CONDITION_SPECS, condition_params, condition_spec
-from production_hub.core.endpoints.catalog import ACTION_SPECS, FieldSpec, action_options, action_spec, normalize_select_value
+from production_hub.core.endpoints.catalog import (
+    ACTION_SPECS,
+    FieldSpec,
+    action_options,
+    action_spec,
+    default_action_params,
+    normalize_select_value,
+)
 from production_hub.core.endpoints.models import ActionDefinition
 from production_hub.ui.pages.common import responsive_grid
 
@@ -206,7 +213,7 @@ class ActionSequenceEditor(QWidget):
 
     def add_action(self) -> None:
         spec = ACTION_SPECS[0]
-        action = ActionDefinition(spec.action_type, params=_default_params(spec.fields))
+        action = ActionDefinition(spec.action_type, params=default_action_params(spec.action_type))
         self.save_current()
         self._actions.append(action)
         self.reload_list()
@@ -294,7 +301,7 @@ class ActionSequenceEditor(QWidget):
             return
         spec = self.current_spec()
         self.description.setText(spec.description)
-        self.fields.set_fields(spec.fields, _default_params(spec.fields))
+        self.fields.set_fields(spec.fields, default_action_params(spec.action_type))
         self.save_current()
         self.reload_list()
         self.list_widget.setCurrentRow(self._current_index)

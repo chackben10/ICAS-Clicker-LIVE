@@ -11,6 +11,7 @@ from production_hub.core.config.models import (
     ServiceLogoMapping,
 )
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+from production_hub.integrations.midi.models import MidiMapping
 
 
 PRESENTATIONS = [
@@ -64,6 +65,17 @@ OBS_LOOK_RULES = [
     ObsLookRuleConfig("Presentation Fullscreen", "ProPresenter Input", [72, 77], [81, 73, 78, 79, 75, 74, 76, 82]),
 ]
 
+PAD_NOTES = ("A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#")
+
+
+def build_default_midi_mappings() -> list[MidiMapping]:
+    mappings: list[MidiMapping] = []
+    for offset, note_name in enumerate(PAD_NOTES):
+        mappings.append(MidiMapping.audio_pad(9 + offset, "Major Pads", f"{note_name} Major Pads", channel=-1))
+        mappings.append(MidiMapping.audio_pad(21 + offset, "Minor Pads", f"{note_name} Minor Pads", channel=-1))
+        mappings.append(MidiMapping.audio_pad(33 + offset, "Neutral Pads", f"{note_name} Neutral Pads", channel=-1))
+    return mappings
+
 
 def build_default_config() -> AppConfig:
     config = AppConfig()
@@ -81,6 +93,7 @@ def build_default_config() -> AppConfig:
     ]
     config.integrations.obs.source_mappings = list(OBS_SOURCES)
     config.integrations.obs.look_rules = list(OBS_LOOK_RULES)
+    config.integrations.midi.mappings = [item.to_dict() for item in build_default_midi_mappings()]
     config.remote_pages = [
         RemotePageConfig("Presentation Clicker / Viewer", "index.html", required_integrations=["ProPresenter"]),
         RemotePageConfig("Media Control Panel", "control.html", required_integrations=["ProPresenter", "OBS"]),

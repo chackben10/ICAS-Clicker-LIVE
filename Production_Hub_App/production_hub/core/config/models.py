@@ -289,8 +289,10 @@ class ViscaConfig(JsonModel):
 
 @dataclass
 class MidiConfig(JsonModel):
-    enabled: bool = False
+    enabled: bool = True
     status_label: str = "Not Configured"
+    input_name: str = ""
+    auto_open_first_input: bool = True
     input_devices: list[str] = field(default_factory=list)
     output_devices: list[str] = field(default_factory=list)
     mappings: list[dict[str, Any]] = field(default_factory=list)

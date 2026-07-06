@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from production_hub.core.automation.engine import AutomationEngine
-from production_hub.core.config.defaults import build_default_automations, build_default_endpoints
+from production_hub.core.config.defaults import build_default_automations, build_default_endpoints, build_default_midi_mappings
 from production_hub.core.config.models import AppPaths
 from production_hub.core.config.repository import ConfigRepository, default_app_root
 from production_hub.core.endpoints.actions import ActionRouter
@@ -19,7 +19,8 @@ from production_hub.core.health.monitor import HealthMonitor
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_DISABLED, STATUS_OFFLINE
 from production_hub.core.logging.log_repository import LogRepository
 from production_hub.core.logging.logger import StructuredLogger, configure_logging
-from production_hub.integrations.midi.placeholder import MidiPlaceholder
+from production_hub.integrations.midi.models import MidiMapping
+from production_hub.integrations.midi.receiver import MidiReceiver
 from production_hub.integrations.obs.service import ObsService
 from production_hub.integrations.panasonic_awp.preset_service import PanasonicPresetService
 from production_hub.integrations.panasonic_awp.service import PanasonicAwpService
@@ -45,7 +46,7 @@ class ApplicationContext:
     panasonic: PanasonicAwpService
     panasonic_presets: PanasonicPresetService
     scoreboard: ScoreboardService
-    midi: MidiPlaceholder
+    midi: MidiReceiver
     health_monitor: HealthMonitor
     log_repository: LogRepository
     logger: StructuredLogger
@@ -76,6 +77,8 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     paths = AppPaths(data_dir or default_app_root())
     config_repository = ConfigRepository(paths)
     config = config_repository.load_app_config()
+    if ensure_midi_defaults(config):
+        config_repository.save_app_config(config)
     if ensure_api_cors_origins(config):
         config_repository.save_app_config(config)
     loaded_endpoints = config_repository.load_endpoints()
@@ -99,7 +102,8 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     panasonic = PanasonicAwpService(config.integrations.panasonic)
     panasonic_presets = PanasonicPresetService(config.integrations.panasonic)
     scoreboard = ScoreboardService(scoreboard_repo)
-    midi = MidiPlaceholder()
+    midi_mappings = [MidiMapping.from_dict(item) for item in config.integrations.midi.mappings]
+    midi = MidiReceiver(config.integrations.midi, midi_mappings, lambda _action, _context: None)
 
     registry = EndpointRegistry(endpoints)
     router = ActionRouter()
@@ -159,6 +163,16 @@ def ensure_api_cors_origins(config: Any) -> bool:
             changed = True
     if changed:
         config.api.cors_allow_origins = origins
+    return changed
+
+
+def ensure_midi_defaults(config: Any) -> bool:
+    midi = config.integrations.midi
+    changed = False
+    if not midi.mappings:
+        midi.mappings = [item.to_dict() for item in build_default_midi_mappings()]
+        midi.enabled = True
+        changed = True
     return changed
 
 
@@ -270,6 +284,10 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
     async def audio_trigger(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         playlist = str(param(action, action_context, "playlist", ""))
         track = str(param(action, action_context, "track", ""))
+        resolved = await context.propresenter.audio.find_track_in_playlist(playlist, track)
+        if resolved:
+            playlist = resolved.playlist
+            track = resolved.name
         await context.propresenter.audio.trigger(playlist, track)
         return await _action_ok(action, "audio triggered", {"playlist": playlist, "track": track})
 
@@ -287,6 +305,26 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         look_name = str(param(action, action_context, "look_name", ""))
         result = await context.obs.apply_look_rule(look_name, force=True)
         return await _action_ok(action, "OBS look rule applied", result or {"look_name": look_name, "skipped": True})
+
+    async def obs_set_scene_item_enabled(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        scene = str(param(action, action_context, "scene", context.config.integrations.obs.main_layout_scene))
+        enabled = str(param(action, action_context, "enabled", True)).lower() in {"1", "true", "yes", "on"}
+        raw_id = str(param(action, action_context, "scene_item_id", "")).strip()
+        source_name = str(param(action, action_context, "source_name", "")).strip()
+        scene_item_id = int(raw_id) if raw_id else 0
+        if not scene_item_id and source_name:
+            items = await context.obs.get_scene_items(scene)
+            match = next((item for item in items if item.source_name == source_name), None)
+            if match:
+                scene_item_id = match.scene_item_id
+        if not scene_item_id:
+            raise ValueError("scene_item_id or matching source_name is required")
+        await context.obs.set_scene_item_enabled(scene, scene_item_id, enabled)
+        return await _action_ok(
+            action,
+            "OBS source visibility set",
+            {"scene": scene, "scene_item_id": scene_item_id, "source_name": source_name, "enabled": enabled},
+        )
 
     async def obs_reconnect(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         connected = await context.obs.connect()
@@ -335,6 +373,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.audio_clear": audio_clear,
         "obs.set_scene": obs_set_scene,
         "obs.apply_look_rule": obs_apply_look_rule,
+        "obs.set_scene_item_enabled": obs_set_scene_item_enabled,
         "obs.reconnect": obs_reconnect,
         "runtime.auto_show": runtime_auto_show,
         "panasonic.recall_preset": panasonic_recall_preset,
