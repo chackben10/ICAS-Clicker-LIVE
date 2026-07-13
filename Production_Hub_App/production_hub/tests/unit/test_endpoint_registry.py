@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition, EndpointMatchRule
 from production_hub.core.endpoints.registry import EndpointRegistry
 from production_hub.core.endpoints.variables import resolve_template
 
@@ -31,6 +31,28 @@ class EndpointRegistryTests(unittest.TestCase):
         self.assertEqual(registry.matches("/post-only", "GET"), [])
         self.assertEqual(len(registry.matches("/post-only", "POST")), 1)
 
+    def test_alias_and_match_rules_select_shared_route_endpoint(self) -> None:
+        previous = EndpointDefinition(
+            key="previous",
+            name="Previous",
+            route="/previous",
+            aliases=["/prev"],
+            actions=[ActionDefinition("propresenter.previous_slide")],
+        )
+        camera = EndpointDefinition(
+            key="camera",
+            name="Camera",
+            route="/preset",
+            actions=[ActionDefinition("obs.set_scene")],
+            allowed_methods=["POST"],
+            match_rules=[EndpointMatchRule("preset", "equals", "camera")],
+        )
+        registry = EndpointRegistry([previous, camera])
+        self.assertEqual(registry.matches("/prev", "GET")[0][0].key, "previous")
+        match = registry.matching_endpoint("/preset", "POST", {"preset": "camera"})
+        self.assertIsNotNone(match)
+        self.assertEqual(match[0].key, "camera")
+
     def test_template_resolution_supports_whole_value_and_embedded_text(self) -> None:
         self.assertEqual(resolve_template("{{preset}}", {"preset": 7}), 7)
         self.assertEqual(resolve_template("#R{{preset}}", {"preset": "07"}), "#R07")
@@ -38,4 +60,3 @@ class EndpointRegistryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -100,11 +100,9 @@ class ProPresenterAudioService:
 
     async def active_text(self) -> str:
         try:
-            data = await self.client.get_json("/audio/playlist/active")
+            data = await self.client.get_json("/transport/audio/current")
         except Exception:
-            return "No audio playing\n"
-        playlist = (data.get("playlist") or {}).get("name")
-        item = (data.get("item") or {}).get("name")
-        if not playlist or not item:
-            return "No audio playing\n"
-        return f"playlist: {playlist}\nitem: {item}\n"
+            return ""
+        if not data.get("is_playing"):
+            return ""
+        return strip_audio_extension(str(data.get("name") or ""))

@@ -60,14 +60,40 @@ class EndpointRegistry:
         for endpoint in self._by_key.values():
             if method not in {item.upper() for item in endpoint.allowed_methods}:
                 continue
-            match = _route_pattern(endpoint.route).match(path)
-            if not match:
-                continue
-            params: dict[str, object] = {}
-            for key, value in match.groupdict().items():
-                params[key] = int(value) if value.lstrip("-").isdigit() else value
-            matched.append((endpoint, params))
+            for route in [endpoint.route, *endpoint.aliases]:
+                match = _route_pattern(route).match(path)
+                if not match:
+                    continue
+                params: dict[str, object] = {}
+                for key, value in match.groupdict().items():
+                    params[key] = int(value) if value.lstrip("-").isdigit() else value
+                matched.append((endpoint, params))
+                break
         return matched
+
+    def matching_endpoint(self, path: str, method: str, data: dict[str, object]) -> tuple[EndpointDefinition, dict[str, object]] | None:
+        for endpoint, path_params in self.matches(path, method):
+            combined = {**data, **path_params}
+            if self._match_rules_pass(endpoint, combined):
+                return endpoint, path_params
+        return None
+
+    def _match_rules_pass(self, endpoint: EndpointDefinition, data: dict[str, object]) -> bool:
+        for rule in endpoint.match_rules:
+            exists = rule.input_name in data and data.get(rule.input_name) not in {None, ""}
+            current = str(data.get(rule.input_name, ""))
+            expected = str(rule.value)
+            if rule.operator == "exists" and not exists:
+                return False
+            if rule.operator == "missing" and exists:
+                return False
+            if rule.operator == "equals" and current.lower() != expected.lower():
+                return False
+            if rule.operator == "not_equals" and current.lower() == expected.lower():
+                return False
+            if rule.operator == "contains" and expected.lower() not in current.lower():
+                return False
+        return True
 
     def all(self) -> list[EndpointDefinition]:
         return list(self._by_key.values())

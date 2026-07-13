@@ -157,6 +157,8 @@ class ActionSequenceEditor(QWidget):
         self.retry_delay_spin.setRange(0, 60)
         self.retry_delay_spin.setDecimals(2)
         self.retry_delay_spin.setSuffix(" sec")
+        self.condition_edit = QLineEdit()
+        self.condition_edit.setPlaceholderText("Optional, for example {{clearslide}}")
         self.build()
 
     def build(self) -> None:
@@ -200,6 +202,7 @@ class ActionSequenceEditor(QWidget):
         form.addRow("Start delay", self.delay_spin)
         form.addRow("Retries", self.retries_spin)
         form.addRow("Retry delay", self.retry_delay_spin)
+        form.addRow("Run when", self.condition_edit)
         right.addLayout(form)
         right.addWidget(self.description)
         right.addWidget(self.fields)
@@ -317,6 +320,7 @@ class ActionSequenceEditor(QWidget):
         self.delay_spin.setValue(float(action.delay_seconds))
         self.retries_spin.setValue(int(action.retries))
         self.retry_delay_spin.setValue(float(action.retry_delay_seconds))
+        self.condition_edit.setText(action.condition)
         self.fields.set_fields(spec.fields, action.params)
         self._loading = False
 
@@ -331,6 +335,7 @@ class ActionSequenceEditor(QWidget):
             delay_seconds=self.delay_spin.value(),
             retries=self.retries_spin.value(),
             retry_delay_seconds=self.retry_delay_spin.value(),
+            condition=self.condition_edit.text().strip(),
         )
 
     def action_type_changed(self) -> None:

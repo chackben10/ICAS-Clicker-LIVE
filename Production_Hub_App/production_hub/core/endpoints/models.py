@@ -30,23 +30,57 @@ class ActionDefinition(JsonModel):
 class EndpointInputDefinition(JsonModel):
     name: str
     label: str = ""
-    kind: str = "text"
+    kind: str = "string"
     required: bool = False
     default: str = ""
     option_source: str = ""
     options: list[str] = field(default_factory=list)
+    min_value: str = ""
+    max_value: str = ""
     description: str = ""
 
     def __post_init__(self) -> None:
         self.name = str(self.name or "").strip()
         self.label = str(self.label or self.name).strip()
-        self.kind = str(self.kind or "text").strip().lower()
+        self.kind = str(self.kind or "string").strip().lower()
+        aliases = {"text": "string", "number": "integer", "int": "integer", "decimal": "float"}
+        self.kind = aliases.get(self.kind, self.kind)
         self.default = str(self.default or "")
         self.option_source = str(self.option_source or "").strip()
         if not self.name:
             raise ValidationError("Endpoint input name cannot be empty")
-        if self.kind not in {"text", "number", "bool", "select"}:
+        if self.kind not in {"string", "integer", "float", "bool", "select"}:
             raise ValidationError(f"Unsupported endpoint input kind: {self.kind}")
+
+
+@dataclass
+class EndpointMatchRule(JsonModel):
+    input_name: str
+    operator: str = "equals"
+    value: str = ""
+
+    def __post_init__(self) -> None:
+        self.input_name = str(self.input_name or "").strip()
+        self.operator = str(self.operator or "equals").strip().lower()
+        self.value = str(self.value if self.value is not None else "")
+        if not self.input_name:
+            raise ValidationError("Match rule input name cannot be empty")
+        if self.operator not in {"equals", "not_equals", "exists", "missing", "contains"}:
+            raise ValidationError(f"Unsupported endpoint match operator: {self.operator}")
+
+
+@dataclass
+class EndpointResponseDefinition(JsonModel):
+    response_type: str = "execution"
+    success_body: str = ""
+    error_body: str = ""
+    media_type: str = "application/json"
+
+    def __post_init__(self) -> None:
+        self.response_type = str(self.response_type or "execution").strip().lower()
+        self.media_type = str(self.media_type or "application/json").strip()
+        if self.response_type not in {"execution", "last_action_data", "static_json", "plain_text", "binary"}:
+            raise ValidationError(f"Unsupported endpoint response type: {self.response_type}")
 
 
 @dataclass
@@ -60,6 +94,10 @@ class EndpointDefinition(JsonModel):
     description: str = ""
     allowed_methods: list[str] = field(default_factory=lambda: ["GET", "POST"])
     inputs: list[EndpointInputDefinition] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    match_rules: list[EndpointMatchRule] = field(default_factory=list)
+    behavior_mode: str = "actions"
+    response: EndpointResponseDefinition = field(default_factory=EndpointResponseDefinition)
 
     def __post_init__(self) -> None:
         self.key = str(self.key or "").strip()
@@ -69,6 +107,14 @@ class EndpointDefinition(JsonModel):
             raise ValidationError("Endpoint key, name, and route are required")
         if not self.route.startswith("/"):
             raise ValidationError(f"Endpoint route must start with /: {self.route}")
+        self.aliases = [str(alias or "").strip() for alias in self.aliases if str(alias or "").strip()]
+        for alias in self.aliases:
+            if not alias.startswith("/"):
+                raise ValidationError(f"Endpoint alias must start with /: {alias}")
+        self.allowed_methods = [str(method or "").strip().upper() for method in self.allowed_methods if str(method or "").strip()]
+        self.behavior_mode = str(self.behavior_mode or "actions").strip().lower()
+        if self.behavior_mode not in {"actions", "read", "actions_then_read"}:
+            raise ValidationError(f"Unsupported endpoint behavior mode: {self.behavior_mode}")
 
 
 @dataclass

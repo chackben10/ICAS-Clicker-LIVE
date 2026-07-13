@@ -6,6 +6,7 @@ from pathlib import Path
 
 from production_hub.app.bootstrap import build_context
 from production_hub.core.automation.models import AutomationDefinition
+from production_hub.core.config.defaults import build_default_endpoints
 from production_hub.core.config.repository import ConfigRepository
 from production_hub.core.config.models import AppPaths
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
@@ -71,6 +72,85 @@ class UndoAndRepairTests(unittest.TestCase):
             self.assertEqual([input_def.name for input_def in endpoint.inputs], ["playlist", "track"])
             reloaded = ConfigRepository(paths).load_endpoints()[0]
             self.assertEqual(reloaded.inputs[0].option_source, "audio_playlists")
+
+    def test_build_context_repairs_page_endpoint_response_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = AppPaths(Path(tmp))
+            repo = ConfigRepository(paths)
+            repo.save_endpoints(
+                [
+                    EndpointDefinition(
+                        "auto_show",
+                        "Auto Show",
+                        "/auto-show",
+                        [ActionDefinition("runtime.auto_show")],
+                    ),
+                    EndpointDefinition(
+                        "audio_active",
+                        "Active Audio",
+                        "/audio/active",
+                        [ActionDefinition("propresenter.audio_active")],
+                    ),
+                ]
+            )
+            context = build_context(Path(tmp))
+
+            auto_show = context.endpoint_registry.get("auto_show")
+            audio_active = context.endpoint_registry.get("audio_active")
+
+            self.assertIsNotNone(auto_show)
+            self.assertIsNotNone(audio_active)
+            self.assertEqual(auto_show.response.response_type, "last_action_data")
+            self.assertEqual(audio_active.response.response_type, "plain_text")
+            self.assertEqual(audio_active.response.success_body, "{{text}}")
+
+    def test_build_context_repairs_audio_trigger_methods(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = AppPaths(Path(tmp))
+            repo = ConfigRepository(paths)
+            repo.save_endpoints(
+                [
+                    EndpointDefinition(
+                        "audio_trigger",
+                        "Audio Trigger",
+                        "/audio/trigger",
+                        [ActionDefinition("propresenter.audio_trigger")],
+                        allowed_methods=["POST"],
+                    )
+                ]
+            )
+            context = build_context(Path(tmp))
+            endpoint = context.endpoint_registry.get("audio_trigger")
+
+            self.assertIsNotNone(endpoint)
+            self.assertEqual(endpoint.allowed_methods, ["GET", "POST"])
+
+    def test_default_endpoints_include_camera_preset_builder_endpoint(self) -> None:
+        endpoint = next(item for item in build_default_endpoints() if item.key == "camera_preset_recall")
+        self.assertEqual(endpoint.route, "/camera/preset")
+        self.assertEqual(endpoint.allowed_methods, ["POST"])
+        self.assertEqual(endpoint.inputs[0].kind, "integer")
+        self.assertEqual(endpoint.inputs[0].min_value, "1")
+        self.assertEqual(endpoint.inputs[0].max_value, "100")
+
+    def test_build_context_moves_debug_api_off_debug_page_route(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = AppPaths(Path(tmp))
+            repo = ConfigRepository(paths)
+            repo.save_endpoints(
+                [
+                    EndpointDefinition(
+                        "debug",
+                        "Debug Snapshot",
+                        "/debug",
+                        [ActionDefinition("system.get_debug")],
+                    )
+                ]
+            )
+            context = build_context(Path(tmp))
+            endpoint = context.endpoint_registry.get("debug")
+            self.assertIsNotNone(endpoint)
+            self.assertEqual(endpoint.route, "/api/debug")
 
     def test_build_context_repairs_blank_builtin_automation_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
