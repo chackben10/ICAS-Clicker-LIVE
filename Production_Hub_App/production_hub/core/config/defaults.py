@@ -10,7 +10,7 @@ from production_hub.core.config.models import (
     RemotePageConfig,
     ServiceLogoMapping,
 )
-from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition, EndpointInputDefinition
 from production_hub.integrations.midi.models import MidiMapping
 
 
@@ -184,7 +184,21 @@ def build_default_endpoints() -> list[EndpointDefinition]:
                 ActionDefinition("propresenter.trigger_presentation", {"label": "iMac Screen"}),
             ],
         ),
-        EndpointDefinition("trigger_macro", "Trigger Macro", "/macro", [ActionDefinition("propresenter.trigger_macro")]),
+        EndpointDefinition(
+            "trigger_macro",
+            "Trigger Macro",
+            "/macro",
+            [ActionDefinition("propresenter.trigger_macro")],
+            inputs=[
+                EndpointInputDefinition(
+                    name="macro_name",
+                    label="Macro",
+                    kind="select",
+                    required=True,
+                    option_source="macros",
+                )
+            ],
+        ),
         EndpointDefinition("timer_start", "Timer Start", "/timer/start", [ActionDefinition("propresenter.timer_start")]),
         EndpointDefinition(
             "timer_stop_reset",
@@ -196,7 +210,22 @@ def build_default_endpoints() -> list[EndpointDefinition]:
                 ActionDefinition("propresenter.timer_reset"),
             ],
         ),
-        EndpointDefinition("audio_trigger", "Audio Trigger", "/audio/trigger", [ActionDefinition("propresenter.audio_trigger")]),
+        EndpointDefinition(
+            "audio_trigger",
+            "Audio Trigger",
+            "/audio/trigger",
+            [ActionDefinition("propresenter.audio_trigger")],
+            inputs=[
+                EndpointInputDefinition(
+                    name="playlist",
+                    label="Playlist",
+                    kind="select",
+                    required=True,
+                    option_source="audio_playlists",
+                ),
+                EndpointInputDefinition(name="track", label="Track", kind="text", required=True),
+            ],
+        ),
         EndpointDefinition("audio_clear", "Audio Clear", "/audio/clear", [ActionDefinition("propresenter.audio_clear")]),
         EndpointDefinition("auto_show", "Auto Show", "/auto-show", [ActionDefinition("runtime.auto_show")]),
     ]

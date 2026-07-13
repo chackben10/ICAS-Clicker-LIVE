@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from production_hub.integrations.scoreboard.models import ScoreRow, ScoreboardState
+from production_hub.integrations.scoreboard.service import ScoreboardDisabled
 from production_hub.ui.pages.common import configure_table, int_from_line_edit, integer_line_edit, scroll_page, title
 
 HISTORY_CAP = 60
@@ -30,7 +31,7 @@ class ScoreboardPage(QWidget):
     def __init__(self, context) -> None:
         super().__init__()
         self.context = context
-        self.state: ScoreboardState = context.scoreboard.get_state()
+        self.state: ScoreboardState = ScoreboardState()
         self.queue = 0
         self.action_history: list[tuple[datetime, str]] = []
 
@@ -157,7 +158,13 @@ class ScoreboardPage(QWidget):
         return group
 
     def reload(self) -> None:
-        self.state = self.context.scoreboard.get_state()
+        try:
+            self.state = self.context.scoreboard.get_state()
+        except ScoreboardDisabled:
+            self.state = ScoreboardState()
+            self.render()
+            self.status.setText("Scoreboard Service is disabled. Re-enable it in Integrations.")
+            return
         self.render()
         self.status.setText("Scoreboard loaded.")
 

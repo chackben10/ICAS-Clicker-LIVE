@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QWidget
+from PySide6.QtWidgets import QGroupBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from production_hub.ui.pages.common import configure_table, scroll_page, title
 
 
-def build_page(context) -> QWidget:
-    scroll, _body, layout = scroll_page()
-    layout.addWidget(title("Diagnostics", "Health, structured logs, request history, and automation inspector."))
+def integration_diagnostics_section(context) -> QWidget:
     integrations = context.health_monitor.integration_list()
+    group = QGroupBox("Integration Diagnostics")
+    layout = QVBoxLayout(group)
     table = QTableWidget(len(integrations), 5)
     table.setHorizontalHeaderLabels(["Integration", "Status", "Target", "Last success", "Last error"])
     for row, item in enumerate(integrations):
@@ -19,9 +19,14 @@ def build_page(context) -> QWidget:
         table.setItem(row, 4, QTableWidgetItem(item.last_error))
     configure_table(table)
     layout.addWidget(table)
+    return group
 
+
+def endpoint_request_history_section(context) -> QWidget:
     state = context.runtime_state_repo.load()
     requests = state.endpoint_request_history[-100:]
+    group = QGroupBox("Recent Endpoint Requests")
+    layout = QVBoxLayout(group)
     req_table = QTableWidget(len(requests), 6)
     req_table.setHorizontalHeaderLabels(["Timestamp", "Method", "Route", "Status", "Caller", "Duration ms"])
     for row, item in enumerate(requests):
@@ -33,4 +38,12 @@ def build_page(context) -> QWidget:
         req_table.setItem(row, 5, QTableWidgetItem(str(item.duration_ms)))
     configure_table(req_table)
     layout.addWidget(req_table)
+    return group
+
+
+def build_page(context) -> QWidget:
+    scroll, _body, layout = scroll_page()
+    layout.addWidget(title("Diagnostics", "Health, structured logs, request history, and automation inspector."))
+    layout.addWidget(integration_diagnostics_section(context))
+    layout.addWidget(endpoint_request_history_section(context))
     return scroll

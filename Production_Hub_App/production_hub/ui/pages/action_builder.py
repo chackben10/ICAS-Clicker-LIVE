@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -29,6 +31,7 @@ from production_hub.core.endpoints.catalog import (
     normalize_select_value,
 )
 from production_hub.core.endpoints.models import ActionDefinition
+from production_hub.ui.dialogs.action_palette import ActionPaletteDialog
 from production_hub.ui.pages.common import responsive_grid
 
 
@@ -51,9 +54,10 @@ def _clear_layout(layout: QFormLayout) -> None:
 
 
 class FieldSetEditor(QWidget):
-    def __init__(self, context) -> None:
+    def __init__(self, context, endpoint_inputs: Callable[[], list[Any]] | None = None) -> None:
         super().__init__()
         self.context = context
+        self.endpoint_inputs = endpoint_inputs or (lambda: [])
         self.fields: tuple[FieldSpec, ...] = ()
         self.widgets: dict[str, QWidget] = {}
         self.form = QFormLayout(self)
@@ -79,17 +83,24 @@ class FieldSetEditor(QWidget):
             self.form.addRow(label, widget)
 
     def _widget_for(self, field: FieldSpec, value: Any) -> QWidget:
+        input_options = [(input_def.label or input_def.name, f"{{{{{input_def.name}}}}}") for input_def in self.endpoint_inputs()]
         if field.kind == "bool":
             widget = QCheckBox()
             widget.setChecked(str(value).lower() in {"1", "true", "yes", "on"})
             return widget
-        if field.kind == "select":
+        if field.kind == "select" or input_options:
             widget = QComboBox()
             widget.setEditable(True)
+            if input_options:
+                for label, template in input_options:
+                    widget.addItem(f"Use input: {label}", template)
+                widget.insertSeparator(len(input_options))
             widget.addItems(action_options(self.context, field))
             text = str(value or "")
             if text:
-                index = widget.findText(text)
+                index = next((i for i in range(widget.count()) if widget.itemData(i) == text), -1)
+                if index < 0:
+                    index = widget.findText(text)
                 if index >= 0:
                     widget.setCurrentIndex(index)
                 else:
@@ -109,16 +120,18 @@ class FieldSetEditor(QWidget):
             if isinstance(widget, QCheckBox):
                 out[field.name] = widget.isChecked()
             elif isinstance(widget, QComboBox):
-                out[field.name] = normalize_select_value(field, widget.currentText())
+                data = widget.currentData()
+                out[field.name] = str(data) if data else normalize_select_value(field, widget.currentText())
             elif isinstance(widget, QLineEdit):
                 out[field.name] = widget.text().strip()
         return out
 
 
 class ActionSequenceEditor(QWidget):
-    def __init__(self, context) -> None:
+    def __init__(self, context, endpoint_inputs: Callable[[], list[Any]] | None = None) -> None:
         super().__init__()
         self.context = context
+        self.endpoint_inputs = endpoint_inputs or (lambda: [])
         self._actions: list[ActionDefinition] = []
         self._current_index = -1
         self._loading = False
@@ -126,12 +139,14 @@ class ActionSequenceEditor(QWidget):
         self.list_widget.setObjectName("BuilderStepList")
         self.list_widget.setMinimumWidth(240)
         self.list_widget.setMinimumHeight(190)
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self.show_action_menu)
         self.type_combo = QComboBox()
         self.type_combo.addItems([f"{spec.category} - {spec.label}" for spec in ACTION_SPECS])
         self.description = QLabel("")
         self.description.setWordWrap(True)
         self.description.setObjectName("HelpText")
-        self.fields = FieldSetEditor(context)
+        self.fields = FieldSetEditor(context, self.endpoint_inputs)
         self.delay_spin = QDoubleSpinBox()
         self.delay_spin.setRange(0, 3600)
         self.delay_spin.setDecimals(2)
@@ -212,12 +227,34 @@ class ActionSequenceEditor(QWidget):
         return ACTION_SPECS[combo_index]
 
     def add_action(self) -> None:
-        spec = ACTION_SPECS[0]
-        action = ActionDefinition(spec.action_type, params=default_action_params(spec.action_type))
+        dialog = ActionPaletteDialog(self.context, parent=self, endpoint_inputs=self.endpoint_inputs)
+        if dialog.exec() != QDialog.DialogCode.Accepted or not dialog.selected_action:
+            return
+        action = dialog.selected_action
         self.save_current()
         self._actions.append(action)
         self.reload_list()
         self.list_widget.setCurrentRow(len(self._actions) - 1)
+
+    def show_action_menu(self, position) -> None:
+        row = self.list_widget.indexAt(position).row()
+        if row >= 0:
+            self.list_widget.setCurrentRow(row)
+        menu = QMenu(self)
+        add = menu.addAction("Add Action")
+        add.triggered.connect(self.add_action)
+        remove = menu.addAction("Remove Action")
+        remove.setEnabled(row >= 0)
+        remove.triggered.connect(self.remove_action)
+        if row >= 0:
+            menu.addSeparator()
+            up = menu.addAction("Move Up")
+            up.setEnabled(row > 0)
+            up.triggered.connect(self.move_up)
+            down = menu.addAction("Move Down")
+            down.setEnabled(row < len(self._actions) - 1)
+            down.triggered.connect(self.move_down)
+        menu.exec(self.list_widget.viewport().mapToGlobal(position))
 
     def remove_action(self) -> None:
         row = self.list_widget.currentRow()
@@ -318,6 +355,8 @@ class ConditionSequenceEditor(QWidget):
         self.list_widget.setObjectName("BuilderStepList")
         self.list_widget.setMinimumWidth(240)
         self.list_widget.setMinimumHeight(160)
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self.show_condition_menu)
         self.type_combo = QComboBox()
         self.type_combo.addItems([f"{spec.category} - {spec.label}" for spec in CONDITION_SPECS])
         self.description = QLabel("")
@@ -384,6 +423,18 @@ class ConditionSequenceEditor(QWidget):
         self._conditions.append({"condition_type": spec.condition_type, "params": _default_params(spec.fields)})
         self.reload_list()
         self.list_widget.setCurrentRow(len(self._conditions) - 1)
+
+    def show_condition_menu(self, position) -> None:
+        row = self.list_widget.indexAt(position).row()
+        if row >= 0:
+            self.list_widget.setCurrentRow(row)
+        menu = QMenu(self)
+        add = menu.addAction("Add Condition")
+        add.triggered.connect(self.add_condition)
+        remove = menu.addAction("Remove Condition")
+        remove.setEnabled(row >= 0)
+        remove.triggered.connect(self.remove_condition)
+        menu.exec(self.list_widget.viewport().mapToGlobal(position))
 
     def remove_condition(self) -> None:
         row = self.list_widget.currentRow()

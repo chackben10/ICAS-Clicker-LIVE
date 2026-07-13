@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from production_hub.core.config.models import ValidationError
+from production_hub.core.config.models import ScoreboardConfig, ValidationError
+from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_DISABLED, STATUS_OFFLINE
 from production_hub.integrations.base import IntegrationBase
 from production_hub.integrations.scoreboard.models import ScoreRow, ScoreboardState
 from production_hub.integrations.scoreboard.repository import ScoreboardRepository
@@ -16,12 +17,38 @@ class ScoreboardConflict(RuntimeError):
         super().__init__(f"Scoreboard revision conflict: expected {expected}, actual {actual}")
 
 
+class ScoreboardDisabled(RuntimeError):
+    def __init__(self) -> None:
+        super().__init__("Scoreboard Service is disabled")
+
+
 class ScoreboardService(IntegrationBase):
-    def __init__(self, repository: ScoreboardRepository) -> None:
-        super().__init__("Scoreboard Service", True, "state/scoreboard.json")
+    def __init__(self, repository: ScoreboardRepository, config: ScoreboardConfig | None = None) -> None:
+        self.config = config or ScoreboardConfig()
+        super().__init__("Scoreboard Service", self.config.enabled, "state/scoreboard.json")
         self.repository = repository
 
+    def health(self) -> IntegrationHealth:
+        self.enabled = self.config.enabled
+        if not self.enabled:
+            return IntegrationHealth(self.name, STATUS_DISABLED, self.target)
+        if self.last_error:
+            return IntegrationHealth(self.name, STATUS_OFFLINE, self.target, self.last_success_at, self.last_error)
+        return IntegrationHealth(self.name, STATUS_CONNECTED, self.target, self.last_success_at, self.last_error)
+
+    def set_enabled(self, enabled: bool) -> None:
+        self.config.enabled = enabled
+        self.enabled = enabled
+        if enabled:
+            self.last_error = ""
+
+    def require_enabled(self) -> None:
+        self.enabled = self.config.enabled
+        if not self.enabled:
+            raise ScoreboardDisabled()
+
     def get_state(self) -> ScoreboardState:
+        self.require_enabled()
         state = self.repository.load()
         self.mark_success()
         return state
@@ -32,6 +59,7 @@ class ScoreboardService(IntegrationBase):
         writer: dict[str, Any] | None = None,
         expected_revision: int | None = None,
     ) -> ScoreboardState:
+        self.require_enabled()
         with self.repository.locked():
             current = self.repository.load()
             if expected_revision is not None and expected_revision != current.revision:
@@ -47,6 +75,7 @@ class ScoreboardService(IntegrationBase):
             return incoming
 
     def add_row(self, name: str = "", score: int = 0) -> ScoreboardState:
+        self.require_enabled()
         state = self.repository.load()
         next_id = f"row-{state.revision + 1}-{len(state.rows) + 1}"
         state.history.append([ScoreRow(row.id, row.name, row.score) for row in state.rows])
@@ -59,6 +88,7 @@ class ScoreboardService(IntegrationBase):
         return state
 
     def undo(self) -> ScoreboardState:
+        self.require_enabled()
         state = self.repository.load()
         if not state.history:
             raise ValidationError("No scoreboard history available")
@@ -67,4 +97,3 @@ class ScoreboardService(IntegrationBase):
         state.modified_at = datetime.now(UTC).isoformat()
         self.repository.save(state)
         return state
-

@@ -26,9 +26,8 @@ from PySide6.QtWidgets import (
 from production_hub.ui.pages import (
     automations_page,
     camera_control_page,
-    data_storage_page,
-    diagnostics_page,
     endpoints_page,
+    input_lists_page,
     integrations_page,
     midi_page,
     overview_page,
@@ -95,14 +94,13 @@ class MainWindow(QMainWindow):
         pages = [
             ("Overview", overview_page.build_page(context)),
             ("Endpoints", endpoints_page.build_page(context)),
+            ("Input Lists", input_lists_page.build_page(context)),
             ("Automations", automations_page.build_page(context)),
             ("Integrations", integrations_page.build_page(context)),
             ("MIDI", midi_page.build_page(context)),
             ("Camera Control", camera_control_page.build_page(context)),
             ("Scoreboard", scoreboard_page.build_page(context)),
             ("Remote Pages", remote_pages_page.build_page(context)),
-            ("Data & Storage", data_storage_page.build_page(context)),
-            ("Diagnostics", diagnostics_page.build_page(context)),
             ("Settings", settings_page.build_page(context)),
         ]
         for name, widget in pages:
@@ -119,7 +117,7 @@ class MainWindow(QMainWindow):
         root.addWidget(self.nav_panel)
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
-        self.setStyleSheet(STYLE)
+        self.apply_theme()
         self.setup_menu_bar()
         self.remove_spinbox_arrows()
         self.set_nav_collapsed(False)
@@ -250,9 +248,10 @@ class MainWindow(QMainWindow):
         self.add_menu_action(self.tools_menu, "Resume Automations", "Ctrl+Shift+G", self.resume_automations)
         self.tools_menu.addSeparator()
         self.add_menu_action(self.tools_menu, "Open Endpoint Builder", "", lambda: self.show_page_by_name("Endpoints"))
+        self.add_menu_action(self.tools_menu, "Open Input Lists", "", lambda: self.show_page_by_name("Input Lists"))
         self.add_menu_action(self.tools_menu, "Open Automation Builder", "", lambda: self.show_page_by_name("Automations"))
         self.add_menu_action(self.tools_menu, "Open Remote Pages", "", lambda: self.show_page_by_name("Remote Pages"))
-        self.add_menu_action(self.tools_menu, "Open Diagnostics", "", lambda: self.show_page_by_name("Diagnostics"))
+        self.add_menu_action(self.tools_menu, "Open Integration Diagnostics", "", lambda: self.show_page_by_name("Integrations"))
         self.add_menu_action(self.tools_menu, "Open Settings", "", lambda: self.show_page_by_name("Settings"))
 
     def setup_help_menu(self) -> None:
@@ -347,6 +346,12 @@ class MainWindow(QMainWindow):
             self.api_handle.stop()
         event.accept()
 
+    def apply_theme(self) -> None:
+        theme = normalized_theme(self.context.config.ui.theme)
+        apply_application_theme(QApplication.instance(), theme)
+        effective = effective_theme(QApplication.instance(), theme)
+        self.setStyleSheet(STYLE + (DARK_STYLE_OVERRIDES if effective == "dark" else LIGHT_STYLE_OVERRIDES))
+
 
 def nav_icon(name: str) -> QIcon:
     pixmap = QPixmap(28, 28)
@@ -365,6 +370,10 @@ def nav_icon(name: str) -> QIcon:
         painter.drawLine(10, 14, 18, 20)
         for x, y in [(6, 11), (17, 5), (17, 17)]:
             painter.drawEllipse(QRectF(x, y, 6, 6))
+    elif name == "Input Lists":
+        for y in [7, 13, 19]:
+            painter.drawLine(9, y, 23, y)
+            painter.drawEllipse(QRectF(5, y - 2, 4, 4))
     elif name == "Automations":
         painter.drawEllipse(QRectF(5, 5, 18, 18))
         painter.setBrush(QColor("#e8edf3"))
@@ -462,18 +471,6 @@ QMenuBar::item {
   border-radius: 5px;
 }
 QMenuBar::item:selected {
-  background: #e8edf3;
-}
-QMenu {
-  background: #ffffff;
-  border: 1px solid #cfd6de;
-  padding: 6px;
-}
-QMenu::item {
-  padding: 6px 28px 6px 10px;
-  border-radius: 5px;
-}
-QMenu::item:selected {
   background: #e8edf3;
 }
 QStatusBar {
@@ -606,6 +603,15 @@ QLabel {
   border: 1px solid #dce1e7;
   border-radius: 8px;
 }
+#IntegrationCard {
+  background: #ffffff;
+  border: 1px solid #dce1e7;
+  border-radius: 8px;
+}
+#IntegrationCard[disabledIntegration="true"] {
+  background: #eef1f4;
+  border-color: #d3dae2;
+}
 #CardTitle {
   font-size: 15px;
   font-weight: 700;
@@ -655,13 +661,13 @@ QGroupBox::title {
   padding: 0 4px;
   background: #ffffff;
 }
-QLineEdit, QTextEdit, QListWidget, QComboBox, QSpinBox, QDoubleSpinBox {
+QLineEdit, QTextEdit, QListWidget, QSpinBox, QDoubleSpinBox {
   background: #ffffff;
   border: 1px solid #cfd6de;
   border-radius: 6px;
   padding: 6px;
 }
-QComboBox, QSpinBox, QDoubleSpinBox {
+QSpinBox, QDoubleSpinBox {
   min-height: 30px;
 }
 QSpinBox, QDoubleSpinBox {
@@ -676,13 +682,6 @@ QSpinBox::up-arrow, QSpinBox::down-arrow,
 QDoubleSpinBox::up-arrow, QDoubleSpinBox::down-arrow {
   width: 0px;
   height: 0px;
-}
-QAbstractItemView {
-  background: #ffffff;
-  border: 1px solid #cfd6de;
-  selection-background-color: #dbeafe;
-  selection-color: #152033;
-  padding: 4px;
 }
 #TargetList {
   min-height: 86px;
@@ -734,9 +733,144 @@ QAbstractItemView {
 }
 """
 
+LIGHT_STYLE_OVERRIDES = """
+QMenu {
+  color: #1c2430;
+}
+"""
+
+DARK_STYLE_OVERRIDES = """
+QMainWindow {
+  background: #1f2329;
+  color: #f2f5f8;
+}
+QWidget {
+  color: #f2f5f8;
+}
+QMenu {
+  color: #f2f5f8;
+}
+QMenuBar {
+  background: #1f2329;
+  color: #f2f5f8;
+  border-bottom: 1px solid #343b45;
+}
+QMenuBar::item:selected {
+  background: #343b45;
+}
+QStatusBar, QScrollArea, #PageBody {
+  background: #1f2329;
+  color: #c9d1db;
+}
+#SidebarPanel, #Sidebar, #SidebarCollapsed, #SidebarToggle {
+  background: #161a20;
+}
+#Sidebar::item, #SidebarCollapsed::item {
+  color: #dce4ed;
+}
+#Sidebar::item:selected, #SidebarCollapsed::item:selected {
+  background: #2f6fed;
+  color: #ffffff;
+}
+#PageTitle {
+  color: #f6f8fb;
+}
+#PageSubtitle, #HelpText, #MetaLabel, #SummaryText, #StatusText {
+  color: #b8c2cf;
+}
+#SectionTitle, #InlineSectionLabel, #CardTitle {
+  color: #f2f5f8;
+}
+#BuilderSidebarPanel, #BuilderSection, #Card, #IntegrationCard, QGroupBox, #SequenceEditorPanel, #ScoreRowCard, #ScoreSummaryBar {
+  background: #282e36;
+  border: 1px solid #3b444f;
+}
+#IntegrationCard[disabledIntegration="true"] {
+  background: #222830;
+  border-color: #343b45;
+}
+#BuilderEditor, #BuilderEditorScroll {
+  background: #1f2329;
+  border: 0;
+}
+#BuilderPanelTitle {
+  color: #f2f5f8;
+}
+#BuilderSection::title {
+  background: #282e36;
+  color: #f2f5f8;
+}
+#SequenceListPanel {
+  background: transparent;
+}
+QGroupBox::title {
+  background: #282e36;
+  color: #f2f5f8;
+}
+QLineEdit, QTextEdit, QListWidget, QSpinBox, QDoubleSpinBox, #BuilderStepList {
+  background: #171b21;
+  color: #f2f5f8;
+  border: 1px solid #46515f;
+  selection-background-color: #2f6fed;
+  selection-color: #ffffff;
+}
+QTableWidget, #BuilderList {
+  background: #171b21;
+  alternate-background-color: #20262e;
+  color: #f2f5f8;
+  border: 1px solid #3b444f;
+  gridline-color: #343b45;
+  selection-background-color: #2f6fed;
+  selection-color: #ffffff;
+}
+QHeaderView::section {
+  background: #282e36;
+  color: #f2f5f8;
+}
+#BuilderStepList::item:selected {
+  background: #2f6fed;
+  color: #ffffff;
+}
+#ScoreValue, #QueueTotal, #TableScoreValue {
+  color: #f6f8fb;
+}
+"""
+
+
+def normalized_theme(value: str) -> str:
+    theme = str(value or "system").strip().lower()
+    return theme if theme in {"system", "light", "dark"} else "system"
+
+
+def effective_theme(app: QApplication | None, theme: str) -> str:
+    if theme in {"light", "dark"}:
+        return theme
+    if app is not None:
+        try:
+            if app.styleHints().colorScheme() == Qt.ColorScheme.Dark:
+                return "dark"
+        except Exception:
+            pass
+    return "light"
+
+
+def apply_application_theme(app: QApplication | None, theme: str) -> None:
+    if app is None:
+        return
+    try:
+        color_scheme = {
+            "light": Qt.ColorScheme.Light,
+            "dark": Qt.ColorScheme.Dark,
+            "system": Qt.ColorScheme.Unknown,
+        }[theme]
+        app.styleHints().setColorScheme(color_scheme)
+    except Exception:
+        pass
+
 
 def run_desktop_app(context, api_handle=None) -> int:
     app = QApplication.instance() or QApplication([])
+    apply_application_theme(app, normalized_theme(context.config.ui.theme))
     app.setAttribute(Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
     app.setWindowIcon(app_icon(app.style()))
     window = MainWindow(context, api_handle)

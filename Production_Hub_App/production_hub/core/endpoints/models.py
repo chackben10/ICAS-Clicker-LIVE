@@ -27,6 +27,29 @@ class ActionDefinition(JsonModel):
 
 
 @dataclass
+class EndpointInputDefinition(JsonModel):
+    name: str
+    label: str = ""
+    kind: str = "text"
+    required: bool = False
+    default: str = ""
+    option_source: str = ""
+    options: list[str] = field(default_factory=list)
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        self.name = str(self.name or "").strip()
+        self.label = str(self.label or self.name).strip()
+        self.kind = str(self.kind or "text").strip().lower()
+        self.default = str(self.default or "")
+        self.option_source = str(self.option_source or "").strip()
+        if not self.name:
+            raise ValidationError("Endpoint input name cannot be empty")
+        if self.kind not in {"text", "number", "bool", "select"}:
+            raise ValidationError(f"Unsupported endpoint input kind: {self.kind}")
+
+
+@dataclass
 class EndpointDefinition(JsonModel):
     key: str
     name: str
@@ -36,6 +59,7 @@ class EndpointDefinition(JsonModel):
     dangerous: bool = False
     description: str = ""
     allowed_methods: list[str] = field(default_factory=lambda: ["GET", "POST"])
+    inputs: list[EndpointInputDefinition] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.key = str(self.key or "").strip()
@@ -64,4 +88,3 @@ class EndpointExecutionResult(JsonModel):
     finished_at: str = ""
     action_results: list[ActionResult] = field(default_factory=list)
     error: str = ""
-

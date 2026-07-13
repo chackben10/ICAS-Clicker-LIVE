@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from production_hub.core.config.input_lists import input_list_choices, normalize_list_choice
+
 
 @dataclass(frozen=True)
 class FieldSpec:
@@ -22,17 +24,24 @@ class ActionSpec:
     category: str
     description: str
     fields: tuple[FieldSpec, ...] = field(default_factory=tuple)
+    path: tuple[str, ...] = ()
 
 
+# AI/agent maintenance note:
+# Every executable Production Hub capability that should be available from MIDI,
+# endpoints, automations, or other action builders belongs in ACTION_SPECS.
+# Pair each new ActionSpec with a handler in app.bootstrap.register_action_handlers.
+# production_hub/tests/unit/test_action_palette_catalog.py enforces both sides.
 ACTION_SPECS: tuple[ActionSpec, ...] = (
-    ActionSpec("propresenter.next_slide", "Next Slide", "ProPresenter", "Advance the active or focused presentation."),
-    ActionSpec("propresenter.previous_slide", "Previous Slide", "ProPresenter", "Go backward in the active or focused presentation."),
+    ActionSpec("propresenter.next_slide", "Next Slide", "ProPresenter", "Advance the active or focused presentation.", path=("ProPresenter Actions", "Slide Control Actions")),
+    ActionSpec("propresenter.previous_slide", "Previous Slide", "ProPresenter", "Go backward in the active or focused presentation.", path=("ProPresenter Actions", "Slide Control Actions")),
     ActionSpec(
         "propresenter.focus_slide",
         "Trigger Slide Index",
         "ProPresenter",
         "Trigger a specific slide index.",
         (FieldSpec("index", "Slide index", "text", "0", "Use a number, or a variable such as {{index}}."),),
+        ("ProPresenter Actions", "Slide Control Actions"),
     ),
     ActionSpec(
         "propresenter.trigger_presentation",
@@ -40,6 +49,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "ProPresenter",
         "Trigger one configured ProPresenter presentation.",
         (FieldSpec("label", "Presentation", "select", "", context_options="presentations"),),
+        ("ProPresenter Actions", "Presentation Actions"),
     ),
     ActionSpec(
         "propresenter.trigger_service_logo",
@@ -47,14 +57,16 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "ProPresenter",
         "Trigger one configured service-logo presentation.",
         (FieldSpec("service_logo_uuid", "Service logo", "select", "", context_options="service_logos"),),
+        ("ProPresenter Actions", "Presentation Actions"),
     ),
-    ActionSpec("propresenter.clear_announcements", "Clear Announcements", "ProPresenter", "Clear the announcements layer."),
+    ActionSpec("propresenter.clear_announcements", "Clear Announcements", "ProPresenter", "Clear the announcements layer.", path=("ProPresenter Actions", "Clear Actions")),
     ActionSpec(
         "propresenter.clear_slide",
         "Clear Slide",
         "ProPresenter",
         "Clear the slide layer, optionally after a delay.",
         (FieldSpec("delay_seconds", "Delay seconds", "text", "0"),),
+        ("ProPresenter Actions", "Clear Actions"),
     ),
     ActionSpec(
         "propresenter.trigger_macro",
@@ -62,10 +74,11 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "ProPresenter",
         "Trigger an allow-listed macro by name.",
         (FieldSpec("macro_name", "Macro", "select", "", context_options="macros"),),
+        ("ProPresenter Actions", "Macro Actions"),
     ),
-    ActionSpec("propresenter.timer_start", "Start Timer", "ProPresenter", "Start the configured timer."),
-    ActionSpec("propresenter.timer_stop", "Stop Timer", "ProPresenter", "Stop the configured timer."),
-    ActionSpec("propresenter.timer_reset", "Reset Timer", "ProPresenter", "Reset the configured timer."),
+    ActionSpec("propresenter.timer_start", "Start Timer", "ProPresenter", "Start the configured timer.", path=("ProPresenter Actions", "Timer Actions")),
+    ActionSpec("propresenter.timer_stop", "Stop Timer", "ProPresenter", "Stop the configured timer.", path=("ProPresenter Actions", "Timer Actions")),
+    ActionSpec("propresenter.timer_reset", "Reset Timer", "ProPresenter", "Reset the configured timer.", path=("ProPresenter Actions", "Timer Actions")),
     ActionSpec(
         "propresenter.audio_trigger",
         "Trigger Audio",
@@ -75,8 +88,9 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
             FieldSpec("playlist", "Playlist", "select", "", context_options="audio_playlists"),
             FieldSpec("track", "Track", "text", "", "Exact track name, or a variable such as {{track}}."),
         ),
+        ("ProPresenter Actions", "Audio Actions"),
     ),
-    ActionSpec("propresenter.audio_clear", "Clear Audio", "ProPresenter", "Clear the audio layer."),
+    ActionSpec("propresenter.audio_clear", "Clear Audio", "ProPresenter", "Clear the audio layer.", path=("ProPresenter Actions", "Audio Actions")),
     ActionSpec(
         "obs.set_scene",
         "Set OBS Scene",
@@ -86,6 +100,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
             FieldSpec("scene", "Scene", "select", "", context_options="obs_scenes"),
             FieldSpec("transition_policy", "Use transition policy", "bool", True),
         ),
+        ("OBS Actions", "Scene Actions"),
     ),
     ActionSpec(
         "obs.apply_look_rule",
@@ -93,6 +108,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "OBS",
         "Apply a configured OBS source visibility rule by look name.",
         (FieldSpec("look_name", "Look name", "select", "", context_options="obs_looks"),),
+        ("OBS Actions", "Look Actions"),
     ),
     ActionSpec(
         "obs.set_scene_item_enabled",
@@ -105,14 +121,16 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
             FieldSpec("source_name", "Source name", "text", "", "Used when scene item id is blank."),
             FieldSpec("enabled", "Visible", "bool", True),
         ),
+        ("OBS Actions", "Source Actions"),
     ),
-    ActionSpec("obs.reconnect", "Reconnect OBS", "OBS", "Reconnect OBS and refresh its health status."),
+    ActionSpec("obs.reconnect", "Reconnect OBS", "OBS", "Reconnect OBS and refresh its health status.", path=("OBS Actions", "Connection Actions")),
     ActionSpec(
         "panasonic.recall_preset",
         "Recall Camera Preset",
         "Panasonic AWP",
         "Recall a Panasonic camera position preset.",
-        (FieldSpec("preset", "Preset number", "text", "1", "Use a number, or a variable such as {{preset}}."),),
+        (FieldSpec("preset", "Preset number", "text", "1", "Use a number, or bind to an endpoint input."),),
+        ("PTZ Actions", "Preset Actions"),
     ),
     ActionSpec(
         "panasonic.save_preset",
@@ -120,6 +138,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "Panasonic AWP",
         "Save the current camera position to a preset.",
         (FieldSpec("preset", "Preset number", "text", "1"),),
+        ("PTZ Actions", "Preset Actions"),
     ),
     ActionSpec(
         "panasonic.send_command",
@@ -130,6 +149,64 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
             FieldSpec("command", "Command", "text", "#R01"),
             FieldSpec("endpoint", "Camera endpoint", "select", "aw_ptz", options=("aw_ptz", "aw_cam")),
         ),
+        ("PTZ Actions", "Command Actions"),
+    ),
+    ActionSpec(
+        "scoreboard.add_row",
+        "Add Scoreboard Row",
+        "Scoreboard",
+        "Add a row to the scoreboard.",
+        (FieldSpec("name", "Name", "text", ""), FieldSpec("score", "Score", "text", "0")),
+        ("Scoreboard Actions", "Row Actions"),
+    ),
+    ActionSpec(
+        "scoreboard.update_score",
+        "Change Score",
+        "Scoreboard",
+        "Add a delta to a scoreboard row.",
+        (
+            FieldSpec("row_id", "Row ID", "text", "", "Preferred when known."),
+            FieldSpec("name", "Name", "text", "", "Used when row ID is blank."),
+            FieldSpec("delta", "Delta", "text", "1"),
+        ),
+        ("Scoreboard Actions", "Score Actions"),
+    ),
+    ActionSpec(
+        "scoreboard.set_score",
+        "Set Score",
+        "Scoreboard",
+        "Set a scoreboard row to an exact score.",
+        (
+            FieldSpec("row_id", "Row ID", "text", "", "Preferred when known."),
+            FieldSpec("name", "Name", "text", "", "Used when row ID is blank."),
+            FieldSpec("score", "Score", "text", "0"),
+        ),
+        ("Scoreboard Actions", "Score Actions"),
+    ),
+    ActionSpec(
+        "scoreboard.clear_row",
+        "Clear Row",
+        "Scoreboard",
+        "Set one scoreboard row to zero.",
+        (
+            FieldSpec("row_id", "Row ID", "text", "", "Preferred when known."),
+            FieldSpec("name", "Name", "text", "", "Used when row ID is blank."),
+        ),
+        ("Scoreboard Actions", "Score Actions"),
+    ),
+    ActionSpec("scoreboard.clear_all", "Clear All Scores", "Scoreboard", "Remove all scoreboard rows.", path=("Scoreboard Actions", "Board Actions")),
+    ActionSpec("scoreboard.undo", "Undo Scoreboard", "Scoreboard", "Undo the last scoreboard change.", path=("Scoreboard Actions", "Board Actions")),
+    ActionSpec(
+        "scoreboard.rename_row",
+        "Rename Row",
+        "Scoreboard",
+        "Rename one scoreboard row.",
+        (
+            FieldSpec("row_id", "Row ID", "text", "", "Preferred when known."),
+            FieldSpec("name", "Current name", "text", "", "Used when row ID is blank."),
+            FieldSpec("new_name", "New name", "text", ""),
+        ),
+        ("Scoreboard Actions", "Row Actions"),
     ),
     ActionSpec(
         "runtime.auto_show",
@@ -137,6 +214,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "Runtime",
         "Enable or disable Auto Show Slides.",
         (FieldSpec("enabled", "Enabled", "bool", True),),
+        ("Runtime Actions", "State Actions"),
     ),
     ActionSpec(
         "delay",
@@ -144,6 +222,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "Utility",
         "Pause execution before continuing to the next step.",
         (FieldSpec("seconds", "Seconds", "text", "1"),),
+        ("Utility Actions", "Timing Actions"),
     ),
 )
 
@@ -159,8 +238,17 @@ def default_action_params(action_type: str) -> dict[str, Any]:
     return {field.name: field.default for field in action_spec(action_type).fields}
 
 
+def action_tree_path(action_type: str) -> tuple[str, ...]:
+    spec = action_spec(action_type)
+    return spec.path or (f"{spec.category} Actions",)
+
+
 def action_options(context: Any, field: FieldSpec) -> list[str]:
     ref = field.context_options
+    if ref:
+        choices = input_list_choices(context.config, ref)
+        if choices:
+            return choices
     if ref == "presentations":
         return [item.label for item in context.config.integrations.propresenter.presentations]
     if ref == "service_logos":
@@ -177,6 +265,6 @@ def action_options(context: Any, field: FieldSpec) -> list[str]:
 
 
 def normalize_select_value(field: FieldSpec, value: str) -> str:
-    if field.context_options == "service_logos" and "|" in value:
-        return value.rsplit("|", 1)[-1].strip()
+    if field.context_options and "|" in value:
+        return normalize_list_choice(value)
     return value.strip()

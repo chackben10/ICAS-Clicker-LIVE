@@ -51,6 +51,27 @@ class UndoAndRepairTests(unittest.TestCase):
             reloaded = ConfigRepository(paths).load_endpoints()
             self.assertTrue(any(endpoint.key == "audio_clear" for endpoint in reloaded))
 
+    def test_build_context_repairs_builtin_endpoint_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = AppPaths(Path(tmp))
+            repo = ConfigRepository(paths)
+            repo.save_endpoints(
+                [
+                    EndpointDefinition(
+                        "audio_trigger",
+                        "Audio Trigger",
+                        "/audio/trigger",
+                        [ActionDefinition("propresenter.audio_trigger")],
+                    )
+                ]
+            )
+            context = build_context(Path(tmp))
+            endpoint = context.endpoint_registry.get("audio_trigger")
+            self.assertIsNotNone(endpoint)
+            self.assertEqual([input_def.name for input_def in endpoint.inputs], ["playlist", "track"])
+            reloaded = ConfigRepository(paths).load_endpoints()[0]
+            self.assertEqual(reloaded.inputs[0].option_source, "audio_playlists")
+
     def test_build_context_repairs_blank_builtin_automation_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             paths = AppPaths(Path(tmp))

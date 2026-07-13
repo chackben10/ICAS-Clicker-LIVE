@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import replace
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from production_hub.core.automation.engine import AutomationEngine
 from production_hub.core.config.defaults import build_default_automations, build_default_endpoints, build_default_midi_mappings
+from production_hub.core.config.input_lists import ensure_default_input_lists
 from production_hub.core.config.models import AppPaths
 from production_hub.core.config.repository import ConfigRepository, default_app_root
 from production_hub.core.endpoints.actions import ActionRouter
@@ -26,6 +28,7 @@ from production_hub.integrations.panasonic_awp.preset_service import PanasonicPr
 from production_hub.integrations.panasonic_awp.service import PanasonicAwpService
 from production_hub.integrations.propresenter.service import ProPresenterService
 from production_hub.integrations.scoreboard.repository import ScoreboardRepository
+from production_hub.integrations.scoreboard.models import ScoreRow
 from production_hub.integrations.scoreboard.service import ScoreboardService
 from production_hub.state.state_repository import RuntimeStateRepository
 from production_hub.state.undo_manager import UndoManager
@@ -81,9 +84,12 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
         config_repository.save_app_config(config)
     if ensure_api_cors_origins(config):
         config_repository.save_app_config(config)
+    if ensure_default_input_lists(config):
+        config_repository.save_app_config(config)
     loaded_endpoints = config_repository.load_endpoints()
-    endpoints = ensure_required_endpoints(loaded_endpoints)
-    if not any(item.key == "audio_clear" for item in loaded_endpoints):
+    loaded_endpoint_data = [item.to_dict() for item in loaded_endpoints]
+    endpoints = ensure_endpoint_input_defaults(ensure_required_endpoints(loaded_endpoints))
+    if [item.to_dict() for item in endpoints] != loaded_endpoint_data:
         config_repository.save_endpoints(endpoints)
     loaded_automations = config_repository.load_automations()
     loaded_automation_data = [item.to_dict() for item in loaded_automations]
@@ -101,7 +107,7 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     obs = ObsService(config.integrations.obs)
     panasonic = PanasonicAwpService(config.integrations.panasonic)
     panasonic_presets = PanasonicPresetService(config.integrations.panasonic)
-    scoreboard = ScoreboardService(scoreboard_repo)
+    scoreboard = ScoreboardService(scoreboard_repo, config.integrations.scoreboard)
     midi_mappings = [MidiMapping.from_dict(item) for item in config.integrations.midi.mappings]
     midi = MidiReceiver(config.integrations.midi, midi_mappings, lambda _action, _context: None)
 
@@ -146,6 +152,17 @@ def ensure_required_endpoints(endpoints: list[EndpointDefinition]) -> list[Endpo
     defaults = {item.key: item for item in build_default_endpoints()}
     audio_clear = defaults.get("audio_clear")
     return [*endpoints, audio_clear] if audio_clear else endpoints
+
+
+def ensure_endpoint_input_defaults(endpoints: list[EndpointDefinition]) -> list[EndpointDefinition]:
+    defaults = {item.key: item for item in build_default_endpoints()}
+    repaired: list[EndpointDefinition] = []
+    for endpoint in endpoints:
+        default = defaults.get(endpoint.key)
+        if default and default.inputs and not endpoint.inputs:
+            endpoint.inputs = [type(input_def).from_dict(input_def.to_dict()) for input_def in default.inputs]
+        repaired.append(endpoint)
+    return repaired
 
 
 def ensure_api_cors_origins(config: Any) -> bool:
@@ -343,19 +360,107 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
 
     async def panasonic_recall_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         preset = int(param(action, action_context, "preset", 0))
-        await context.panasonic.recall_preset(preset)
+        ok = await context.panasonic.recall_preset(preset)
+        if not ok:
+            return ActionResult(action.action_type, False, "camera preset recall failed", {"preset": preset})
         return await _action_ok(action, "camera preset recalled", {"preset": preset})
 
     async def panasonic_save_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         preset = int(param(action, action_context, "preset", 0))
-        await context.panasonic.save_preset(preset)
+        ok = await context.panasonic.save_preset(preset)
+        if not ok:
+            return ActionResult(action.action_type, False, "camera preset save failed", {"preset": preset})
         return await _action_ok(action, "camera preset saved", {"preset": preset})
 
     async def panasonic_send_command(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         command = str(param(action, action_context, "command", ""))
         endpoint = str(param(action, action_context, "endpoint", "aw_ptz"))
-        await context.panasonic.send_command(command, endpoint)
+        ok = await context.panasonic.send_command(command, endpoint)
+        if not ok:
+            return ActionResult(action.action_type, False, "camera command failed", {"command": command, "endpoint": endpoint})
         return await _action_ok(action, "camera command sent", {"command": command, "endpoint": endpoint})
+
+    def scoreboard_row(row_id: str = "", name: str = "") -> ScoreRow | None:
+        state = context.scoreboard.get_state()
+        if row_id:
+            match = next((row for row in state.rows if row.id == row_id), None)
+            if match:
+                return match
+        if name:
+            return next((row for row in state.rows if row.name == name), None)
+        return None
+
+    def scoreboard_save(rows: list[ScoreRow], writer_action: str) -> dict[str, Any]:
+        state = context.scoreboard.get_state()
+        history = state.legacy_payload().get("history", [])
+        history.append([row.to_dict() for row in state.rows])
+        updated = context.scoreboard.update_state(
+            {"rows": [row.to_dict() for row in rows], "history": history[-100:]},
+            writer={"source": "Production Hub action", "action": writer_action},
+            expected_revision=state.revision,
+        )
+        return {"revision": updated.revision, "rows": len(updated.rows)}
+
+    async def scoreboard_add_row(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        name = str(param(action, action_context, "name", ""))
+        score = int(param(action, action_context, "score", 0))
+        state = context.scoreboard.add_row(name, score)
+        return await _action_ok(action, "scoreboard row added", {"revision": state.revision, "name": name, "score": score})
+
+    async def scoreboard_update_score(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        row_id = str(param(action, action_context, "row_id", ""))
+        name = str(param(action, action_context, "name", ""))
+        delta = int(param(action, action_context, "delta", 0))
+        row = scoreboard_row(row_id, name)
+        if row is None:
+            raise ValueError("scoreboard row not found")
+        state = context.scoreboard.get_state()
+        rows = [replace(item, score=int(item.score) + delta) if item.id == row.id else item for item in state.rows]
+        data = scoreboard_save(rows, action.action_type)
+        return await _action_ok(action, "score updated", {**data, "row_id": row.id, "delta": delta})
+
+    async def scoreboard_set_score(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        row_id = str(param(action, action_context, "row_id", ""))
+        name = str(param(action, action_context, "name", ""))
+        score = int(param(action, action_context, "score", 0))
+        row = scoreboard_row(row_id, name)
+        if row is None:
+            raise ValueError("scoreboard row not found")
+        state = context.scoreboard.get_state()
+        rows = [replace(item, score=score) if item.id == row.id else item for item in state.rows]
+        data = scoreboard_save(rows, action.action_type)
+        return await _action_ok(action, "score set", {**data, "row_id": row.id, "score": score})
+
+    async def scoreboard_clear_row(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        row_id = str(param(action, action_context, "row_id", ""))
+        name = str(param(action, action_context, "name", ""))
+        row = scoreboard_row(row_id, name)
+        if row is None:
+            raise ValueError("scoreboard row not found")
+        state = context.scoreboard.get_state()
+        rows = [replace(item, score=0) if item.id == row.id else item for item in state.rows]
+        data = scoreboard_save(rows, action.action_type)
+        return await _action_ok(action, "score row cleared", {**data, "row_id": row.id})
+
+    async def scoreboard_clear_all(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        data = scoreboard_save([], action.action_type)
+        return await _action_ok(action, "scoreboard cleared", data)
+
+    async def scoreboard_undo(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        state = context.scoreboard.undo()
+        return await _action_ok(action, "scoreboard undo complete", {"revision": state.revision, "rows": len(state.rows)})
+
+    async def scoreboard_rename_row(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        row_id = str(param(action, action_context, "row_id", ""))
+        name = str(param(action, action_context, "name", ""))
+        new_name = str(param(action, action_context, "new_name", ""))
+        row = scoreboard_row(row_id, name)
+        if row is None:
+            raise ValueError("scoreboard row not found")
+        state = context.scoreboard.get_state()
+        rows = [replace(item, name=new_name) if item.id == row.id else item for item in state.rows]
+        data = scoreboard_save(rows, action.action_type)
+        return await _action_ok(action, "scoreboard row renamed", {**data, "row_id": row.id, "name": new_name})
 
     handlers = {
         "propresenter.next_slide": propresenter_next,
@@ -379,6 +484,13 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "panasonic.recall_preset": panasonic_recall_preset,
         "panasonic.save_preset": panasonic_save_preset,
         "panasonic.send_command": panasonic_send_command,
+        "scoreboard.add_row": scoreboard_add_row,
+        "scoreboard.update_score": scoreboard_update_score,
+        "scoreboard.set_score": scoreboard_set_score,
+        "scoreboard.clear_row": scoreboard_clear_row,
+        "scoreboard.clear_all": scoreboard_clear_all,
+        "scoreboard.undo": scoreboard_undo,
+        "scoreboard.rename_row": scoreboard_rename_row,
     }
     for action_type, handler in handlers.items():
         router.register(action_type, handler)

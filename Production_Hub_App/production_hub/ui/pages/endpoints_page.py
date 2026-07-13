@@ -5,6 +5,7 @@ import re
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -14,12 +15,14 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+from production_hub.core.config.input_lists import input_list_by_key, source_labels
+from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition, EndpointInputDefinition
 from production_hub.ui.pages.action_builder import ActionSequenceEditor
 from production_hub.ui.pages.common import PAGE_MARGIN, configure_table, responsive_grid, responsive_two_pane, run_background, set_table_row, title
 
@@ -44,7 +47,9 @@ class EndpointsPage(QWidget):
         self.get_check = QCheckBox("GET")
         self.post_check = QCheckBox("POST")
         self.description_edit = QTextEdit()
-        self.actions_editor = ActionSequenceEditor(context)
+        self.inputs_table = QTableWidget()
+        self.preview = QTextEdit()
+        self.actions_editor = ActionSequenceEditor(context, self.inputs_from_table)
         self._loading = False
         self.build()
         self.reload()
@@ -132,16 +137,42 @@ class EndpointsPage(QWidget):
         self.description_edit.setPlaceholderText("What should a volunteer know before using this endpoint?")
         details_layout.addWidget(QLabel("Description"))
         details_layout.addWidget(self.description_edit)
-        helper = QLabel("Route variables use braces, for example /camera/{preset:int}. Any action field can use {{preset}}.")
+        helper = QLabel("Route variables use braces, for example /camera/{preset:int}. Action fields can bind to inputs from their dropdowns.")
         helper.setObjectName("HelpText")
         helper.setWordWrap(True)
         details_layout.addWidget(helper)
         editor_layout.addWidget(details_box)
 
+        inputs_box, inputs_layout = self.section("Endpoint Inputs")
+        input_help = QLabel("Define what callers can send. Select inputs reference live Input Lists by key, so list edits update this endpoint automatically.")
+        input_help.setObjectName("HelpText")
+        input_help.setWordWrap(True)
+        inputs_layout.addWidget(input_help)
+        self.configure_inputs_table()
+        inputs_layout.addWidget(self.inputs_table)
+        input_buttons = QHBoxLayout()
+        for label, handler in [("Add Input", self.add_input_row), ("Remove Input", self.remove_input_row)]:
+            button = QPushButton(label)
+            button.clicked.connect(handler)
+            input_buttons.addWidget(button)
+        input_buttons.addStretch()
+        inputs_layout.addLayout(input_buttons)
+        editor_layout.addWidget(inputs_box)
+
         actions_box, actions_layout = self.section("Action Sequence")
+        action_help = QLabel("Right-click the steps list to add actions. For endpoints with inputs, action fields offer Use input choices.")
+        action_help.setObjectName("HelpText")
+        action_help.setWordWrap(True)
+        actions_layout.addWidget(action_help)
         self.actions_editor.setMinimumHeight(380)
         actions_layout.addWidget(self.actions_editor)
         editor_layout.addWidget(actions_box)
+
+        preview_box, preview_layout = self.section("Generated Request Preview")
+        self.preview.setReadOnly(True)
+        self.preview.setFixedHeight(150)
+        preview_layout.addWidget(self.preview)
+        editor_layout.addWidget(preview_box)
         editor_layout.addWidget(self.status)
         editor_layout.addStretch()
 
@@ -160,6 +191,12 @@ class EndpointsPage(QWidget):
             ),
             1,
         )
+        for widget in [self.name_edit, self.key_edit, self.route_edit]:
+            widget.textChanged.connect(self.update_preview)
+        self.description_edit.textChanged.connect(self.update_preview)
+        self.get_check.toggled.connect(self.update_preview)
+        self.post_check.toggled.connect(self.update_preview)
+        self.inputs_table.itemChanged.connect(lambda _item: self.update_preview())
 
     def section(self, heading: str) -> tuple[QGroupBox, QVBoxLayout]:
         box = QGroupBox(heading)
@@ -168,6 +205,131 @@ class EndpointsPage(QWidget):
         layout.setContentsMargins(14, 18, 14, 14)
         layout.setSpacing(10)
         return box, layout
+
+    def configure_inputs_table(self) -> None:
+        self.inputs_table.setColumnCount(6)
+        self.inputs_table.setHorizontalHeaderLabels(["Name", "Label", "Type", "Required", "List Source", "Default"])
+        configure_table(self.inputs_table)
+        self.inputs_table.setMinimumHeight(150)
+        self.inputs_table.horizontalHeader().setStretchLastSection(True)
+
+    def add_input_row(self) -> None:
+        row = self.inputs_table.rowCount()
+        self.inputs_table.insertRow(row)
+        self.set_input_row(row, EndpointInputDefinition("input_name", "Input label", "text"))
+        self.update_preview()
+
+    def remove_input_row(self) -> None:
+        row = self.inputs_table.currentRow()
+        if row >= 0:
+            self.inputs_table.removeRow(row)
+            self.update_preview()
+
+    def table_item(self, value: object):
+        return QTableWidgetItem(str(value if value is not None else ""))
+
+    def set_input_row(self, row: int, input_def: EndpointInputDefinition) -> None:
+        self.inputs_table.setItem(row, 0, self.table_item(input_def.name))
+        self.inputs_table.setItem(row, 1, self.table_item(input_def.label))
+        type_combo = QComboBox()
+        type_combo.addItems(["text", "number", "bool", "select"])
+        type_combo.setCurrentText(input_def.kind)
+        type_combo.currentIndexChanged.connect(self.update_preview)
+        self.inputs_table.setCellWidget(row, 2, type_combo)
+        required_combo = QComboBox()
+        required_combo.addItems(["No", "Yes"])
+        required_combo.setCurrentText("Yes" if input_def.required else "No")
+        required_combo.currentIndexChanged.connect(self.update_preview)
+        self.inputs_table.setCellWidget(row, 3, required_combo)
+        source_combo = QComboBox()
+        source_combo.addItem("", "")
+        for key, label in source_labels(self.context.config):
+            source_combo.addItem(label, key)
+        index = source_combo.findData(input_def.option_source)
+        if index >= 0:
+            source_combo.setCurrentIndex(index)
+        source_combo.currentIndexChanged.connect(self.update_preview)
+        self.inputs_table.setCellWidget(row, 4, source_combo)
+        self.inputs_table.setItem(row, 5, self.table_item(input_def.default))
+
+    def load_inputs(self, inputs: list[EndpointInputDefinition]) -> None:
+        self.inputs_table.setRowCount(0)
+        for input_def in inputs:
+            row = self.inputs_table.rowCount()
+            self.inputs_table.insertRow(row)
+            self.set_input_row(row, input_def)
+        self.update_preview()
+
+    def inputs_from_table(self) -> list[EndpointInputDefinition]:
+        inputs: list[EndpointInputDefinition] = []
+        for row in range(self.inputs_table.rowCount()):
+            name = self.input_cell(row, 0)
+            if not name:
+                continue
+            inputs.append(
+                EndpointInputDefinition(
+                    name=name,
+                    label=self.input_cell(row, 1) or name,
+                    kind=(self.input_cell(row, 2) or "text").lower(),
+                    required=self.input_cell(row, 3).lower() in {"yes", "true", "1", "required"},
+                    option_source=self.input_cell(row, 4),
+                    default=self.input_cell(row, 5),
+                )
+            )
+        return inputs
+
+    def input_cell(self, row: int, column: int) -> str:
+        widget = self.inputs_table.cellWidget(row, column)
+        if isinstance(widget, QComboBox):
+            data = widget.currentData()
+            if data is not None:
+                return str(data)
+            return widget.currentText().strip()
+        item = self.inputs_table.item(row, column)
+        return str(item.text() if item else "").strip()
+
+    def example_value(self, input_def: EndpointInputDefinition) -> object:
+        if input_def.default != "":
+            return input_def.default
+        if input_def.option_source:
+            input_list = input_list_by_key(self.context.config, input_def.option_source)
+            if input_list:
+                item = next((candidate for candidate in input_list.items if candidate.enabled), None)
+                if item:
+                    return item.value
+        if input_def.kind == "number":
+            return 1
+        if input_def.kind == "bool":
+            return True
+        return input_def.name
+
+    def update_preview(self, *_args) -> None:
+        if self._loading:
+            return
+        route = self.route_edit.text().strip() or "/new-endpoint"
+        inputs = self.inputs_from_table()
+        body = {input_def.name: self.example_value(input_def) for input_def in inputs if input_def.name}
+        lines = []
+        methods = []
+        if self.get_check.isChecked():
+            methods.append("GET")
+        if self.post_check.isChecked():
+            methods.append("POST")
+        lines.append(f"Route: {route}")
+        lines.append(f"Methods: {', '.join(methods) if methods else 'GET'}")
+        if inputs:
+            lines.append("")
+            lines.append("JSON body or query values:")
+            for name, value in body.items():
+                lines.append(f"  {name}: {value}")
+            lines.append("")
+            lines.append("Action bindings:")
+            for input_def in inputs:
+                lines.append(f"  {input_def.label}: Use input: {input_def.name} -> {{{{{input_def.name}}}}}")
+        else:
+            lines.append("")
+            lines.append("No caller input required.")
+        self.preview.setPlainText("\n".join(lines))
 
     def endpoints(self) -> list[EndpointDefinition]:
         return sorted(self.context.endpoint_registry.all(), key=lambda item: item.name.lower())
@@ -247,7 +409,9 @@ class EndpointsPage(QWidget):
         self.dangerous_check.setChecked(endpoint.dangerous)
         self.description_edit.setPlainText(endpoint.description)
         self.actions_editor.set_actions(endpoint.actions)
+        self.load_inputs(endpoint.inputs)
         self._loading = False
+        self.update_preview()
 
     def new_endpoint(self) -> None:
         self.table.clearSelection()
@@ -292,6 +456,7 @@ class EndpointsPage(QWidget):
             dangerous=self.dangerous_check.isChecked(),
             description=self.description_edit.toPlainText().strip(),
             allowed_methods=methods,
+            inputs=self.inputs_from_table(),
         )
 
     def save_current(self) -> None:
@@ -321,7 +486,8 @@ class EndpointsPage(QWidget):
         self.status.setText("Running endpoint test...")
 
         async def run():
-            result = await self.context.endpoint_executor.execute(endpoint, {})
+            test_context = {input_def.name: self.example_value(input_def) for input_def in endpoint.inputs}
+            result = await self.context.endpoint_executor.execute(endpoint, test_context)
             return "Test passed." if result.ok else f"Test failed: {result.error}"
 
         run_background(run, lambda _ok, message: self.status.setText(message))

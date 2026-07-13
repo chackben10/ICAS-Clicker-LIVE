@@ -10,6 +10,7 @@ from typing import Any
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
 from production_hub.core.automation.evaluator import evaluate_conditions
+from production_hub.core.config.input_lists import poll_due_input_lists
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
@@ -178,22 +179,22 @@ def start_midi_receiver(context: ApplicationContext, loop: asyncio.AbstractEvent
         context.health_monitor.update(context.midi.health())
         return None
 
-    def schedule_midi_action(action: ActionDefinition, action_context: dict[str, Any]) -> None:
+    def schedule_midi_action(actions: list[ActionDefinition], action_context: dict[str, Any]) -> None:
         async def _run() -> None:
             context.logger.info(
                 "midi_action_received",
                 (
                     f"MIDI note {action_context.get('midi_note')} velocity {action_context.get('midi_velocity')} "
-                    f"mapped to {action.action_type} {action.params}"
+                    f"mapped to {len(actions)} action(s)"
                 ),
-                action=action.to_dict(),
+                actions=[action.to_dict() for action in actions],
                 midi=action_context,
             )
             endpoint = EndpointDefinition(
                 key="midi:pad_trigger",
                 name="MIDI Pad Trigger",
                 route="/__midi/pad-trigger",
-                actions=[action],
+                actions=actions,
                 enabled=True,
             )
             result = await context.endpoint_executor.execute(endpoint, action_context)
@@ -217,9 +218,9 @@ def start_midi_receiver(context: ApplicationContext, loop: asyncio.AbstractEvent
                     "midi_action_failed",
                     (
                         f"MIDI note {action_context.get('midi_note')} failed for "
-                        f"{action.action_type} {action.params}: {exc}"
+                        f"{len(actions)} action(s): {exc}"
                     ),
-                    action=action.to_dict(),
+                    actions=[action.to_dict() for action in actions],
                     midi=action_context,
                     error=str(exc),
                 )
@@ -568,11 +569,13 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     clicker_listener = start_clicker_listener(context, loop)
     midi_receiver = start_midi_receiver(context, loop)
     next_due: dict[str, float] = {}
+    next_list_due: dict[str, float] = {}
 
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
             await _run_due_automations(context, next_due)
+            await poll_due_input_lists(context, next_list_due)
     finally:
         if clicker_listener:
             clicker_listener.stop()

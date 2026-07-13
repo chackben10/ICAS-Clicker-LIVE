@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -18,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from production_hub.ui.pages.common import int_from_line_edit, integer_line_edit, responsive_grid, run_background, scroll_page, title
+from production_hub.ui.pages.common import responsive_grid, run_background, scroll_page, title
 
 
 class CameraControlPage(QWidget):
@@ -34,8 +31,7 @@ class CameraControlPage(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         scroll, _body, layout = scroll_page()
         root.addWidget(scroll)
-        layout.addWidget(title("Camera Control", "Panasonic AWP setup, PTZ diagnostics, VISCA bridge settings, and presets."))
-        layout.addWidget(self.connection_group())
+        layout.addWidget(title("Camera Control", "Panasonic AWP controls, PTZ diagnostics, and presets."))
 
         layout.addWidget(
             responsive_grid(
@@ -46,54 +42,6 @@ class CameraControlPage(QWidget):
         )
         layout.addWidget(self.status)
         layout.addStretch()
-
-    def connection_group(self) -> QGroupBox:
-        cfg = self.context.config.integrations
-        group = QGroupBox("Network Configuration")
-        form = QFormLayout(group)
-        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        form.setHorizontalSpacing(14)
-        form.setVerticalSpacing(10)
-        self.camera_ip = QLineEdit(cfg.panasonic.camera_ip)
-        self.camera_user = QLineEdit(cfg.panasonic.username)
-        self.camera_password = QLineEdit(cfg.panasonic.password)
-        self.camera_password.setEchoMode(QLineEdit.EchoMode.Password)
-        show_password = QCheckBox("Show")
-        show_password.toggled.connect(
-            lambda checked: self.camera_password.setEchoMode(
-                QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
-            )
-        )
-        self.visca_ip = QLineEdit(cfg.visca.listen_ip)
-        self.visca_port = integer_line_edit(cfg.visca.udp_port, 1, 65535)
-        self.reuse_port = QCheckBox("Shared port")
-        self.reuse_port.setChecked(cfg.visca.reuse_port)
-
-        password_row = QWidget()
-        password_layout = QHBoxLayout(password_row)
-        password_layout.setContentsMargins(0, 0, 0, 0)
-        password_layout.setSpacing(8)
-        password_layout.addWidget(self.camera_password, 1)
-        password_layout.addWidget(show_password)
-
-        visca_row = QWidget()
-        visca_layout = QHBoxLayout(visca_row)
-        visca_layout.setContentsMargins(0, 0, 0, 0)
-        visca_layout.setSpacing(8)
-        visca_layout.addWidget(self.visca_port)
-        visca_layout.addWidget(self.reuse_port)
-        visca_layout.addStretch()
-
-        form.addRow("Camera IP", self.camera_ip)
-        form.addRow("User", self.camera_user)
-        form.addRow("Password", password_row)
-        form.addRow("VISCA listen IP", self.visca_ip)
-        form.addRow("UDP port", visca_row)
-        save = QPushButton("Save Settings")
-        save.clicked.connect(self.save_settings)
-        form.addRow("", save)
-        return group
 
     def system_group(self) -> QGroupBox:
         group = QGroupBox("System")
@@ -215,20 +163,6 @@ class CameraControlPage(QWidget):
             self.status.setText("Select a preset first.")
             return None
         return int(item.data(Qt.ItemDataRole.UserRole))
-
-    def save_settings(self) -> None:
-        cfg = self.context.config.integrations
-        cfg.panasonic.camera_ip = self.camera_ip.text().strip()
-        cfg.panasonic.username = self.camera_user.text().strip()
-        cfg.panasonic.password = self.camera_password.text()
-        cfg.panasonic.default_pan_tilt_speed = self.pan_speed.value()
-        cfg.panasonic.default_zoom_speed = self.zoom_speed.value()
-        cfg.panasonic.default_focus_speed = self.focus_speed.value()
-        cfg.visca.listen_ip = self.visca_ip.text().strip()
-        cfg.visca.udp_port = int_from_line_edit(self.visca_port, cfg.visca.udp_port)
-        cfg.visca.reuse_port = self.reuse_port.isChecked()
-        self.context.config_repository.save_app_config(self.context.config)
-        self.status.setText("Camera and VISCA settings saved.")
 
     def send_command(self, command: str, endpoint: str = "aw_ptz") -> None:
         self.status.setText(f"Sending {command}...")

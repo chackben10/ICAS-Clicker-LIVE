@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-from production_hub.integrations.scoreboard.service import ScoreboardConflict
+from production_hub.integrations.scoreboard.service import ScoreboardConflict, ScoreboardDisabled
 
 
 def router(context) -> APIRouter:
@@ -10,7 +10,10 @@ def router(context) -> APIRouter:
 
     @api.get("/score")
     async def get_score() -> dict:
-        return context.scoreboard.get_state().legacy_payload()
+        try:
+            return context.scoreboard.get_state().legacy_payload()
+        except ScoreboardDisabled as exc:
+            raise HTTPException(status_code=503, detail={"ok": False, "error": "scoreboard_disabled", "message": str(exc)})
 
     @api.post("/score")
     async def post_score(request: Request, payload: dict) -> dict:
@@ -23,6 +26,8 @@ def router(context) -> APIRouter:
         }
         try:
             return context.scoreboard.update_state(payload, writer=writer, expected_revision=expected).legacy_payload()
+        except ScoreboardDisabled as exc:
+            raise HTTPException(status_code=503, detail={"ok": False, "error": "scoreboard_disabled", "message": str(exc)})
         except ScoreboardConflict as exc:
             raise HTTPException(
                 status_code=409,
@@ -30,4 +35,3 @@ def router(context) -> APIRouter:
             )
 
     return api
-

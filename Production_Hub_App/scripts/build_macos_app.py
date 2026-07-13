@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = APP_ROOT / "dist"
 BUILD_ROOT = APP_ROOT / "build" / "macos"
+INSTALL_TARGET = Path("/Applications/Production Hub.app")
 ICON_SOURCE = APP_ROOT / "Production_hub.icon"
 ICON_OUTPUT = APP_ROOT / "assets" / "ProductionHub.icns"
 IC_TOOL = Path("/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool")
@@ -284,10 +285,12 @@ def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
     run(["/usr/bin/touch", str(app_path)])
 
 
-def install_app(app_path: Path, destination_root: Path) -> Path:
-    log(f"Installing app to {destination_root}...")
-    target = destination_root / app_path.name
-    destination_root.mkdir(parents=True, exist_ok=True)
+def install_app(app_path: Path, target: Path) -> Path:
+    target = target.expanduser()
+    if target.suffix != ".app":
+        target = target / app_path.name
+    log(f"Installing app to {target}...")
+    target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(app_path, target, symlinks=True)
@@ -296,9 +299,15 @@ def install_app(app_path: Path, destination_root: Path) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build and optionally install Production Hub.app for macOS.")
-    parser.add_argument("--install", action="store_true", help="Copy/update Production Hub.app in /Applications after building.")
-    parser.add_argument("--install-destination", type=Path, default=Path("/Applications"), help="Destination folder for --install.")
+    parser = argparse.ArgumentParser(description="Build and install Production Hub.app for macOS.")
+    parser.add_argument("--install", action="store_true", help="Deprecated; install is now the default.")
+    parser.add_argument("--no-install", action="store_true", help="Build only and leave the app in Production_Hub_App/dist.")
+    parser.add_argument(
+        "--install-destination",
+        type=Path,
+        default=INSTALL_TARGET,
+        help="Destination .app path or folder. Defaults to /Applications/Production Hub.app.",
+    )
     parser.add_argument("--install-deps", action="store_true", help="Install runtime and build dependencies before building.")
     parser.add_argument("--icon-only", action="store_true", help="Only generate assets/ProductionHub.icns from Production_hub.icon.")
     return parser.parse_args()
@@ -316,8 +325,8 @@ def main() -> int:
         remote_pages = stage_remote_pages()
         app_path = build_app(icon_path, remote_pages)
         print(f"Built: {app_path}")
-        if args.install:
-            installed = install_app(app_path, args.install_destination.expanduser())
+        if not args.no_install:
+            installed = install_app(app_path, args.install_destination)
             print(f"Installed: {installed}")
         return 0
     except BuildError as exc:

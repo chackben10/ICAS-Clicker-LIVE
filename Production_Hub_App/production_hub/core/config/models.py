@@ -299,11 +299,17 @@ class MidiConfig(JsonModel):
 
 
 @dataclass
+class ScoreboardConfig(JsonModel):
+    enabled: bool = True
+
+
+@dataclass
 class IntegrationConfig(JsonModel):
     propresenter: ProPresenterConfig = field(default_factory=ProPresenterConfig)
     obs: ObsConfig = field(default_factory=ObsConfig)
     panasonic: PanasonicConfig = field(default_factory=PanasonicConfig)
     visca: ViscaConfig = field(default_factory=ViscaConfig)
+    scoreboard: ScoreboardConfig = field(default_factory=ScoreboardConfig)
     midi: MidiConfig = field(default_factory=MidiConfig)
 
 
@@ -321,10 +327,106 @@ class RemotePageConfig(JsonModel):
 
 
 @dataclass
+class InputListItem(JsonModel):
+    label: str
+    value: str = ""
+    description: str = ""
+    enabled: bool = True
+
+    def __post_init__(self) -> None:
+        self.label = _non_empty(self.label, "input_list_item.label")
+        self.value = str(self.value if self.value not in {None, ""} else self.label).strip()
+        self.description = str(self.description or "").strip()
+
+
+@dataclass
+class InputListColumn(JsonModel):
+    key: str
+    title: str
+    data_type: str = "string"
+    role: str = ""
+
+    def __post_init__(self) -> None:
+        self.key = _non_empty(self.key, "input_list_column.key")
+        self.title = _non_empty(self.title, "input_list_column.title")
+        self.data_type = str(self.data_type or "string").strip().lower()
+        self.role = str(self.role or "").strip().lower()
+        if self.data_type not in {"string", "int", "float", "bool", "array_string", "array_int", "json"}:
+            raise ValidationError(f"Unsupported input list column type: {self.data_type}")
+
+
+@dataclass
+class InputListCell(JsonModel):
+    mode: str = "static"
+    value: Any = ""
+    url: str = ""
+    json_path: str = ""
+    preview: str = ""
+
+    def __post_init__(self) -> None:
+        self.mode = str(self.mode or "static").strip().lower()
+        self.url = str(self.url or "").strip()
+        self.json_path = str(self.json_path or "").strip()
+        self.preview = str(self.preview or "").strip()
+        if self.mode not in {"static", "polled"}:
+            raise ValidationError(f"Unsupported input list cell mode: {self.mode}")
+
+
+@dataclass
+class InputListRow(JsonModel):
+    enabled: bool = True
+    cells: dict[str, InputListCell] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.cells = {
+            str(key): value if isinstance(value, InputListCell) else InputListCell.from_dict(value)
+            for key, value in self.cells.items()
+        }
+
+
+@dataclass
+class InputListDefinition(JsonModel):
+    key: str
+    name: str
+    items: list[InputListItem] = field(default_factory=list)
+    description: str = ""
+    builtin: bool = False
+    columns: list[InputListColumn] = field(default_factory=list)
+    rows: list[InputListRow] = field(default_factory=list)
+    polling_rate_seconds: float = 0
+
+    def __post_init__(self) -> None:
+        self.key = _non_empty(self.key, "input_list.key")
+        self.name = _non_empty(self.name, "input_list.name")
+        self.description = str(self.description or "").strip()
+        self.polling_rate_seconds = max(0, float(self.polling_rate_seconds))
+        if not self.columns and self.items:
+            self.columns = [
+                InputListColumn("label", "Label", "string", "label"),
+                InputListColumn("value", "Value", "string", "value"),
+                InputListColumn("description", "Description", "string"),
+            ]
+            self.rows = [
+                InputListRow(
+                    item.enabled,
+                    {
+                        "label": InputListCell("static", item.label),
+                        "value": InputListCell("static", item.value),
+                        "description": InputListCell("static", item.description),
+                    },
+                )
+                for item in self.items
+            ]
+
+
+@dataclass
 class UiPreferences(JsonModel):
     start_page: str = "Overview"
     sidebar_collapsed: bool = False
     theme: str = "system"
+    endpoint_option_lists: dict[str, list[str]] = field(default_factory=dict)
+    input_lists: list[InputListDefinition] = field(default_factory=list)
+    input_lists_initialized: bool = False
     keep_running_after_window_close: bool = True
     show_menu_bar_icon: bool = True
     launch_at_login: bool = False

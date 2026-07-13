@@ -149,13 +149,32 @@ def create_app(context):
                     data["body"] = raw.decode("utf-8", errors="replace")
         return data
 
+    def apply_endpoint_inputs(endpoint, data: dict[str, object]) -> dict[str, object]:
+        for input_def in getattr(endpoint, "inputs", []):
+            name = input_def.name
+            value = data.get(name)
+            if name not in data or value is None or value == "":
+                if input_def.default != "":
+                    data[name] = input_def.default
+                elif input_def.required:
+                    raise HTTPException(status_code=422, detail=f"Missing required input: {name}")
+            if name in data and input_def.kind == "number":
+                try:
+                    data[name] = int(data[name])
+                except Exception:
+                    raise HTTPException(status_code=422, detail=f"Input {name} must be a number")
+            if name in data and input_def.kind == "bool":
+                data[name] = str(data[name]).lower() in {"1", "true", "yes", "on"}
+        return data
+
     @app.api_route("/{page_path:path}", methods=["GET", "POST"])
     async def remote_page_alias(page_path: str, request: Request):
         normalized = page_path.strip("/")
         dynamic_matches = context.endpoint_registry.matches("/" + normalized, request.method)
         if dynamic_matches:
             endpoint, path_params = dynamic_matches[0]
-            execution = await context.endpoint_executor.execute(endpoint, await dynamic_context(request, path_params))
+            execution_context = apply_endpoint_inputs(endpoint, await dynamic_context(request, path_params))
+            execution = await context.endpoint_executor.execute(endpoint, execution_context)
             return execution.to_dict()
 
         if request.method != "GET":

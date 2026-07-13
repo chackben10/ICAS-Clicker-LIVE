@@ -16,3 +16,7 @@ class MidiMappingService:
     def action_for(self, event_type: str, channel: int, number: int):
         mapping = self.mapping_for(event_type, channel, number)
         return mapping.action if mapping else None
+
+    def actions_for(self, event_type: str, channel: int, number: int):
+        mapping = self.mapping_for(event_type, channel, number)
+        return list(mapping.actions) if mapping else []

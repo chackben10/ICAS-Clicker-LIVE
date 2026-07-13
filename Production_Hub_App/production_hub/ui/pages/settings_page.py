@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QCheckBox, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from production_hub.ui.pages import data_storage_page
 from production_hub.ui.pages.common import card, scroll_page, title
 
 
@@ -14,6 +15,10 @@ class SettingsPage(QWidget):
         self.keep_running = QCheckBox("Keep Production Hub running when the window is closed")
         self.menu_bar_icon = QCheckBox("Show menu-bar status icon")
         self.launch_at_login = QCheckBox("Launch Production Hub at login")
+        self.theme = QComboBox()
+        self.theme.addItem("System Setting", "system")
+        self.theme.addItem("Light Mode", "light")
+        self.theme.addItem("Dark Mode", "dark")
         self.build()
 
     def build(self) -> None:
@@ -48,6 +53,7 @@ class SettingsPage(QWidget):
             )
         )
         layout.addWidget(self.preferences_group())
+        layout.addWidget(data_storage_page.storage_paths_card(self.context))
         layout.addWidget(self.status)
         layout.addStretch()
 
@@ -58,6 +64,13 @@ class SettingsPage(QWidget):
         self.keep_running.setChecked(cfg.keep_running_after_window_close)
         self.menu_bar_icon.setChecked(cfg.show_menu_bar_icon)
         self.launch_at_login.setChecked(cfg.launch_at_login)
+        theme_index = self.theme.findData(str(cfg.theme or "system").lower())
+        self.theme.setCurrentIndex(theme_index if theme_index >= 0 else 0)
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("Appearance"))
+        theme_row.addWidget(self.theme)
+        theme_row.addStretch()
+        layout.addLayout(theme_row)
         layout.addWidget(self.keep_running)
         layout.addWidget(self.menu_bar_icon)
         layout.addWidget(self.launch_at_login)
@@ -81,7 +94,11 @@ class SettingsPage(QWidget):
         cfg.keep_running_after_window_close = self.keep_running.isChecked()
         cfg.show_menu_bar_icon = self.menu_bar_icon.isChecked()
         cfg.launch_at_login = self.launch_at_login.isChecked()
+        cfg.theme = str(self.theme.currentData() or "system")
         self.context.config_repository.save_app_config(self.context.config)
+        apply_theme = getattr(self.window(), "apply_theme", None)
+        if callable(apply_theme):
+            apply_theme()
         self.status.setText("Preferences saved. Restart the app to apply menu-bar icon changes.")
 
 
