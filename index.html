@@ -302,8 +302,10 @@
     }
 
     .search-icon {
-      font-size: 1rem;
-      line-height: 1;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: currentColor;
     }
 
     .search-launch-label {
@@ -352,11 +354,6 @@
       border: 1px solid var(--border-color);
       border-radius: 12px;
       background: var(--slide-bg);
-    }
-
-    .search-input-shell:focus-within {
-      border-color: #007aff;
-      box-shadow: 0 0 0 2px rgba(0,122,255,0.16);
     }
 
     .song-search-input {
@@ -462,6 +459,7 @@
     }
 
     .settings-overlay {
+      --modal-edge-space: clamp(12px, 3vh, 24px);
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.65);
@@ -469,7 +467,8 @@
       align-items: center;
       justify-content: center;
       z-index: 999;
-      padding: 18px;
+      padding: var(--modal-edge-space);
+      overflow: hidden;
     }
 
     .settings-card {
@@ -478,8 +477,12 @@
       border-radius: 12px;
       padding: 16px;
       width: min(100%, 360px);
-      max-height: calc(100vh - 36px);
+      max-height: calc(100vh - var(--modal-edge-space) - var(--modal-edge-space));
+      max-height: calc(100dvh - var(--modal-edge-space) - var(--modal-edge-space));
       overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
       box-shadow: 0 18px 40px var(--modal-shadow);
       transition: background 0.2s ease, color 0.2s ease;
     }
@@ -640,7 +643,10 @@
       </div>
 
       <button id="searchModeButton" class="search-launch" type="button" aria-controls="searchView">
-        <span class="search-icon" aria-hidden="true">🔍</span>
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path>
+        </svg>
         <span class="search-launch-label">Search Song Library</span>
       </button>
 
@@ -657,13 +663,19 @@
       <div class="search-mode-header">
         <button id="searchBackButton" class="search-back-btn" type="button">Back</button>
         <label class="search-input-shell">
-          <span class="search-icon" aria-hidden="true">🔍</span>
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+          </svg>
           <input
             id="songSearchInput"
             class="song-search-input"
             type="search"
+            inputmode="search"
+            enterkeyhint="search"
             placeholder="Search songs"
             autocomplete="off"
+            autocorrect="off"
             autocapitalize="none"
             spellcheck="false"
           />
@@ -707,6 +719,15 @@
         </label>
       </div>
       <div class="settings-subtitle">Automatically scrolls to the current slide</div>
+
+      <div class="settings-row">
+        <span>Search Bar</span>
+        <label class="switch" aria-label="Search Bar">
+          <input type="checkbox" id="searchBarToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-subtitle">Shows Song Library search above the presentation</div>
 
       <div class="settings-row-column">
         <label>Slide Preview Preference</label>
@@ -794,6 +815,7 @@
       viewerMode: "icas-viewer-mode",
       previewPreference: "icas-slide-preview-preference",
       autoScroll: "icas-auto-scroll",
+      searchBar: "icas-search-bar-visible",
       showNotes: "icas-show-slide-notes",
       showDisabledSlides: "icas-show-disabled-slides",
       showLabels: "icas-show-slide-labels",
@@ -806,6 +828,7 @@
       viewerMode: false,
       previewPreference: "text",
       autoScroll: false,
+      searchBar: true,
       showNotes: false,
       showDisabledSlides: false,
       showLabels: false,
@@ -849,6 +872,7 @@
 
       dom.viewerModeToggle = document.getElementById("viewerModeToggle");
       dom.autoScrollToggle = document.getElementById("autoScrollToggle");
+      dom.searchBarToggle = document.getElementById("searchBarToggle");
       dom.showNotesToggle = document.getElementById("showNotesToggle");
       dom.showDisabledSlidesToggle = document.getElementById("showDisabledSlidesToggle");
       dom.showLabelsToggle = document.getElementById("showLabelsToggle");
@@ -907,6 +931,18 @@
 
     function setAutoScroll(value) {
       setStoredBool(STORAGE_KEYS.autoScroll, value);
+    }
+
+    function getSearchBarEnabled() {
+      return getStoredBool(STORAGE_KEYS.searchBar, DEFAULTS.searchBar);
+    }
+
+    function setSearchBarEnabled(value) {
+      setStoredBool(STORAGE_KEYS.searchBar, value);
+    }
+
+    function applySearchBarVisibility() {
+      dom.searchModeButton.hidden = !getSearchBarEnabled();
     }
 
     function getShowNotes() {
@@ -1008,6 +1044,7 @@
 
       dom.viewerModeToggle.checked = getViewerMode();
       dom.autoScrollToggle.checked = getAutoScroll();
+      dom.searchBarToggle.checked = getSearchBarEnabled();
       dom.showNotesToggle.checked = getShowNotes();
       dom.showDisabledSlidesToggle.checked = getShowDisabledSlides();
       dom.showLabelsToggle.checked = getShowLabels();
@@ -1521,8 +1558,12 @@
       dom.searchView.hidden = !searchModeActive;
 
       if (searchModeActive) {
+        try {
+          dom.songSearchInput.focus({ preventScroll: true });
+        } catch {
+          dom.songSearchInput.focus();
+        }
         fetchSongResults(dom.songSearchInput.value);
-        requestAnimationFrame(() => dom.songSearchInput.focus());
         return;
       }
 
@@ -1636,6 +1677,11 @@
         setAutoScroll(event.target.checked);
       });
 
+      dom.searchBarToggle.addEventListener("change", event => {
+        setSearchBarEnabled(event.target.checked);
+        applySearchBarVisibility();
+      });
+
       dom.showNotesToggle.addEventListener("change", event => {
         setShowNotes(event.target.checked);
         fetchStatus();
@@ -1690,6 +1736,7 @@
       cacheDom();
       applyTheme(getThemeMode());
       syncSettingsUI();
+      applySearchBarVisibility();
       bindEventListeners();
       fetchStatus();
       setInterval(fetchStatus, STATUS_REFRESH_MS);
