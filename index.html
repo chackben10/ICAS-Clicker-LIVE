@@ -313,6 +313,61 @@
       font-weight: 500;
     }
 
+    .library-preview-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: -2px 0 14px;
+      padding: 12px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--label-bg);
+    }
+
+    .library-preview-copy {
+      min-width: 0;
+    }
+
+    .library-preview-label {
+      color: var(--slide-text);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .library-preview-status {
+      margin-top: 3px;
+      color: var(--status-grey);
+      font-size: 0.8rem;
+      line-height: 1.3;
+    }
+
+    .return-live-btn {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 7px 11px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: var(--modal-bg);
+      color: var(--slide-text);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .return-live-btn:hover,
+    .return-live-btn:focus-visible {
+      background: var(--slide-bg);
+      outline: none;
+      border-color: #007aff;
+    }
+
+    .return-live-btn:disabled,
+    .search-launch:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
     .search-view {
       width: 100%;
     }
@@ -423,6 +478,15 @@
       outline: none;
     }
 
+    .search-result-row.unavailable {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .search-result-row.unavailable:hover {
+      background: transparent;
+    }
+
     .search-result-row + .search-result-row td {
       border-top: 1px solid var(--border-color);
     }
@@ -437,6 +501,15 @@
       color: var(--slide-text);
       font-size: 0.95rem;
       font-weight: 600;
+    }
+
+    .search-result-unavailable {
+      display: inline-block;
+      margin-left: 7px;
+      color: var(--status-grey);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
     }
 
     .search-result-library {
@@ -455,6 +528,15 @@
 
       .search-results-table th:last-child {
         width: 38%;
+      }
+
+      .library-preview-banner {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .return-live-btn {
+        width: 100%;
       }
     }
 
@@ -650,6 +732,18 @@
         <span class="search-launch-label">Search Song Library</span>
       </button>
 
+      <div id="libraryPreviewBanner" class="library-preview-banner" hidden>
+        <div class="library-preview-copy">
+          <div class="library-preview-label">Library Preview</div>
+          <div id="libraryPreviewStatus" class="library-preview-status" aria-live="polite">
+            Only this device is previewing this presentation.
+          </div>
+        </div>
+        <button id="returnToLiveButton" class="return-live-btn" type="button">
+          Return to Live Presentation
+        </button>
+      </div>
+
       <div id="presentationName" class="presentation-name">Loading...</div>
 
       <div id="statusText" class="slide-status">
@@ -839,10 +933,19 @@
     const THUMBNAIL_POLL_MS = 650;
     const STATUS_REFRESH_MS = 1000;
     const FOCUS_REFRESH_DELAY_MS = 350;
+    const ACTIVATION_CONFIRM_TIMEOUT_MS = 3000;
+    const ACTIVATION_CONFIRM_POLL_MS = 150;
 
     let pendingSelectedIndex = null;
     let lastSlideIndexForAutoScroll = null;
     let currentPresentationUuid = null;
+    let presentationViewMode = "live";
+    let libraryPreview = null;
+    let presentationViewRevision = 0;
+    let liveStatusRequestSequence = 0;
+    let presentationRequestController = null;
+    let presentationRequestSequence = 0;
+    let previewTriggerInFlight = false;
     let searchModeActive = false;
     let searchRequestController = null;
     let searchRequestSequence = 0;
@@ -865,6 +968,9 @@
       dom.songSearchInput = document.getElementById("songSearchInput");
       dom.searchResultsStatus = document.getElementById("searchResultsStatus");
       dom.searchResultsBody = document.getElementById("searchResultsBody");
+      dom.libraryPreviewBanner = document.getElementById("libraryPreviewBanner");
+      dom.libraryPreviewStatus = document.getElementById("libraryPreviewStatus");
+      dom.returnToLiveButton = document.getElementById("returnToLiveButton");
 
       dom.settingsButton = document.getElementById("settingsButton");
       dom.settingsOverlay = document.getElementById("settingsOverlay");
@@ -942,7 +1048,7 @@
     }
 
     function applySearchBarVisibility() {
-      dom.searchModeButton.hidden = !getSearchBarEnabled();
+      dom.searchModeButton.hidden = !getSearchBarEnabled() && presentationViewMode !== "library-preview";
     }
 
     function getShowNotes() {
@@ -1347,6 +1453,10 @@
         item.classList.add("selected");
       }
 
+      if (state.interactionLocked && !isCurrent) {
+        item.disabled = true;
+      }
+
       if (isDisabledSlide) {
         item.classList.add("disabled-slide");
       }
@@ -1378,9 +1488,12 @@
       appendMetadata(item, slide, settings);
 
       item.addEventListener("click", () => {
-        if (!settings.viewerMode && !isCurrent) {
-          focusSlide(index);
+        if (settings.viewerMode || isCurrent || state.interactionLocked) return;
+        if (state.mode === "library-preview") {
+          triggerLibraryPreviewSlide(index);
+          return;
         }
+        focusSlide(index);
       });
 
       return { item, isCurrent };
@@ -1459,8 +1572,105 @@
       return currentSlideEl;
     }
 
-    async function fetchJson(url) {
-      const response = await fetch(url, { cache: "no-cache" });
+    function getSlideRenderSettings() {
+      return {
+        viewerMode: getViewerMode(),
+        autoScroll: getAutoScroll(),
+        textScale: getTextScale(),
+        previewPreference: getPreviewPreference(),
+        showNotes: getShowNotes(),
+        showDisabledSlides: getShowDisabledSlides(),
+        showLabels: getShowLabels()
+      };
+    }
+
+    function presentationFromPayload(payload) {
+      return payload?.presentation && typeof payload.presentation === "object"
+        ? payload.presentation
+        : null;
+    }
+
+    function presentationUuid(payload) {
+      return String(presentationFromPayload(payload)?.id?.uuid || "").trim();
+    }
+
+    function renderLibraryPreview() {
+      if (presentationViewMode !== "library-preview" || !libraryPreview) return;
+
+      const presentation = presentationFromPayload(libraryPreview.payload);
+      if (!presentation) return;
+
+      const uuid = presentationUuid(libraryPreview.payload) || libraryPreview.uuid;
+      const name = String(presentation?.id?.name || libraryPreview.name || "Untitled Song");
+      const slides = getSlidesFromPresentation(presentation);
+
+      clearThumbnailStateForNewPresentation(uuid);
+      dom.presentationName.textContent = name;
+      dom.statusText.textContent = `${slides.length} ${slides.length === 1 ? "slide" : "slides"} · Select a slide to take it live`;
+
+      renderSlides(
+        slides,
+        {
+          uuid,
+          currentIndex: null,
+          focused: true,
+          mode: "library-preview",
+          interactionLocked: previewTriggerInFlight
+        },
+        getSlideRenderSettings()
+      );
+    }
+
+    function updateLibraryPreviewUI(message = "") {
+      const active = presentationViewMode === "library-preview" && Boolean(libraryPreview);
+      dom.libraryPreviewBanner.hidden = !active;
+      dom.returnToLiveButton.disabled = active && previewTriggerInFlight;
+      dom.searchModeButton.disabled = active && previewTriggerInFlight;
+
+      if (active) {
+        dom.libraryPreviewStatus.textContent = message || "Only this device is previewing this presentation.";
+      }
+
+      applySearchBarVisibility();
+    }
+
+    function showLibraryPreview(result, payload) {
+      const requestedUuid = String(result?.uuid || "").trim();
+      const returnedUuid = presentationUuid(payload);
+      libraryPreview = {
+        uuid: returnedUuid || requestedUuid,
+        name: String(presentationFromPayload(payload)?.id?.name || result?.name || "Untitled Song"),
+        payload
+      };
+      presentationViewMode = "library-preview";
+      presentationViewRevision += 1;
+      pendingSelectedIndex = null;
+      lastSlideIndexForAutoScroll = null;
+      setSearchMode(false);
+      updateLibraryPreviewUI();
+      renderLibraryPreview();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function returnToLivePresentation(options = {}) {
+      if (presentationViewMode !== "library-preview") return;
+
+      presentationViewMode = "live";
+      libraryPreview = null;
+      previewTriggerInFlight = false;
+      presentationViewRevision += 1;
+      pendingSelectedIndex = null;
+      lastSlideIndexForAutoScroll = null;
+      updateLibraryPreviewUI();
+      fetchStatus();
+
+      if (options.focusButton !== false) {
+        (dom.searchModeButton.hidden ? dom.settingsButton : dom.searchModeButton).focus();
+      }
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, { cache: "no-cache", ...options });
       if (!response.ok) throw new Error(`Request failed: ${response.status} ${url}`);
       return response.json();
     }
@@ -1473,31 +1683,83 @@
       return [];
     }
 
-    function handleInactiveSongResult(event) {
-      event.preventDefault();
+    async function selectSongResult(result) {
+      const uuid = String(result?.uuid || "").trim();
+      if (!uuid) {
+        dom.searchResultsStatus.textContent = "This song does not have a presentation UUID yet.";
+        return;
+      }
+
+      const sequence = ++presentationRequestSequence;
+      presentationRequestController?.abort();
+      presentationRequestController = new AbortController();
+      dom.searchResultsStatus.textContent = `Loading “${String(result?.name || "song")}”…`;
+      dom.searchView.setAttribute("aria-busy", "true");
+
+      try {
+        const payload = await fetchJson(
+          `${BASE_URL}/presentation/${encodeURIComponent(uuid)}`,
+          { signal: presentationRequestController.signal }
+        );
+        if (sequence !== presentationRequestSequence) return;
+
+        const presentation = presentationFromPayload(payload);
+        const returnedUuid = presentationUuid(payload);
+        if (!presentation) throw new Error("Presentation response did not contain presentation data");
+        if (returnedUuid && returnedUuid.toLowerCase() !== uuid.toLowerCase()) {
+          throw new Error("Presentation response UUID did not match the selected song");
+        }
+
+        showLibraryPreview(result, payload);
+      } catch (error) {
+        if (error?.name === "AbortError" || sequence !== presentationRequestSequence) return;
+        console.error(error);
+        dom.searchResultsStatus.textContent = "This presentation could not be loaded. Choose another song or try again.";
+      } finally {
+        if (sequence === presentationRequestSequence) {
+          dom.searchView.setAttribute("aria-busy", "false");
+        }
+      }
     }
 
     function buildSongResultRow(result) {
       const row = document.createElement("tr");
       row.className = "search-result-row";
-      row.tabIndex = 0;
       row.setAttribute("role", "button");
-      row.setAttribute("aria-label", `Select ${result?.name || "song"}`);
-      row.dataset.uuid = String(result?.uuid || "");
+      const uuid = String(result?.uuid || "").trim();
+      const available = Boolean(uuid);
+      row.tabIndex = available ? 0 : -1;
+      row.setAttribute("aria-label", available ? `Preview ${result?.name || "song"}` : `${result?.name || "song"} unavailable`);
+      row.setAttribute("aria-disabled", String(!available));
+      row.dataset.uuid = uuid;
+      row.classList.toggle("unavailable", !available);
 
       const name = document.createElement("td");
       name.className = "search-result-name";
       name.textContent = String(result?.name || "Untitled Song");
+
+      if (!available) {
+        const unavailable = document.createElement("span");
+        unavailable.className = "search-result-unavailable";
+        unavailable.textContent = "Unavailable";
+        name.appendChild(unavailable);
+      }
 
       const library = document.createElement("td");
       library.className = "search-result-library";
       library.textContent = String(result?.library || "");
 
       row.append(name, library);
-      row.addEventListener("click", handleInactiveSongResult);
+      if (!available) return row;
+
+      row.addEventListener("click", event => {
+        event.preventDefault();
+        selectSongResult(result);
+      });
       row.addEventListener("keydown", event => {
         if (event.key === "Enter" || event.key === " ") {
-          handleInactiveSongResult(event);
+          event.preventDefault();
+          selectSongResult(result);
         }
       });
       return row;
@@ -1553,6 +1815,7 @@
     }
 
     function setSearchMode(active) {
+      if (active && previewTriggerInFlight) return;
       searchModeActive = Boolean(active);
       dom.clickerView.hidden = searchModeActive;
       dom.searchView.hidden = !searchModeActive;
@@ -1568,6 +1831,7 @@
       }
 
       searchRequestController?.abort();
+      presentationRequestController?.abort();
       dom.searchModeButton.focus();
     }
 
@@ -1577,14 +1841,96 @@
       setTimeout(fetchStatus, FOCUS_REFRESH_DELAY_MS);
     }
 
+    function wait(milliseconds) {
+      return new Promise(resolve => setTimeout(resolve, milliseconds));
+    }
+
+    async function waitForLivePresentation(uuid, index) {
+      const deadline = Date.now() + ACTIVATION_CONFIRM_TIMEOUT_MS;
+
+      while (Date.now() < deadline) {
+        await wait(ACTIVATION_CONFIRM_POLL_MS);
+        try {
+          const [presentationPayload, indexPayload] = await Promise.all([
+            fetchJson(`${BASE_URL}/active-presentation`),
+            fetchJson(`${BASE_URL}/slide-index`)
+          ]);
+          const activeUuid = presentationUuid(presentationPayload);
+          const activeIndex = indexPayload?.presentation_index?.index;
+          if (activeUuid.toLowerCase() === uuid.toLowerCase() && activeIndex === index) {
+            return true;
+          }
+        } catch (error) {
+          console.warn("Waiting for triggered presentation failed", error);
+        }
+      }
+
+      return false;
+    }
+
+    async function triggerLibraryPreviewSlide(index) {
+      if (presentationViewMode !== "library-preview" || !libraryPreview || previewTriggerInFlight) return;
+
+      const uuid = libraryPreview.uuid;
+      const revision = presentationViewRevision;
+      let failureMessage = "";
+      previewTriggerInFlight = true;
+      pendingSelectedIndex = index;
+      updateLibraryPreviewUI(`Taking slide ${index + 1} live…`);
+      renderLibraryPreview();
+
+      try {
+        const response = await fetch(
+          `${BASE_URL}/presentation/${encodeURIComponent(uuid)}/${encodeURIComponent(index)}/trigger`,
+          { method: "POST", cache: "no-store" }
+        );
+        if (!response.ok) throw new Error(`Slide trigger failed: ${response.status}`);
+
+        updateLibraryPreviewUI("Waiting for the live presentation to update…");
+        await waitForLivePresentation(uuid, index);
+
+        if (
+          presentationViewMode === "library-preview" &&
+          presentationViewRevision === revision &&
+          libraryPreview?.uuid === uuid
+        ) {
+          returnToLivePresentation({ focusButton: false });
+        }
+      } catch (error) {
+        console.error(error);
+        failureMessage = "The slide could not be taken live. Try again.";
+      } finally {
+        if (
+          presentationViewMode === "library-preview" &&
+          presentationViewRevision === revision &&
+          libraryPreview?.uuid === uuid
+        ) {
+          previewTriggerInFlight = false;
+          pendingSelectedIndex = null;
+          updateLibraryPreviewUI(failureMessage);
+          renderLibraryPreview();
+        }
+      }
+    }
+
     async function fetchStatus() {
+      if (presentationViewMode === "library-preview") return;
+
+      const sequence = ++liveStatusRequestSequence;
+      const revision = presentationViewRevision;
       try {
         const [presentationResponse, indexResponse] = await Promise.all([
           fetchJson(`${BASE_URL}/active-presentation`),
           fetchJson(`${BASE_URL}/slide-index`)
         ]);
 
-        const presentation = presentationResponse.presentation;
+        if (
+          sequence !== liveStatusRequestSequence ||
+          revision !== presentationViewRevision ||
+          presentationViewMode !== "live"
+        ) return;
+
+        const presentation = presentationFromPayload(presentationResponse);
         const uuid = presentation?.id?.uuid || null;
         const name = presentation?.id?.name || "No active presentation";
         const slides = getSlidesFromPresentation(presentation);
@@ -1601,19 +1947,11 @@
           pendingSelectedIndex = null;
         }
 
-        const settings = {
-          viewerMode: getViewerMode(),
-          autoScroll: getAutoScroll(),
-          textScale: getTextScale(),
-          previewPreference: getPreviewPreference(),
-          showNotes: getShowNotes(),
-          showDisabledSlides: getShowDisabledSlides(),
-          showLabels: getShowLabels()
-        };
+        const settings = getSlideRenderSettings();
 
         const currentSlideEl = renderSlides(
           slides,
-          { uuid, currentIndex: indexValue, focused },
+          { uuid, currentIndex: indexValue, focused, mode: "live", interactionLocked: false },
           settings
         );
 
@@ -1633,8 +1971,18 @@
           lastSlideIndexForAutoScroll = indexValue;
         }
       } catch (error) {
-        console.error(error);
+        if (revision === presentationViewRevision && presentationViewMode === "live") {
+          console.error(error);
+        }
       }
+    }
+
+    function refreshDisplayedPresentation() {
+      if (presentationViewMode === "library-preview") {
+        renderLibraryPreview();
+        return;
+      }
+      fetchStatus();
     }
 
     function openModal() {
@@ -1653,6 +2001,7 @@
       dom.settingsCloseButton.addEventListener("click", closeModal);
       dom.searchModeButton.addEventListener("click", () => setSearchMode(true));
       dom.searchBackButton.addEventListener("click", () => setSearchMode(false));
+      dom.returnToLiveButton.addEventListener("click", () => returnToLivePresentation());
       dom.songSearchInput.addEventListener("input", event => {
         fetchSongResults(event.target.value);
       });
@@ -1671,6 +2020,7 @@
 
       dom.viewerModeToggle.addEventListener("change", event => {
         setViewerMode(event.target.checked);
+        refreshDisplayedPresentation();
       });
 
       dom.autoScrollToggle.addEventListener("change", event => {
@@ -1684,17 +2034,17 @@
 
       dom.showNotesToggle.addEventListener("change", event => {
         setShowNotes(event.target.checked);
-        fetchStatus();
+        refreshDisplayedPresentation();
       });
 
       dom.showDisabledSlidesToggle.addEventListener("change", event => {
         setShowDisabledSlides(event.target.checked);
-        fetchStatus();
+        refreshDisplayedPresentation();
       });
 
       dom.showLabelsToggle.addEventListener("change", event => {
         setShowLabels(event.target.checked);
-        fetchStatus();
+        refreshDisplayedPresentation();
       });
 
       dom.advancedSettingsButton.addEventListener("click", () => {
@@ -1705,7 +2055,7 @@
         btn.addEventListener("click", () => {
           setPreviewPreference(btn.dataset.pref);
           updateSegmentUI(dom.previewPreferenceButtons, "pref", getPreviewPreference());
-          fetchStatus();
+          refreshDisplayedPresentation();
         });
       });
 
@@ -1722,7 +2072,7 @@
 
       dom.textSizeSlider.addEventListener("change", () => {
         setTextScale(dom.textSizeSlider.value);
-        fetchStatus();
+        refreshDisplayedPresentation();
       });
 
       if (window.matchMedia) {

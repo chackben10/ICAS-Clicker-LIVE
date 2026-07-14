@@ -36,6 +36,14 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
     ActionSpec("propresenter.next_slide", "Next Slide", "ProPresenter", "Advance the active or focused presentation.", path=("ProPresenter Actions", "Slide Control Actions")),
     ActionSpec("propresenter.previous_slide", "Previous Slide", "ProPresenter", "Go backward in the active or focused presentation.", path=("ProPresenter Actions", "Slide Control Actions")),
     ActionSpec("propresenter.get_active_presentation", "Get Active Presentation", "ProPresenter", "Return the active ProPresenter presentation.", path=("Read / Data Modules", "ProPresenter")),
+    ActionSpec(
+        "propresenter.get_presentation_by_uuid",
+        "Get Presentation by UUID",
+        "ProPresenter",
+        "Return one ProPresenter presentation by UUID.",
+        (FieldSpec("uuid", "Presentation UUID", "text", "", "Use a UUID, or a variable such as {{uuid}}."),),
+        ("Read / Data Modules", "ProPresenter"),
+    ),
     ActionSpec("propresenter.get_slide_index", "Get Slide Index", "ProPresenter", "Return the current ProPresenter slide index.", path=("Read / Data Modules", "ProPresenter")),
     ActionSpec("propresenter.get_current_base", "Get Current Base", "ProPresenter", "Return whether the app is using the active or focused presentation base.", path=("Read / Data Modules", "ProPresenter")),
     ActionSpec("propresenter.get_service_logos", "Get Service Logos", "ProPresenter", "Return configured service-logo mappings.", path=("Read / Data Modules", "ProPresenter")),
@@ -58,6 +66,17 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "ProPresenter",
         "Trigger a specific slide index.",
         (FieldSpec("index", "Slide index", "text", "0", "Use a number, or a variable such as {{index}}."),),
+        ("ProPresenter Actions", "Slide Control Actions"),
+    ),
+    ActionSpec(
+        "propresenter.trigger_presentation_slide",
+        "Trigger Presentation Slide",
+        "ProPresenter",
+        "Trigger a slide index in a presentation selected by UUID.",
+        (
+            FieldSpec("uuid", "Presentation UUID", "text", "", "Use a UUID, or a variable such as {{uuid}}."),
+            FieldSpec("index", "Slide index", "text", "0", "Use a number, or a variable such as {{index}}."),
+        ),
         ("ProPresenter Actions", "Slide Control Actions"),
     ),
     ActionSpec(

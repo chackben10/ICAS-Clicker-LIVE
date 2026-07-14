@@ -171,6 +171,8 @@ Implemented routes include:
 
 - `GET /health`
 - `GET /active-presentation`
+- `GET /presentation/{uuid}`
+- `POST /presentation/{uuid}/{index}/trigger`
 - `GET /slide-index`
 - `GET /thumbnail?uuid=...&index=...`
 - `GET|POST /focus?index=...`

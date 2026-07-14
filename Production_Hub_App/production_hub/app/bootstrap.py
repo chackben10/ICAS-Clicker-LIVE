@@ -307,6 +307,11 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         data = await context.propresenter.full_presentation()
         return await _action_ok(action, "active presentation read", data)
 
+    async def propresenter_get_presentation_by_uuid(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        uuid = str(param(action, action_context, "uuid", "")).strip()
+        data = await context.propresenter.presentation_by_uuid(uuid)
+        return await _action_ok(action, "presentation read", data)
+
     async def propresenter_get_slide_index(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         data = await context.propresenter.slide_index()
         return await _action_ok(action, "slide index read", data)
@@ -349,6 +354,12 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         index = int(param(action, action_context, "index", 0))
         await context.propresenter.focus_slide(index)
         return await _action_ok(action, "slide focused", {"index": index})
+
+    async def propresenter_trigger_presentation_slide(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        uuid = str(param(action, action_context, "uuid", "")).strip()
+        index = int(param(action, action_context, "index", 0))
+        await context.propresenter.trigger_presentation_slide(uuid, index)
+        return await _action_ok(action, "presentation slide triggered", {"uuid": uuid, "index": index})
 
     async def trigger_presentation(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         label = str(param(action, action_context, "label", ""))
@@ -714,12 +725,14 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.next_slide": propresenter_next,
         "propresenter.previous_slide": propresenter_previous,
         "propresenter.get_active_presentation": propresenter_get_active_presentation,
+        "propresenter.get_presentation_by_uuid": propresenter_get_presentation_by_uuid,
         "propresenter.get_slide_index": propresenter_get_slide_index,
         "propresenter.get_current_base": propresenter_get_current_base,
         "propresenter.get_service_logos": propresenter_get_service_logos,
         "propresenter.get_macros": propresenter_get_macros,
         "propresenter.get_thumbnail": propresenter_get_thumbnail,
         "propresenter.focus_slide": propresenter_focus,
+        "propresenter.trigger_presentation_slide": propresenter_trigger_presentation_slide,
         "propresenter.trigger_presentation": trigger_presentation,
         "propresenter.trigger_service_logo": trigger_service_logo,
         "propresenter.clear_announcements": clear_announcements,

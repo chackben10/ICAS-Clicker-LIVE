@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Path, Query, Response
 
 
 def router(context) -> APIRouter:
@@ -27,6 +27,18 @@ def router(context) -> APIRouter:
     @api.get("/active-presentation")
     async def active_presentation() -> dict:
         return await context.propresenter.full_presentation()
+
+    @api.get("/presentation/{uuid}")
+    async def presentation_by_uuid(uuid: str = Path(..., min_length=1)) -> dict:
+        return await context.propresenter.presentation_by_uuid(uuid)
+
+    @api.post("/presentation/{uuid}/{index}/trigger")
+    async def trigger_presentation_slide(
+        uuid: str = Path(..., min_length=1),
+        index: int = Path(..., ge=0),
+    ) -> dict:
+        await context.propresenter.trigger_presentation_slide(uuid, index)
+        return {"ok": True, "uuid": uuid, "index": index}
 
     @api.get("/slide-index")
     async def slide_index() -> dict:

@@ -43,6 +43,9 @@ class ProPresenterService:
         return await self.client.get_json("/presentation/focused")
 
     async def presentation_by_uuid(self, uuid: str) -> dict[str, Any]:
+        uuid = str(uuid or "").strip()
+        if not uuid:
+            raise ValueError("Presentation UUID is required")
         uuid_q = self.client.quote_segment(uuid)
         return await self.client.get_json(f"/presentation/{uuid_q}")
 
@@ -142,6 +145,16 @@ class ProPresenterService:
     async def focus_slide(self, index: int) -> bool:
         await self.refresh_presentation_base()
         return await self.client.trigger(f"{self._current_base}/{int(index)}/trigger")
+
+    async def trigger_presentation_slide(self, uuid: str, index: int) -> bool:
+        uuid = str(uuid or "").strip()
+        if not uuid:
+            raise ValueError("Presentation UUID is required")
+        index = int(index)
+        if index < 0:
+            raise ValueError("Slide index must be nonnegative")
+        uuid_q = self.client.quote_segment(uuid)
+        return await self.client.trigger(f"/presentation/{uuid_q}/{index}/trigger")
 
     async def trigger_presentation_label(self, label: str) -> bool:
         return await self.client.trigger_presentation(self._presentation_uuid(label))
