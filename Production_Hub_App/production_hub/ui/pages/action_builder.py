@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Callable
 
 from PySide6.QtCore import Qt
@@ -17,6 +18,8 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QSpinBox,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -502,3 +505,231 @@ class ConditionSequenceEditor(QWidget):
         self.save_current()
         self.reload_list()
         self.list_widget.setCurrentRow(self._current_index)
+
+
+class RuleTreeEditor(QWidget):
+    """Nested boolean rule editor used by the automation macro builder."""
+
+    GROUP_LABELS = {"and": "All rules (AND)", "or": "Any rule (OR)", "none": "No rules (NOT)"}
+
+    def __init__(self, context) -> None:
+        super().__init__()
+        self.context = context
+        self._rules: dict[str, Any] = {"operator": "and", "children": []}
+        self._current_path: tuple[int, ...] | None = None
+        self._loading = False
+        self.tree = QTreeWidget()
+        self.tree.setObjectName("BuilderStepList")
+        self.tree.setHeaderLabels(["Rule logic"])
+        self.tree.setMinimumHeight(230)
+        self.tree.setIndentation(24)
+        self.group_combo = QComboBox()
+        for operator in ("and", "or", "none"):
+            self.group_combo.addItem(self.GROUP_LABELS[operator], operator)
+        self.negate_check = QCheckBox("If not (invert this rule)")
+        self.type_combo = QComboBox()
+        self.type_combo.addItems([f"{spec.category} - {spec.label}" for spec in CONDITION_SPECS])
+        self.description = QLabel("")
+        self.description.setWordWrap(True)
+        self.description.setObjectName("HelpText")
+        self.fields = FieldSetEditor(context)
+        self.group_editor = QWidget()
+        group_form = QFormLayout(self.group_editor)
+        group_form.setContentsMargins(0, 0, 0, 0)
+        group_form.addRow("Group logic", self.group_combo)
+        self.rule_editor = QWidget()
+        rule_layout = QVBoxLayout(self.rule_editor)
+        rule_layout.setContentsMargins(0, 0, 0, 0)
+        rule_form = QFormLayout()
+        rule_form.addRow("Rule", self.type_combo)
+        rule_form.addRow("Logic", self.negate_check)
+        rule_layout.addLayout(rule_form)
+        rule_layout.addWidget(self.description)
+        rule_layout.addWidget(self.fields)
+        self.build()
+
+    def build(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(10)
+        helper = QLabel("Nest groups to combine ALL (and), ANY (or), and NONE (not) logic. Invert an individual rule with If not.")
+        helper.setObjectName("HelpText")
+        helper.setWordWrap(True)
+        root.addWidget(helper)
+        root.addWidget(self.tree)
+        buttons = QHBoxLayout()
+        for label, handler in [
+            ("Add Rule", self.add_rule),
+            ("Add Group", self.add_group),
+            ("Remove", self.remove_node),
+            ("Up", lambda: self.move_node(-1)),
+            ("Down", lambda: self.move_node(1)),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(handler)
+            buttons.addWidget(button)
+        root.addLayout(buttons)
+        editor = QWidget()
+        editor.setObjectName("SequenceEditorPanel")
+        editor_layout = QVBoxLayout(editor)
+        editor_layout.addWidget(self.group_editor)
+        editor_layout.addWidget(self.rule_editor)
+        root.addWidget(editor)
+        self.tree.currentItemChanged.connect(self.selection_changed)
+        self.type_combo.currentIndexChanged.connect(self.condition_type_changed)
+        self.group_combo.currentIndexChanged.connect(self.group_type_changed)
+
+    def set_rules(self, rules: dict[str, Any]) -> None:
+        self._rules = deepcopy(rules or {"operator": "and", "children": []})
+        if "children" not in self._rules:
+            self._rules = {"operator": "and", "children": [self._rules]}
+        self._current_path = None
+        self.reload_tree(())
+
+    def rules(self) -> dict[str, Any]:
+        self.save_current()
+        return deepcopy(self._rules)
+
+    def _node(self, path: tuple[int, ...]) -> dict[str, Any]:
+        node = self._rules
+        for index in path:
+            node = node["children"][index]
+        return node
+
+    def _parent_path(self, path: tuple[int, ...]) -> tuple[int, ...]:
+        return path[:-1]
+
+    def _target_group_path(self) -> tuple[int, ...]:
+        path = self._current_path or ()
+        node = self._node(path)
+        return path if "children" in node else self._parent_path(path)
+
+    def reload_tree(self, select_path: tuple[int, ...] | None = None) -> None:
+        self._loading = True
+        self._current_path = None
+        self.tree.clear()
+
+        def add(parent, node: dict[str, Any], path: tuple[int, ...]) -> None:
+            item = QTreeWidgetItem([self.summary(node, path)])
+            item.setData(0, Qt.ItemDataRole.UserRole, list(path))
+            if parent is None:
+                self.tree.addTopLevelItem(item)
+            else:
+                parent.addChild(item)
+            for index, child in enumerate(node.get("children") or []):
+                if isinstance(child, dict):
+                    add(item, child, (*path, index))
+            item.setExpanded(True)
+
+        add(None, self._rules, ())
+        self._loading = False
+        wanted = () if select_path is None else select_path
+        matches = self.tree.findItems("*", Qt.MatchFlag.MatchWildcard | Qt.MatchFlag.MatchRecursive)
+        selected = next((item for item in matches if tuple(item.data(0, Qt.ItemDataRole.UserRole) or []) == wanted), None)
+        if selected:
+            self.tree.setCurrentItem(selected)
+
+    def summary(self, node: dict[str, Any], path: tuple[int, ...]) -> str:
+        if "children" in node:
+            label = self.GROUP_LABELS.get(str(node.get("operator") or "and"), "All rules (AND)")
+            return ("WHEN " if not path else "GROUP: ") + label
+        spec = condition_spec(str(node.get("condition_type") or "always"))
+        params = condition_params(node)
+        detail = ", ".join(f"{key}={value}" for key, value in params.items() if value not in {"", None})
+        prefix = "IF NOT " if node.get("negate") else "IF "
+        return prefix + spec.label + (f" ({detail})" if detail else "")
+
+    def selection_changed(self, current, _previous) -> None:
+        if self._loading or current is None:
+            return
+        self.save_current()
+        self._current_path = tuple(current.data(0, Qt.ItemDataRole.UserRole) or [])
+        self.load_current()
+
+    def load_current(self) -> None:
+        self._loading = True
+        node = self._node(self._current_path or ())
+        is_group = "children" in node
+        self.group_editor.setVisible(is_group)
+        self.rule_editor.setVisible(not is_group)
+        if is_group:
+            index = self.group_combo.findData(str(node.get("operator") or "and"))
+            self.group_combo.setCurrentIndex(max(0, index))
+        else:
+            condition_type = str(node.get("condition_type") or "always")
+            index = next((i for i, spec in enumerate(CONDITION_SPECS) if spec.condition_type == condition_type), 0)
+            self.type_combo.setCurrentIndex(index)
+            spec = CONDITION_SPECS[index]
+            self.negate_check.setChecked(bool(node.get("negate", False)))
+            self.description.setText(spec.description)
+            self.fields.set_fields(spec.fields, condition_params(node))
+        self._loading = False
+
+    def save_current(self) -> None:
+        if self._loading or self._current_path is None:
+            return
+        node = self._node(self._current_path)
+        if "children" in node:
+            node["operator"] = str(self.group_combo.currentData() or "and")
+        else:
+            spec = CONDITION_SPECS[max(0, self.type_combo.currentIndex())]
+            node.clear()
+            node.update(
+                {
+                    "condition_type": spec.condition_type,
+                    "params": self.fields.values(),
+                    "negate": self.negate_check.isChecked(),
+                }
+            )
+
+    def add_rule(self) -> None:
+        self.save_current()
+        parent_path = self._target_group_path()
+        parent = self._node(parent_path)
+        spec = CONDITION_SPECS[0]
+        parent.setdefault("children", []).append(
+            {"condition_type": spec.condition_type, "params": _default_params(spec.fields), "negate": False}
+        )
+        self.reload_tree((*parent_path, len(parent["children"]) - 1))
+
+    def add_group(self) -> None:
+        self.save_current()
+        parent_path = self._target_group_path()
+        parent = self._node(parent_path)
+        parent.setdefault("children", []).append({"operator": "and", "children": []})
+        self.reload_tree((*parent_path, len(parent["children"]) - 1))
+
+    def remove_node(self) -> None:
+        path = self._current_path
+        if not path:
+            return
+        parent = self._node(self._parent_path(path))
+        parent["children"].pop(path[-1])
+        self.reload_tree(self._parent_path(path))
+
+    def move_node(self, offset: int) -> None:
+        path = self._current_path
+        if not path:
+            return
+        parent = self._node(self._parent_path(path))
+        target = path[-1] + offset
+        if target < 0 or target >= len(parent["children"]):
+            return
+        self.save_current()
+        parent["children"][path[-1]], parent["children"][target] = parent["children"][target], parent["children"][path[-1]]
+        self.reload_tree((*self._parent_path(path), target))
+
+    def condition_type_changed(self) -> None:
+        if self._loading or self._current_path is None:
+            return
+        spec = CONDITION_SPECS[max(0, self.type_combo.currentIndex())]
+        self.description.setText(spec.description)
+        self.fields.set_fields(spec.fields, _default_params(spec.fields))
+        self.save_current()
+        self.reload_tree(self._current_path)
+
+    def group_type_changed(self) -> None:
+        if self._loading or self._current_path is None:
+            return
+        self.save_current()
+        self.reload_tree(self._current_path)

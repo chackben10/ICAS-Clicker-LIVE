@@ -57,9 +57,12 @@
         if (!raw) return "";
         const itemMatch = raw.match(/^item:\s*(.+)$/im);
         if (itemMatch && itemMatch[1]) {
-          return itemMatch[1].trim();
+          return stripAudioExtension(itemMatch[1].trim());
         }
-        return "";
+        return stripAudioExtension(raw);
+      }
+      function stripAudioExtension(value) {
+        return String(value || "").trim().replace(/\.(wav|mp3|aiff|aif|m4a)$/i, "").trim();
       }
       function fitText() {
         const text = audioText.textContent.trim();

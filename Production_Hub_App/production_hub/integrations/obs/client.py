@@ -54,17 +54,28 @@ class ObsClient(IntegrationBase):
                 return False
 
     async def call(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
-        if not self._client:
+        if not self._client or not self.connected:
             await self.connect()
         if not self._client:
             raise RuntimeError(self.last_error or "OBS is not connected")
-        method = getattr(self._client, method_name)
         try:
-            result = await asyncio.to_thread(method, *args, **kwargs)
+            result = await asyncio.to_thread(getattr(self._client, method_name), *args, **kwargs)
             self.connected = True
             self.mark_success()
             return result
         except Exception as exc:
             self.connected = False
+            self._client = None
             self.mark_error(str(exc))
-            raise
+            if not self.config.automatic_reconnect or not await self.connect() or not self._client:
+                raise
+            try:
+                result = await asyncio.to_thread(getattr(self._client, method_name), *args, **kwargs)
+                self.connected = True
+                self.mark_success()
+                return result
+            except Exception as retry_exc:
+                self.connected = False
+                self._client = None
+                self.mark_error(str(retry_exc))
+                raise

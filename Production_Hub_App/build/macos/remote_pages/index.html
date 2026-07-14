@@ -272,6 +272,195 @@
       overflow-wrap: anywhere;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
+    .search-launch {
+      width: 100%;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 0 14px;
+      padding: 10px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--slide-bg);
+      color: var(--status-grey);
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .search-launch:hover,
+    .search-launch:focus-visible {
+      background: var(--label-bg);
+      color: var(--slide-text);
+      outline: none;
+      border-color: #007aff;
+    }
+
+    .search-icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .search-launch-label {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .search-view {
+      width: 100%;
+    }
+
+    .search-mode-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .search-back-btn {
+      flex: 0 0 auto;
+      min-height: 44px;
+      padding: 0 13px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--slide-text);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .search-back-btn:hover,
+    .search-back-btn:focus-visible {
+      background: var(--label-bg);
+      outline: none;
+      border-color: #007aff;
+    }
+
+    .search-input-shell {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 44px;
+      padding: 0 13px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--slide-bg);
+    }
+
+    .search-input-shell:focus-within {
+      border-color: #007aff;
+      box-shadow: 0 0 0 2px rgba(0,122,255,0.16);
+    }
+
+    .song-search-input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--slide-text);
+      font-size: 1rem;
+    }
+
+    .song-search-input::placeholder {
+      color: var(--status-grey);
+      opacity: 0.85;
+    }
+
+    .search-results-status {
+      min-height: 24px;
+      margin: 2px 2px 8px;
+      color: var(--status-grey);
+      font-size: 0.88rem;
+    }
+
+    .search-results-scroll {
+      max-height: calc(100vh - 112px);
+      overflow: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--bg);
+      overscroll-behavior: contain;
+    }
+
+    .search-results-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .search-results-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 10px 12px;
+      background: var(--modal-bg);
+      color: var(--status-grey);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    .search-results-table th:last-child {
+      width: 34%;
+    }
+
+    .search-result-row {
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+
+    .search-result-row:hover,
+    .search-result-row:focus-visible {
+      background: var(--label-bg);
+      outline: none;
+    }
+
+    .search-result-row + .search-result-row td {
+      border-top: 1px solid var(--border-color);
+    }
+
+    .search-result-row td {
+      padding: 12px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .search-result-name {
+      color: var(--slide-text);
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .search-result-library {
+      color: var(--status-grey);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 460px) {
+      .search-mode-header {
+        align-items: stretch;
+      }
+
+      .search-back-btn {
+        padding: 0 11px;
+      }
+
+      .search-results-table th:last-child {
+        width: 38%;
+      }
+    }
+
     .settings-overlay {
       position: fixed;
       inset: 0;
@@ -444,18 +633,57 @@
 
 <body>
   <div class="wrapper">
-    <div class="top-row">
-      <div class="page-title">ICAS Presentation Clicker</div>
-      <button class="top-btn" id="settingsButton" type="button">Settings</button>
-    </div>
+    <main id="clickerView">
+      <div class="top-row">
+        <div class="page-title">ICAS Presentation Clicker</div>
+        <button class="top-btn" id="settingsButton" type="button">Settings</button>
+      </div>
 
-    <div id="presentationName" class="presentation-name">Loading...</div>
+      <button id="searchModeButton" class="search-launch" type="button" aria-controls="searchView">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <span class="search-launch-label">Search Song Library</span>
+      </button>
 
-    <div id="statusText" class="slide-status">
-      Slide <span id="slideCurrent">0</span> of <span id="slideTotal">0</span>
-    </div>
+      <div id="presentationName" class="presentation-name">Loading...</div>
 
-    <div id="slidesContainer" class="slides-list"></div>
+      <div id="statusText" class="slide-status">
+        Slide <span id="slideCurrent">0</span> of <span id="slideTotal">0</span>
+      </div>
+
+      <div id="slidesContainer" class="slides-list"></div>
+    </main>
+
+    <section id="searchView" class="search-view" aria-label="Song Library Search" hidden>
+      <div class="search-mode-header">
+        <button id="searchBackButton" class="search-back-btn" type="button">Back</button>
+        <label class="search-input-shell">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            id="songSearchInput"
+            class="song-search-input"
+            type="search"
+            placeholder="Search songs"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+          />
+        </label>
+      </div>
+
+      <div id="searchResultsStatus" class="search-results-status" aria-live="polite">Loading songs…</div>
+
+      <div class="search-results-scroll">
+        <table class="search-results-table">
+          <thead>
+            <tr>
+              <th scope="col">Song</th>
+              <th scope="col">Library</th>
+            </tr>
+          </thead>
+          <tbody id="searchResultsBody"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
   <div id="settingsOverlay" class="settings-overlay" aria-hidden="true">
@@ -592,6 +820,9 @@
     let pendingSelectedIndex = null;
     let lastSlideIndexForAutoScroll = null;
     let currentPresentationUuid = null;
+    let searchModeActive = false;
+    let searchRequestController = null;
+    let searchRequestSequence = 0;
 
     const thumbCache = Object.create(null);
     const thumbInflight = Object.create(null);
@@ -600,9 +831,17 @@
     const dom = {};
 
     function cacheDom() {
+      dom.clickerView = document.getElementById("clickerView");
       dom.presentationName = document.getElementById("presentationName");
       dom.statusText = document.getElementById("statusText");
       dom.slidesContainer = document.getElementById("slidesContainer");
+
+      dom.searchModeButton = document.getElementById("searchModeButton");
+      dom.searchView = document.getElementById("searchView");
+      dom.searchBackButton = document.getElementById("searchBackButton");
+      dom.songSearchInput = document.getElementById("songSearchInput");
+      dom.searchResultsStatus = document.getElementById("searchResultsStatus");
+      dom.searchResultsBody = document.getElementById("searchResultsBody");
 
       dom.settingsButton = document.getElementById("settingsButton");
       dom.settingsOverlay = document.getElementById("settingsOverlay");
@@ -1189,6 +1428,108 @@
       return response.json();
     }
 
+    function songResultsFromPayload(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.items)) return payload.items;
+      if (Array.isArray(payload?.results)) return payload.results;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    }
+
+    function handleInactiveSongResult(event) {
+      event.preventDefault();
+    }
+
+    function buildSongResultRow(result) {
+      const row = document.createElement("tr");
+      row.className = "search-result-row";
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", `Select ${result?.name || "song"}`);
+      row.dataset.uuid = String(result?.uuid || "");
+
+      const name = document.createElement("td");
+      name.className = "search-result-name";
+      name.textContent = String(result?.name || "Untitled Song");
+
+      const library = document.createElement("td");
+      library.className = "search-result-library";
+      library.textContent = String(result?.library || "");
+
+      row.append(name, library);
+      row.addEventListener("click", handleInactiveSongResult);
+      row.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          handleInactiveSongResult(event);
+        }
+      });
+      return row;
+    }
+
+    function renderSongResults(results, query) {
+      dom.searchResultsBody.replaceChildren();
+      results.forEach(result => {
+        dom.searchResultsBody.appendChild(buildSongResultRow(result));
+      });
+
+      if (results.length === 0) {
+        dom.searchResultsStatus.textContent = query ? `No songs found for “${query}”.` : "No songs available.";
+        return;
+      }
+
+      const suffix = results.length === 1 ? "result" : "results";
+      dom.searchResultsStatus.textContent = query
+        ? `${results.length} ${suffix} for “${query}”`
+        : `${results.length} songs`;
+    }
+
+    async function fetchSongResults(queryValue = "") {
+      const query = String(queryValue ?? "");
+      const sequence = ++searchRequestSequence;
+      searchRequestController?.abort();
+      searchRequestController = new AbortController();
+
+      dom.searchResultsBody.replaceChildren();
+      dom.searchResultsStatus.textContent = "Searching…";
+      dom.searchView.setAttribute("aria-busy", "true");
+
+      try {
+        const url = `${BASE_URL}/song-library/search?query=${encodeURIComponent(query)}`;
+        const response = await fetch(url, {
+          cache: "no-cache",
+          signal: searchRequestController.signal
+        });
+        if (!response.ok) throw new Error(`Song search failed: ${response.status}`);
+        const payload = await response.json();
+        if (sequence !== searchRequestSequence) return;
+        renderSongResults(songResultsFromPayload(payload), query);
+      } catch (error) {
+        if (error?.name === "AbortError" || sequence !== searchRequestSequence) return;
+        console.error(error);
+        dom.searchResultsBody.replaceChildren();
+        dom.searchResultsStatus.textContent = "Song search is unavailable. Try again.";
+      } finally {
+        if (sequence === searchRequestSequence) {
+          dom.searchView.setAttribute("aria-busy", "false");
+        }
+      }
+    }
+
+    function setSearchMode(active) {
+      searchModeActive = Boolean(active);
+      dom.clickerView.hidden = searchModeActive;
+      dom.searchView.hidden = !searchModeActive;
+
+      if (searchModeActive) {
+        fetchSongResults(dom.songSearchInput.value);
+        requestAnimationFrame(() => dom.songSearchInput.focus());
+        return;
+      }
+
+      searchRequestController?.abort();
+      dom.searchModeButton.focus();
+    }
+
     async function focusSlide(index) {
       pendingSelectedIndex = index;
       fetch(`${BASE_URL}/focus?index=${encodeURIComponent(index)}`).catch(() => {});
@@ -1269,6 +1610,11 @@
     function bindEventListeners() {
       dom.settingsButton.addEventListener("click", openModal);
       dom.settingsCloseButton.addEventListener("click", closeModal);
+      dom.searchModeButton.addEventListener("click", () => setSearchMode(true));
+      dom.searchBackButton.addEventListener("click", () => setSearchMode(false));
+      dom.songSearchInput.addEventListener("input", event => {
+        fetchSongResults(event.target.value);
+      });
 
       dom.settingsOverlay.addEventListener("click", event => {
         if (event.target === dom.settingsOverlay) closeModal();
@@ -1277,6 +1623,8 @@
       document.addEventListener("keydown", event => {
         if (event.key === "Escape" && dom.settingsOverlay.style.display === "flex") {
           closeModal();
+        } else if (event.key === "Escape" && searchModeActive) {
+          setSearchMode(false);
         }
       });
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
 
-AutomationHandler = Callable[[AutomationDefinition, AutomationRunState], Awaitable[str]]
+AutomationHandler = Callable[[AutomationDefinition, AutomationRunState, dict[str, Any]], Awaitable[str]]
 
 
 class AutomationEngine:
@@ -26,7 +27,7 @@ class AutomationEngine:
     def resume_all(self) -> None:
         self.paused = False
 
-    async def run_once(self, key: str) -> AutomationRunState:
+    async def run_once(self, key: str, action_context: dict[str, Any] | None = None) -> AutomationRunState:
         definition = self.definitions[key]
         state = self.states[key]
         if self.paused or not definition.enabled:
@@ -37,7 +38,7 @@ class AutomationEngine:
             state.last_condition_result = "no_handler"
             return state
         try:
-            message = await handler(definition, state)
+            message = await handler(definition, state, dict(action_context or {}))
             state.mark_success(message)
         except Exception as exc:
             state.mark_error(str(exc))

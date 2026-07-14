@@ -1,6 +1,6 @@
 __pycache__/
 *.py[cod]
 .venv/
+dist/
 dev-data/
 .production_hub_data/
-

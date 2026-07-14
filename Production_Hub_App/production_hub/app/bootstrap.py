@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from production_hub.core.automation.engine import AutomationEngine
+from production_hub.core.automation.catalog import normalize_trigger
 from production_hub.core.config.defaults import build_default_automations, build_default_endpoints, build_default_midi_mappings
 from production_hub.core.config.input_lists import ensure_default_input_lists
 from production_hub.core.config.models import AppPaths
@@ -29,6 +30,7 @@ from production_hub.integrations.obs.service import ObsService
 from production_hub.integrations.panasonic_awp.preset_service import PanasonicPresetService
 from production_hub.integrations.panasonic_awp.service import PanasonicAwpService
 from production_hub.integrations.propresenter.service import ProPresenterService
+from production_hub.integrations.propresenter.audio_service import strip_audio_extension
 from production_hub.integrations.scoreboard.repository import ScoreboardRepository
 from production_hub.integrations.scoreboard.models import ScoreRow
 from production_hub.integrations.scoreboard.service import ScoreboardService
@@ -231,14 +233,28 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
     defaults = {item.key: item for item in build_default_automations()}
     repaired = []
     for automation in automations:
+        if automation.key == "obs_connection_watchdog":
+            continue
         default = defaults.get(automation.key)
         if default is None:
             repaired.append(automation)
             continue
+        automation.trigger = normalize_trigger(automation.trigger)
+        if automation.key == "auto_show_slides" and automation.interval_seconds <= 0:
+            automation.interval_seconds = default.interval_seconds
+        if automation.key == "bible_look_enforcement" and automation.trigger == "interval":
+            automation.trigger = default.trigger
+            automation.conditions = [dict(condition) for condition in default.conditions]
+            automation.rules = dict(default.rules)
         if not automation.conditions and default.conditions:
             automation.conditions = [dict(condition) for condition in default.conditions]
+            automation.rules = dict(default.rules)
         if not automation.actions and default.actions:
             automation.actions = [ActionDefinition.from_dict(action.to_dict()) for action in default.actions]
+        if automation.key == "slide_label_audio_sync" and len(automation.actions) == 1:
+            action = automation.actions[0]
+            if action.action_type == "propresenter.audio_trigger" and "slide_label" in str(action.params):
+                automation.actions = [ActionDefinition("propresenter.audio_from_slide_label")]
         repaired.append(automation)
     return repaired
 
@@ -381,6 +397,50 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
             track = resolved.name
         await context.propresenter.audio.trigger(playlist, track)
         return await _action_ok(action, "audio triggered", {"playlist": playlist, "track": track})
+
+    async def audio_from_slide_label(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        audio_config = context.config.integrations.propresenter.audio
+        if not audio_config.slide_label_sync_enabled:
+            return await _action_ok(action, "slide-label audio sync disabled")
+        index = action_context.get("slide_index")
+        if index is None:
+            return await _action_ok(action, "no active slide")
+        active = await context.propresenter.active_presentation()
+        presentation = active.get("presentation") if isinstance(active, dict) else {}
+        presentation = presentation if isinstance(presentation, dict) else {}
+        identifier = presentation.get("id")
+        identifier = identifier if isinstance(identifier, dict) else {}
+        uuid = str(identifier.get("uuid") or "")
+        wanted_uuid = str(action_context.get("presentation_uuid") or "")
+        if wanted_uuid and uuid != wanted_uuid:
+            return await _action_ok(action, "presentation changed before audio lookup")
+        offset = 0
+        slide = None
+        for group in presentation.get("groups") or []:
+            if not isinstance(group, dict):
+                continue
+            for candidate in group.get("slides") or []:
+                if offset == int(index):
+                    slide = candidate if isinstance(candidate, dict) else None
+                    break
+                offset += 1
+            if slide is not None:
+                break
+        label = strip_audio_extension(str((slide or {}).get("label") or ""))
+        if not label:
+            return await _action_ok(action, "active slide has no audio label")
+        history_key = f"{uuid}:{index}:{label}"
+        if not context.propresenter.audio.remember_triggered(history_key):
+            return await _action_ok(action, "slide-label audio already triggered")
+        track = await context.propresenter.audio.find_track(label)
+        if not track:
+            return await _action_ok(action, "no matching slide-label audio track", {"label": label})
+        if audio_config.trigger_delay_seconds:
+            import asyncio
+
+            await asyncio.sleep(audio_config.trigger_delay_seconds)
+        await context.propresenter.audio.trigger(track.playlist, track.name)
+        return await _action_ok(action, "slide-label audio triggered", {"playlist": track.playlist, "track": track.name})
 
     async def audio_clear(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         await context.propresenter.audio.clear()
@@ -669,6 +729,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.timer_stop": timer_stop,
         "propresenter.timer_reset": timer_reset,
         "propresenter.audio_trigger": audio_trigger,
+        "propresenter.audio_from_slide_label": audio_from_slide_label,
         "propresenter.audio_clear": audio_clear,
         "propresenter.audio_playlists": audio_playlists,
         "propresenter.audio_tracks": audio_tracks,

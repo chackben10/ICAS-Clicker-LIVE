@@ -107,6 +107,13 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         ),
         ("ProPresenter Actions", "Audio Actions"),
     ),
+    ActionSpec(
+        "propresenter.audio_from_slide_label",
+        "Play Audio From Slide Label",
+        "ProPresenter",
+        "Find and play the audio track named by the newly active slide label.",
+        path=("ProPresenter Actions", "Audio Actions"),
+    ),
     ActionSpec("propresenter.audio_clear", "Clear Audio", "ProPresenter", "Clear the audio layer.", path=("ProPresenter Actions", "Audio Actions")),
     ActionSpec("propresenter.audio_playlists", "Get Audio Playlists", "ProPresenter", "Return configured audio playlists.", path=("Read / Data Modules", "ProPresenter")),
     ActionSpec(

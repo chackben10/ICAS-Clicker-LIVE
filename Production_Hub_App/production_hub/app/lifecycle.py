@@ -9,14 +9,13 @@ from typing import Any
 
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
-from production_hub.core.automation.evaluator import evaluate_conditions
+from production_hub.core.automation.evaluator import evaluate_rule_tree
+from production_hub.core.automation.triggers import AutomationTriggerMonitor
 from production_hub.core.config.input_lists import poll_due_input_lists
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
 from production_hub.integrations.panasonic_awp.models import PanasonicCommand
-from production_hub.integrations.propresenter.audio_service import strip_audio_extension
-from production_hub.integrations.obs.service import ObsTemporarilyNotReady
 from production_hub.integrations.visca.udp_listener import ViscaUdpListener
 
 
@@ -310,200 +309,9 @@ def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEv
     return ClickerListenerHandle(thread=thread, stop_event=stop_event)
 
 
-def _get_presentation(active_obj: dict[str, Any]) -> dict[str, Any]:
-    presentation = active_obj.get("presentation")
-    return presentation if isinstance(presentation, dict) else {}
-
-
-def _active_uuid(active_obj: dict[str, Any]) -> str:
-    presentation_id = _get_presentation(active_obj).get("id")
-    return str(presentation_id.get("uuid") or "") if isinstance(presentation_id, dict) else ""
-
-
-def _first_group_name(active_obj: dict[str, Any]) -> str:
-    groups = _get_presentation(active_obj).get("groups")
-    if isinstance(groups, list) and groups and isinstance(groups[0], dict):
-        return str(groups[0].get("name") or "")
-    return ""
-
-
-def _has_single_colon_group(active_obj: dict[str, Any]) -> bool:
-    groups = _get_presentation(active_obj).get("groups")
-    if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
-        return False
-    return ":" in str(groups[0].get("name") or "")
-
-
-def _find_slide(active_obj: dict[str, Any], current_index: int) -> dict[str, Any] | None:
-    groups = _get_presentation(active_obj).get("groups")
-    if not isinstance(groups, list):
-        return None
-    offset = 0
-    for group in groups:
-        if not isinstance(group, dict):
-            continue
-        slides = group.get("slides")
-        if not isinstance(slides, list):
-            continue
-        for slide in slides:
-            if offset == current_index:
-                return slide if isinstance(slide, dict) else None
-            offset += 1
-    return None
-
-
-def _slide_index(data: dict[str, Any]) -> int | None:
-    presentation_index = data.get("presentation_index")
-    if not isinstance(presentation_index, dict):
-        return None
-    index = presentation_index.get("index")
-    return int(index) if index is not None else None
-
-
 def register_automation_handlers(context: ApplicationContext) -> None:
-    memory: dict[str, Any] = {
-        "bible_condition": False,
-        "bible_last_macro_at": 0.0,
-        "last_auto_show_state": None,
-    }
-
-    async def bible_look_enforcement(definition: AutomationDefinition, state: AutomationRunState) -> str:
-        if not context.config.integrations.propresenter.enabled:
-            return "propresenter_disabled"
-        active = await context.propresenter.active_presentation()
-        condition = _has_single_colon_group(active)
-        rising = condition and not bool(memory["bible_condition"])
-        memory["bible_condition"] = condition
-        if not rising:
-            return "condition_not_rising"
-
-        import time
-
-        now = time.time()
-        if (now - float(memory["bible_last_macro_at"])) < definition.cooldown_seconds:
-            return "cooldown"
-
-        current_look = await context.propresenter.current_look_name()
-        if current_look == context.config.integrations.propresenter.bible_look_name:
-            return "already_bible_look"
-
-        macro_uuid = context.config.integrations.propresenter.bible_macro_trigger_uuid
-        macro_q = context.propresenter.client.quote_segment(macro_uuid)
-        await context.propresenter.client.trigger(f"/macro/{macro_q}/trigger")
-        memory["bible_last_macro_at"] = now
-        return "bible_macro_triggered"
-
-    async def obs_look_sync(definition: AutomationDefinition, state: AutomationRunState) -> str:
-        if not context.config.integrations.propresenter.enabled or not context.config.integrations.obs.enabled:
-            return "integration_disabled"
-        look_name = await context.propresenter.current_look_name()
-        if not look_name:
-            return "no_current_look"
-        runtime = context.runtime_state_repo.load()
-        if runtime.current_propresenter_look != look_name:
-            runtime.current_propresenter_look = look_name
-            context.runtime_state_repo.save(runtime)
-        try:
-            result = await context.obs.apply_look_rule(look_name)
-        except ObsTemporarilyNotReady:
-            return "obs_not_ready"
-        if not result:
-            return f"no_rule:{look_name}"
-        return "visibility_skipped" if result.get("skipped") else "visibility_applied"
-
-    async def slide_label_audio_sync(definition: AutomationDefinition, state: AutomationRunState) -> str:
-        config = context.config.integrations.propresenter.audio
-        if not context.config.integrations.propresenter.enabled or not config.slide_label_sync_enabled:
-            return "audio_sync_disabled"
-        index = _slide_index(await context.propresenter.slide_index())
-        if index is None or index < 0:
-            return "no_active_slide"
-        active = await context.propresenter.active_presentation()
-        uuid = _active_uuid(active)
-        if not uuid:
-            return "no_active_presentation"
-        slide = _find_slide(active, index)
-        if not slide:
-            return "slide_not_found"
-        label = strip_audio_extension(str(slide.get("label") or ""))
-        if not label:
-            return "slide_has_no_audio_label"
-        key = f"{uuid}:{index}:{label}"
-        if not context.propresenter.audio.remember_triggered(key):
-            return "duplicate_slide_label"
-        track = await context.propresenter.audio.find_track(label)
-        if not track:
-            return "no_matching_audio_track"
-        await asyncio.sleep(config.trigger_delay_seconds)
-        await context.propresenter.audio.trigger(track.playlist, track.name)
-        return f"audio_triggered:{track.playlist}/{track.name}"
-
-    async def auto_show_slides(definition: AutomationDefinition, state: AutomationRunState) -> str:
-        runtime = context.runtime_state_repo.load()
-        if not runtime.auto_show_enabled:
-            memory["last_auto_show_state"] = None
-            return "auto_show_disabled"
-        index_data = await context.propresenter.slide_index()
-        index = _slide_index(index_data)
-        presentation_index = index_data.get("presentation_index") if isinstance(index_data.get("presentation_index"), dict) else {}
-        presentation_id = presentation_index.get("presentation_id") if isinstance(presentation_index, dict) else {}
-        uuid_from_index = str(presentation_id.get("uuid") or "") if isinstance(presentation_id, dict) else ""
-        active = await context.propresenter.active_presentation()
-        group_name = _first_group_name(active)
-        if index is None and not group_name:
-            memory["last_auto_show_state"] = None
-            return "no_presentation_state"
-        current_state = f"{uuid_from_index}:{index}|{group_name}"
-        previous_state = memory.get("last_auto_show_state")
-        memory["last_auto_show_state"] = current_state
-        if previous_state and previous_state != current_state:
-            await context.propresenter.clear_announcements()
-            await context.obs.set_scene("ProPresenter Input", use_policy=True)
-            return "show_slides_applied"
-        return "state_primed" if previous_state is None else "state_unchanged"
-
-    async def obs_connection_watchdog(definition: AutomationDefinition, state: AutomationRunState) -> str:
-        if not context.config.integrations.obs.enabled:
-            return "obs_disabled"
-        if not context.obs.client.connected:
-            connected = await context.obs.connect()
-            context.health_monitor.update(context.obs.client.health())
-            return "obs_reconnected" if connected else "obs_unavailable"
-        try:
-            await context.obs.get_current_scene()
-            context.health_monitor.update(context.obs.client.health())
-            return "obs_connected"
-        except Exception:
-            connected = await context.obs.connect()
-            context.health_monitor.update(context.obs.client.health())
-            return "obs_reconnected" if connected else "obs_unavailable"
-
-    def soft_fail(handler):
-        async def _wrapped(definition: AutomationDefinition, state: AutomationRunState) -> str:
-            try:
-                conditions_ok, condition_message = await evaluate_conditions(context, definition.conditions)
-                state.last_condition_result = condition_message
-                if not conditions_ok:
-                    return f"conditions_not_met:{condition_message}"
-                return await handler(definition, state)
-            except Exception as exc:
-                return f"unavailable:{exc}"
-
-        return _wrapped
-
-    context.automation_engine.register_handler("bible_look_enforcement", soft_fail(bible_look_enforcement))
-    context.automation_engine.register_handler("obs_look_sync", soft_fail(obs_look_sync))
-    context.automation_engine.register_handler("slide_label_audio_sync", soft_fail(slide_label_audio_sync))
-    context.automation_engine.register_handler("auto_show_slides", soft_fail(auto_show_slides))
-    context.automation_engine.register_handler("obs_connection_watchdog", soft_fail(obs_connection_watchdog))
-
-
-def _automation_interval(context: ApplicationContext, definition: AutomationDefinition) -> float:
-    if definition.interval_seconds > 0:
-        return definition.interval_seconds
-    if definition.key in {"obs_look_sync", "slide_label_audio_sync", "auto_show_slides"}:
-        return max(0.25, float(context.config.integrations.propresenter.polling_interval_seconds))
-    return 0
+    for definition in context.automation_engine.definitions.values():
+        register_generic_automation_handler(context, definition)
 
 
 def register_generic_automation_handler(context: ApplicationContext, definition: AutomationDefinition) -> None:
@@ -512,7 +320,11 @@ def register_generic_automation_handler(context: ApplicationContext, definition:
 
     last_success_at = 0.0
 
-    async def generic_handler(current_definition: AutomationDefinition, state: AutomationRunState) -> str:
+    async def generic_handler(
+        current_definition: AutomationDefinition,
+        state: AutomationRunState,
+        action_context: dict[str, Any],
+    ) -> str:
         nonlocal last_success_at
         import time
 
@@ -520,7 +332,7 @@ def register_generic_automation_handler(context: ApplicationContext, definition:
         if current_definition.cooldown_seconds and (now - last_success_at) < current_definition.cooldown_seconds:
             return "cooldown"
 
-        conditions_ok, condition_message = await evaluate_conditions(context, current_definition.conditions)
+        conditions_ok, condition_message = await evaluate_rule_tree(context, current_definition.rules, action_context)
         state.last_condition_result = condition_message
         if not conditions_ok:
             return f"conditions_not_met:{condition_message}"
@@ -532,7 +344,12 @@ def register_generic_automation_handler(context: ApplicationContext, definition:
             actions=current_definition.actions,
             enabled=True,
         )
-        result = await context.endpoint_executor.execute(endpoint, {"automation_key": current_definition.key})
+        execution_context = {
+            **action_context,
+            "automation_id": current_definition.key,
+            "automation_name": current_definition.name,
+        }
+        result = await context.endpoint_executor.execute(endpoint, execution_context)
         if result.ok:
             last_success_at = now
             return "actions_complete"
@@ -543,23 +360,23 @@ def register_generic_automation_handler(context: ApplicationContext, definition:
 
 async def _run_due_automations(
     context: ApplicationContext,
-    next_due: dict[str, float],
+    trigger_monitor: AutomationTriggerMonitor,
 ) -> None:
     import time
 
     now = time.monotonic()
+    trigger_monitor.forget_missing(set(context.automation_engine.definitions))
     for definition in list(context.automation_engine.definitions.values()):
         register_generic_automation_handler(context, definition)
-        interval = _automation_interval(context, definition)
-        if interval <= 0:
+        try:
+            due, action_context = await trigger_monitor.due(definition, now)
+        except Exception as exc:
+            state = context.automation_engine.states.get(definition.key)
+            if state:
+                state.last_condition_result = f"trigger_unavailable:{exc}"
             continue
-        if definition.key not in next_due:
-            next_due[definition.key] = now + interval
-            continue
-        if now < next_due[definition.key]:
-            continue
-        next_due[definition.key] = now + interval
-        await context.automation_engine.run_once(definition.key)
+        if due:
+            await context.automation_engine.run_once(definition.key, action_context)
 
 
 async def _background_services_main(context: ApplicationContext, stop_event: threading.Event) -> None:
@@ -568,14 +385,50 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
     midi_receiver = start_midi_receiver(context, loop)
-    next_due: dict[str, float] = {}
+    trigger_monitor = AutomationTriggerMonitor(context)
     next_list_due: dict[str, float] = {}
+    next_reconnect_at = 0.0
 
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
-            await _run_due_automations(context, next_due)
+            await _run_due_automations(context, trigger_monitor)
             await poll_due_input_lists(context, next_list_due)
+            import time
+
+            now = time.monotonic()
+            if now >= next_reconnect_at:
+                next_reconnect_at = now + 4.0
+                obs_config = context.config.integrations.obs
+                if obs_config.enabled and obs_config.automatic_reconnect:
+                    if context.obs.client.connected:
+                        try:
+                            await context.obs.get_current_scene()
+                        except Exception:
+                            await context.obs.connect()
+                    else:
+                        await context.obs.connect()
+                    context.health_monitor.update(context.obs.client.health())
+                propresenter_config = context.config.integrations.propresenter
+                if propresenter_config.enabled and propresenter_config.automatic_reconnect:
+                    try:
+                        await context.propresenter.health_check()
+                    except Exception as exc:
+                        context.propresenter.client.mark_error(str(exc))
+                    context.health_monitor.update(context.propresenter.client.health())
+                if context.config.integrations.panasonic.enabled:
+                    try:
+                        await context.panasonic.test_connection()
+                    except Exception as exc:
+                        context.panasonic.client.mark_error(str(exc))
+                    context.health_monitor.update(context.panasonic.client.health())
+                if midi_receiver is not None and not midi_receiver.is_active:
+                    midi_receiver.stop()
+                    midi_receiver = None
+                if context.config.integrations.midi.enabled and midi_receiver is None:
+                    midi_receiver = start_midi_receiver(context, loop)
+                if context.config.integrations.visca.enabled and listener is None:
+                    listener = await start_visca_listener(context)
     finally:
         if clicker_listener:
             clicker_listener.stop()

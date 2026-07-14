@@ -351,7 +351,7 @@ class InputListColumn(JsonModel):
         self.title = _non_empty(self.title, "input_list_column.title")
         self.data_type = str(self.data_type or "string").strip().lower()
         self.role = str(self.role or "").strip().lower()
-        if self.data_type not in {"string", "int", "float", "bool", "array_string", "array_int", "json"}:
+        if self.data_type not in {"string", "int", "float", "bool", "array_string", "array_int", "dictionary", "json"}:
             raise ValidationError(f"Unsupported input list column type: {self.data_type}")
 
 
@@ -362,12 +362,16 @@ class InputListCell(JsonModel):
     url: str = ""
     json_path: str = ""
     preview: str = ""
+    json_key_path: str = ""
+    json_value_path: str = ""
 
     def __post_init__(self) -> None:
         self.mode = str(self.mode or "static").strip().lower()
         self.url = str(self.url or "").strip()
         self.json_path = str(self.json_path or "").strip()
         self.preview = str(self.preview or "").strip()
+        self.json_key_path = str(self.json_key_path or "").strip()
+        self.json_value_path = str(self.json_value_path or "").strip()
         if self.mode not in {"static", "polled"}:
             raise ValidationError(f"Unsupported input list cell mode: {self.mode}")
 

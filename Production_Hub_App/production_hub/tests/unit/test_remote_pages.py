@@ -14,6 +14,15 @@ from production_hub.core.endpoints.models import ActionDefinition, EndpointDefin
 
 
 class RemotePageDiscoveryTests(unittest.TestCase):
+    def test_root_clicker_has_live_song_library_search_view(self) -> None:
+        root_index = Path(__file__).resolve().parents[4] / "index.html"
+        html = root_index.read_text(encoding="utf-8")
+        self.assertIn('id="searchModeButton"', html)
+        self.assertIn('id="songSearchInput"', html)
+        self.assertIn('id="searchResultsBody"', html)
+        self.assertIn('/song-library/search?query=', html)
+        self.assertIn('dom.songSearchInput.addEventListener("input"', html)
+
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]
         pages = discover_remote_pages(workspace, build_default_config().remote_pages)

@@ -8,6 +8,31 @@ from production_hub.core.config.models import JsonModel, ValidationError
 from production_hub.core.endpoints.models import ActionDefinition
 
 
+def conditions_to_rule_tree(conditions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Convert the original flat, implicit-AND condition list to a rule tree."""
+    return {
+        "operator": "and",
+        "children": [
+            {
+                "condition_type": str(condition.get("condition_type") or condition.get("type") or "always"),
+                "params": dict(condition.get("params") or {}),
+                "negate": bool(condition.get("negate", False)),
+            }
+            for condition in conditions
+        ],
+    }
+
+
+def rule_tree_leaves(rule: dict[str, Any]) -> list[dict[str, Any]]:
+    if "condition_type" in rule or ("type" in rule and "children" not in rule):
+        return [rule]
+    leaves: list[dict[str, Any]] = []
+    for child in rule.get("children") or []:
+        if isinstance(child, dict):
+            leaves.extend(rule_tree_leaves(child))
+    return leaves
+
+
 @dataclass
 class AutomationDefinition(JsonModel):
     key: str
@@ -18,6 +43,7 @@ class AutomationDefinition(JsonModel):
     cooldown_seconds: float = 0
     debounce_seconds: float = 0
     conditions: list[dict[str, Any]] = field(default_factory=list)
+    rules: dict[str, Any] = field(default_factory=dict)
     actions: list[ActionDefinition] = field(default_factory=list)
     repeated_error_disable_threshold: int = 5
     description: str = ""
@@ -31,6 +57,12 @@ class AutomationDefinition(JsonModel):
         self.interval_seconds = max(0, float(self.interval_seconds))
         self.cooldown_seconds = max(0, float(self.cooldown_seconds))
         self.debounce_seconds = max(0, float(self.debounce_seconds))
+        if not self.rules:
+            self.rules = conditions_to_rule_tree(self.conditions)
+        if not isinstance(self.rules, dict):
+            raise ValidationError("Automation rules must be a rule group")
+        # Keep the legacy field populated so older exports and diagnostics remain useful.
+        self.conditions = [dict(item) for item in rule_tree_leaves(self.rules)]
 
 
 @dataclass
@@ -56,4 +88,3 @@ class AutomationRunState(JsonModel):
         self.last_error = error
         self.run_count += 1
         self.consecutive_errors += 1
-

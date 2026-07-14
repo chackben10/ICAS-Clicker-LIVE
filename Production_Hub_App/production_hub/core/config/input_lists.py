@@ -16,7 +16,30 @@ def static_cell(value: object = "") -> InputListCell:
 
 
 def polled_cell(url: str, json_path: str, preview: object = "") -> InputListCell:
-    return InputListCell("polled", preview, url, json_path, preview_text(preview))
+    return InputListCell(
+        mode="polled",
+        value=preview,
+        url=url,
+        json_path=json_path,
+        preview=preview_text(preview),
+    )
+
+
+def polled_dictionary_cell(
+    url: str,
+    json_key_path: str,
+    json_value_path: str,
+    preview: dict[str, Any] | None = None,
+) -> InputListCell:
+    value = dict(preview or {})
+    return InputListCell(
+        mode="polled",
+        value=value,
+        url=url,
+        preview=preview_text(value),
+        json_key_path=json_key_path,
+        json_value_path=json_value_path,
+    )
 
 
 def row(enabled: bool, **cells: InputListCell) -> InputListRow:
@@ -24,7 +47,9 @@ def row(enabled: bool, **cells: InputListCell) -> InputListRow:
 
 
 def preview_text(value: object, limit: int = 80) -> str:
-    if isinstance(value, list):
+    if isinstance(value, dict):
+        text = ", ".join(f"{key}: {item}" for key, item in value.items())
+    elif isinstance(value, list):
         text = ", ".join(str(item) for item in value)
     else:
         text = str(value if value is not None else "")
@@ -51,20 +76,28 @@ def default_song_library_list() -> InputListDefinition:
         columns=[
             column("library_name", "Library Name", "string", "label"),
             column("uuid", "UUID", "string", "value"),
-            column("songs", "Songs", "array_string"),
+            column("songs", "Songs", "dictionary"),
         ],
         rows=[
             row(
                 True,
                 library_name=static_cell("Malayalam Songs"),
                 uuid=static_cell(""),
-                songs=polled_cell("v1/library/Malayalam%20Songs", "items[].name", []),
+                songs=polled_dictionary_cell(
+                    "v1/library/Malayalam%20Songs",
+                    "items[].name",
+                    "items[].uuid",
+                ),
             ),
             row(
                 False,
                 library_name=static_cell("English SOngs"),
                 uuid=static_cell(""),
-                songs=polled_cell("v1/library/English%Songs", "items[].name", []),
+                songs=polled_dictionary_cell(
+                    "v1/library/English%Songs",
+                    "items[].name",
+                    "items[].uuid",
+                ),
             ),
         ],
     )
@@ -94,14 +127,37 @@ def list_items(definition: InputListDefinition) -> list[InputListItem]:
     for row_def in definition.rows:
         label = row_cell(row_def, label_column).value
         value = row_cell(row_def, value_column).value
-        if isinstance(label, list):
+        if isinstance(label, dict):
+            value_map = value if isinstance(value, dict) else label
+            for dictionary_key in label:
+                label_text = str(dictionary_key or "").strip()
+                if not label_text:
+                    continue
+                dictionary_value = value_map.get(dictionary_key, label_text)
+                items.append(
+                    InputListItem(
+                        label_text,
+                        str(dictionary_value if dictionary_value is not None and dictionary_value != "" else label_text),
+                        enabled=row_def.enabled,
+                    )
+                )
+            continue
+        elif isinstance(label, list):
             label = ", ".join(str(item) for item in label)
-        if isinstance(value, list):
+        if isinstance(value, dict):
+            value = ", ".join(str(item) for item in value.values())
+        elif isinstance(value, list):
             value = ", ".join(str(item) for item in value)
         label_text = str(label or "").strip()
         if not label_text:
             continue
-        items.append(InputListItem(label_text, str(value if value not in {None, ""} else label_text), enabled=row_def.enabled))
+        items.append(
+            InputListItem(
+                label_text,
+                str(value if value is not None and value != "" else label_text),
+                enabled=row_def.enabled,
+            )
+        )
     if items:
         return items
     return list(definition.items)
@@ -195,19 +251,59 @@ def custom_input_lists(config: Any) -> list[InputListDefinition]:
 
 
 def ensure_default_input_lists(config: Any) -> bool:
-    if getattr(config.ui, "input_lists_initialized", False):
-        return False
-    existing = custom_input_lists(config)
-    existing_keys = {item.key for item in existing}
-    seeded = [*existing]
-    for item in default_input_lists(config):
-        if item.key not in existing_keys:
-            seeded.append(item)
-    for item in seeded:
-        item.builtin = False
-    config.ui.input_lists = seeded
-    config.ui.input_lists_initialized = True
-    return True
+    changed = False
+    if not getattr(config.ui, "input_lists_initialized", False):
+        existing = custom_input_lists(config)
+        existing_keys = {item.key for item in existing}
+        seeded = [*existing]
+        for item in default_input_lists(config):
+            if item.key not in existing_keys:
+                seeded.append(item)
+        for item in seeded:
+            item.builtin = False
+        config.ui.input_lists = seeded
+        config.ui.input_lists_initialized = True
+        changed = True
+    return ensure_song_library_dictionary(config) or changed
+
+
+def ensure_song_library_dictionary(config: Any) -> bool:
+    """Migrate the built-in Songs cell from a title array to title -> UUID data."""
+    changed = False
+    for index, raw_definition in enumerate(list(config.ui.input_lists)):
+        definition = InputListDefinition.from_dict(
+            raw_definition.to_dict() if hasattr(raw_definition, "to_dict") else raw_definition
+        )
+        if definition.key != "song_library":
+            continue
+        songs_column = next((item for item in definition.columns if item.key == "songs"), None)
+        if songs_column is None:
+            continue
+        if songs_column.data_type != "dictionary":
+            songs_column.data_type = "dictionary"
+            changed = True
+        for row_def in definition.rows:
+            cell = row_def.cells.get("songs")
+            if cell is None:
+                continue
+            if isinstance(cell.value, list):
+                cell.value = {str(name): "" for name in cell.value if str(name).strip()}
+                cell.preview = preview_text(cell.value)
+                changed = True
+            if cell.mode != "polled":
+                continue
+            key_path = cell.json_key_path or cell.json_path or "items[].name"
+            value_path = cell.json_value_path or "items[].uuid"
+            if cell.json_key_path != key_path or cell.json_value_path != value_path or cell.json_path:
+                cell.json_key_path = key_path
+                cell.json_value_path = value_path
+                cell.json_path = ""
+                changed = True
+        if changed:
+            definition.builtin = False
+            config.ui.input_lists[index] = definition
+        break
+    return changed
 
 
 def all_input_lists(config: Any) -> list[InputListDefinition]:
@@ -282,14 +378,41 @@ async def _fetch_json(context: Any, url: str) -> dict[str, Any]:
 
 async def poll_input_list_definition(context: Any, definition: InputListDefinition) -> bool:
     changed = False
+    column_types = {item.key: item.data_type for item in definition.columns}
     for row_def in definition.rows:
         if not row_def.enabled:
             continue
-        for cell in row_def.cells.values():
+        for column_key, cell in row_def.cells.items():
             if cell.mode != "polled":
                 continue
             data = await _fetch_json(context, cell.url)
-            value = _json_path(data, cell.json_path) if cell.json_path else data
+            if column_types.get(column_key) == "dictionary":
+                key_path = cell.json_key_path or cell.json_path
+                value_path = cell.json_value_path
+                if key_path and value_path:
+                    keys = _json_path(data, key_path)
+                    values = _json_path(data, value_path)
+                    if not isinstance(keys, list) or not isinstance(values, list):
+                        raise ValueError(
+                            f"Dictionary polling paths for {definition.name}.{column_key} must both return arrays"
+                        )
+                    if len(keys) != len(values):
+                        raise ValueError(
+                            f"Dictionary polling paths for {definition.name}.{column_key} returned different lengths"
+                        )
+                    value = {
+                        str(key): item
+                        for key, item in zip(keys, values)
+                        if key is not None and str(key).strip()
+                    }
+                else:
+                    value = _json_path(data, cell.json_path) if cell.json_path else data
+                    if not isinstance(value, dict):
+                        raise ValueError(
+                            f"Dictionary polling for {definition.name}.{column_key} requires key/value paths or an object"
+                        )
+            else:
+                value = _json_path(data, cell.json_path) if cell.json_path else data
             if value is None:
                 value = []
             if cell.value != value:

@@ -161,6 +161,8 @@ class ProPresenterService:
         return await self.client.trigger("/clear/layer/slide")
 
     async def trigger_macro(self, macro_name: str) -> bool:
+        if macro_name == self.config.bible_macro_trigger_uuid:
+            return await self.client.trigger_macro(macro_name)
         if not self.macro_allowed(macro_name):
             raise ValueError(f"Macro is not allow-listed: {macro_name}")
         return await self.client.trigger_macro(macro_name)

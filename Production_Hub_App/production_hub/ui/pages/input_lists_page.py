@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -43,6 +44,9 @@ from production_hub.core.endpoints.catalog import ACTION_SPECS
 from production_hub.ui.pages.common import PAGE_MARGIN, configure_table, run_background, set_table_row, title
 
 
+INPUT_LIST_DATA_TYPES = ["string", "int", "float", "bool", "array_string", "array_int", "dictionary", "json"]
+
+
 def slugify(text: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9_]+", "_", text.strip().lower()).strip("_")
     return slug or "new_list"
@@ -65,14 +69,40 @@ def parse_array(value: object, item_type: str = "string") -> list[Any]:
     return [str(item) for item in raw]
 
 
+def parse_dictionary(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return {str(key): item for key, item in value.items() if str(key).strip()}
+    if isinstance(value, list):
+        return {str(item): "" for item in value if str(item).strip()}
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return {str(key): item for key, item in parsed.items() if str(key).strip()}
+    except (TypeError, ValueError):
+        pass
+    result: dict[str, Any] = {}
+    for line in text.splitlines():
+        key, separator, item = line.partition("=")
+        if separator and key.strip():
+            result[key.strip()] = item.strip()
+    return result
+
+
 def full_preview_text(value: object) -> str:
+    if isinstance(value, dict):
+        return "\n".join(f"{key} → {item}" for key, item in value.items())
     if isinstance(value, list):
         return "\n".join(f"{index}. {item}" for index, item in enumerate(value))
     return str(value if value is not None else "")
 
 
 def one_line_preview(value: object, limit: int = 72) -> str:
-    if isinstance(value, list):
+    if isinstance(value, dict):
+        text = ", ".join(f"{key}: {item}" for key, item in value.items())
+    elif isinstance(value, list):
         text = ", ".join(str(item) for item in value)
     else:
         text = str(value if value is not None else "")
@@ -115,7 +145,10 @@ class StaticCellDialog(QDialog):
         self.setWindowTitle(title_text)
         self.setMinimumSize(520, 320)
         self.editor = QTextEdit()
-        self.editor.setPlainText(str(cell.value if cell.value is not None else ""))
+        if isinstance(cell.value, dict):
+            self.editor.setPlainText(json.dumps(cell.value, indent=2, ensure_ascii=False))
+        else:
+            self.editor.setPlainText(str(cell.value if cell.value is not None else ""))
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Static Value"))
         layout.addWidget(self.editor)
@@ -134,14 +167,19 @@ class StaticCellDialog(QDialog):
 
 
 class PolledCellDialog(QDialog):
-    def __init__(self, cell: InputListCell, parent: QWidget | None = None) -> None:
+    def __init__(self, cell: InputListCell, data_type: str = "string", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Polled Cell")
         self.setMinimumWidth(720)
         self.url = QLineEdit(cell.url)
         self.json_path = QLineEdit(cell.json_path)
+        self.json_key_path = QLineEdit(cell.json_key_path or cell.json_path)
+        self.json_value_path = QLineEdit(cell.json_value_path)
+        self.dictionary_mode = data_type == "dictionary"
         self.url.setMinimumWidth(480)
         self.json_path.setMinimumWidth(480)
+        self.json_key_path.setMinimumWidth(480)
+        self.json_value_path.setMinimumWidth(480)
         self.url.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.json_path.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.current_value = cell.value
@@ -154,9 +192,17 @@ class PolledCellDialog(QDialog):
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         form.addRow("GET URL", self.url)
-        form.addRow("JSON path", self.json_path)
+        if self.dictionary_mode:
+            form.addRow("Key JSON path", self.json_key_path)
+            form.addRow("Value JSON path", self.json_value_path)
+        else:
+            form.addRow("JSON path", self.json_path)
         layout.addLayout(form)
-        help_text = QLabel("The URL and JSON path define how Production Hub fills this cell. The preview is read-only and updates after polling.")
+        if self.dictionary_mode:
+            message = "Both paths must return arrays in the same order. Production Hub stores each key-path item with the value-path item at the same index."
+        else:
+            message = "The URL and JSON path define how Production Hub fills this cell. The preview updates after polling."
+        help_text = QLabel(message)
         help_text.setObjectName("HelpText")
         help_text.setWordWrap(True)
         layout.addWidget(help_text)
@@ -173,7 +219,14 @@ class PolledCellDialog(QDialog):
         layout.addLayout(buttons)
 
     def cell(self) -> InputListCell:
-        return InputListCell("polled", self.current_value, self.url.text().strip(), self.json_path.text().strip())
+        return InputListCell(
+            mode="polled",
+            value=self.current_value,
+            url=self.url.text().strip(),
+            json_path="" if self.dictionary_mode else self.json_path.text().strip(),
+            json_key_path=self.json_key_path.text().strip() if self.dictionary_mode else "",
+            json_value_path=self.json_value_path.text().strip() if self.dictionary_mode else "",
+        )
 
 
 def cell_value_from_preview(text: str) -> object:
@@ -611,7 +664,7 @@ class InputListsPage(QWidget):
             title.setData(Qt.ItemDataRole.UserRole + 1, column.role)
             self.columns_table.setItem(row, 0, title)
             type_combo = QComboBox()
-            type_combo.addItems(["string", "int", "float", "bool", "array_string", "array_int", "json"])
+            type_combo.addItems(INPUT_LIST_DATA_TYPES)
             type_combo.setCurrentText(column.data_type)
             type_combo.currentIndexChanged.connect(lambda _index: self.auto_apply_columns())
             self.columns_table.setCellWidget(row, 1, type_combo)
@@ -710,6 +763,11 @@ class InputListsPage(QWidget):
 
     def cell_tooltip(self, cell: InputListCell) -> str:
         if cell.mode == "polled":
+            if cell.json_key_path or cell.json_value_path:
+                return (
+                    f"GET {cell.url}\nKey JSON path: {cell.json_key_path}\n"
+                    f"Value JSON path: {cell.json_value_path}\nDouble-click to inspect."
+                )
             return f"GET {cell.url}\nJSON path: {cell.json_path}\nDouble-click to inspect."
         return "Double-click to inspect."
 
@@ -722,7 +780,7 @@ class InputListsPage(QWidget):
         title.setData(Qt.ItemDataRole.UserRole + 1, "" if self.columns_table.rowCount() else "label")
         self.columns_table.setItem(row, 0, title)
         type_combo = QComboBox()
-        type_combo.addItems(["string", "int", "float", "bool", "array_string", "array_int", "json"])
+        type_combo.addItems(INPUT_LIST_DATA_TYPES)
         type_combo.currentIndexChanged.connect(lambda _index: self.auto_apply_columns())
         self.columns_table.setCellWidget(row, 1, type_combo)
         self.fit_table_height(self.columns_table)
@@ -843,16 +901,21 @@ class InputListsPage(QWidget):
 
     def set_static_cell(self, row: int, column: int) -> None:
         before = self.ui_definition_snapshot()
-        item = self.rows_table.item(row, column)
-        text = item.text().splitlines()[-1] if item else ""
-        cell = InputListCell("static", text)
+        data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
+        if data_type == "dictionary":
+            value = parse_dictionary(self.cell_from_table(row, column).value)
+        else:
+            item = self.rows_table.item(row, column)
+            value = item.text().splitlines()[-1] if item else ""
+        cell = InputListCell("static", value)
         self.set_table_cell(row, column, cell)
         self.current_rows = self.rows_from_table()
         self.record_ui_change("Set input-list cell static", before, self.ui_definition_snapshot())
 
     def set_polled_cell(self, row: int, column: int) -> None:
         cell = self.cell_from_table(row, column)
-        dialog = PolledCellDialog(cell, self)
+        data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
+        dialog = PolledCellDialog(cell, data_type, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             before = self.ui_definition_snapshot()
             self.set_table_cell(row, column, dialog.cell())
@@ -882,7 +945,11 @@ class InputListsPage(QWidget):
             item.setText(display_cell(cell))
             item.setData(Qt.ItemDataRole.UserRole, cell.to_dict())
             item.setToolTip(self.cell_tooltip(cell))
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
+            if data_type == "dictionary":
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            else:
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.rows_table.setItem(row, column, item)
             self.fit_table_height(self.rows_table)
         finally:
@@ -901,6 +968,7 @@ class InputListsPage(QWidget):
     def polled_cell_widget(self, row: int, column: int, cell: InputListCell) -> QWidget:
         widget = QWidget()
         widget.setProperty("cell", cell.to_dict())
+        widget.setToolTip(self.cell_tooltip(cell))
         widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         widget.customContextMenuRequested.connect(lambda position: self.show_cell_menu_at(row, column, widget.mapToGlobal(position)))
         layout = QVBoxLayout(widget)
@@ -909,7 +977,7 @@ class InputListsPage(QWidget):
         url = QLabel(f"<b>Polling URL</b><br>{cell.url or 'Polled request not configured'}")
         url.setTextFormat(Qt.TextFormat.RichText)
         url.setWordWrap(False)
-        url.setToolTip(f"Polling URL\n{cell.url or 'Polled request not configured'}")
+        url.setToolTip(self.cell_tooltip(cell))
         url.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         url.customContextMenuRequested.connect(lambda position: self.show_cell_menu_at(row, column, url.mapToGlobal(position)))
         preview = QLabel(f"<b>Preview</b>  {one_line_preview(cell.value)}")
@@ -936,7 +1004,8 @@ class InputListsPage(QWidget):
             data = item.data(Qt.ItemDataRole.UserRole)
             if isinstance(data, dict):
                 cell = InputListCell.from_dict(data)
-                if cell.mode == "static":
+                data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
+                if cell.mode == "static" and data_type != "dictionary":
                     cell.value = item.text().strip()
                 return cell
             return InputListCell("static", item.text().strip())
@@ -987,6 +1056,8 @@ class InputListsPage(QWidget):
             return parse_array(value, "string")
         if data_type == "array_int":
             return parse_array(value, "int")
+        if data_type == "dictionary":
+            return parse_dictionary(value)
         if data_type == "int":
             try:
                 return int(str(value).strip())

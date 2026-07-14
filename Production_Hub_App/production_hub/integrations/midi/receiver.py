@@ -40,6 +40,12 @@ class MidiReceiver:
     def input_name(self) -> str:
         return self._input_name or self.config.input_name or "Auto"
 
+    @property
+    def is_active(self) -> bool:
+        if self._port is None:
+            return False
+        return not bool(getattr(self._port, "closed", False))
+
     def start(self) -> bool:
         if not self.config.enabled:
             return False
@@ -68,7 +74,7 @@ class MidiReceiver:
             return False
 
     def stop(self) -> None:
-        if self._port is not None:
+        if self.is_active:
             self._port.close()
             self._append_log(f"{local_timestamp()} input={self.input_name} status=stopped")
         self._port = None
@@ -76,7 +82,7 @@ class MidiReceiver:
     def health(self) -> IntegrationHealth:
         if not self.config.enabled:
             return IntegrationHealth(self.name, STATUS_DISABLED, target="Disabled")
-        if self._port is not None:
+        if self.is_active:
             return IntegrationHealth(
                 self.name,
                 STATUS_CONNECTED,

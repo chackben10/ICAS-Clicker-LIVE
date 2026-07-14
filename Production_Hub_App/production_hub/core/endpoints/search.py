@@ -16,9 +16,10 @@ class SongSearchMatch:
     name: str
     library: str
     score: float
+    uuid: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "library": self.library, "score": round(self.score, 3)}
+        return {"name": self.name, "uuid": self.uuid, "library": self.library, "score": round(self.score, 3)}
 
 
 def normalized_text(value: str) -> str:
@@ -103,44 +104,51 @@ def song_score(query: str, title: str) -> float:
     return max(scores)
 
 
-def song_titles_from_input_list(context: Any, list_key: str = "song_library") -> list[tuple[str, str]]:
+def song_titles_from_input_list(context: Any, list_key: str = "song_library") -> list[tuple[str, str, str]]:
     definition = input_list_by_key(context.config, list_key)
     if definition is None:
         return []
-    titles: list[tuple[str, str]] = []
+    titles: list[tuple[str, str, str]] = []
     seen: set[str] = set()
     for row in definition.rows:
         if not row.enabled:
             continue
         library = str(row_cell(row, "library_name").value or definition.name).strip() or definition.name
         songs = row_cell(row, "songs").value
-        if isinstance(songs, str):
-            songs = [songs]
-        if not isinstance(songs, list):
-            continue
-        for item in songs:
+        if isinstance(songs, dict):
+            song_items = songs.items()
+        else:
+            if isinstance(songs, str):
+                songs = [songs]
+            if not isinstance(songs, list):
+                continue
+            song_items = ((item, "") for item in songs)
+        for item, uuid in song_items:
             name = str(item or "").strip()
             key = normalized_text(name)
             if not name or key in seen:
                 continue
             seen.add(key)
-            titles.append((name, library))
+            titles.append((name, library, str(uuid or "").strip()))
     if titles:
         return titles
     for item in definition.items:
         if item.enabled:
-            titles.append((item.label, definition.name))
+            titles.append((item.label, definition.name, item.value if item.value != item.label else ""))
     return titles
 
 
 def search_song_library(context: Any, query: str, list_key: str = "song_library", limit: int = 25) -> list[dict[str, Any]]:
     query = str(query or "").strip()
     limit = max(1, min(25, int(limit or 25)))
+    titles = song_titles_from_input_list(context, list_key)
     if not query:
-        return []
+        matches = [SongSearchMatch(name, library, 1.0, uuid) for name, library, uuid in titles]
+        matches.sort(key=lambda item: item.name.lower())
+        return [item.to_dict() for item in matches[:limit]]
     matches = [
-        SongSearchMatch(name, library, song_score(query, name))
-        for name, library in song_titles_from_input_list(context, list_key)
+        SongSearchMatch(name, library, song_score(query, name), uuid)
+        for name, library, uuid in titles
     ]
     matches.sort(key=lambda item: (-item.score, item.name.lower()))
     return [item.to_dict() for item in matches[:limit] if item.score >= 0.35]

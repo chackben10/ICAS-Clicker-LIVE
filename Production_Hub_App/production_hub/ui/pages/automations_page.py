@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import re
+from uuid import uuid4
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -21,16 +21,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from production_hub.core.automation.evaluator import evaluate_conditions
+from production_hub.core.automation.catalog import TRIGGER_SPECS, normalize_trigger, trigger_spec
+from production_hub.core.automation.evaluator import evaluate_rule_tree
 from production_hub.core.automation.models import AutomationDefinition, AutomationRunState
-from production_hub.core.endpoints.models import EndpointDefinition
-from production_hub.ui.pages.action_builder import ActionSequenceEditor, ConditionSequenceEditor
+from production_hub.core.automation.triggers import trigger_snapshot
+from production_hub.core.endpoints.models import EndpointDefinition, EndpointInputDefinition
+from production_hub.ui.pages.action_builder import ActionSequenceEditor, RuleTreeEditor
 from production_hub.ui.pages.common import PAGE_MARGIN, responsive_grid, responsive_two_pane, run_background, set_table_row, title
-
-
-def keyify(text: str) -> str:
-    key = re.sub(r"[^a-zA-Z0-9_]+", "_", text.strip().lower()).strip("_")
-    return key or "new_automation"
 
 
 class AutomationsPage(QWidget):
@@ -40,19 +37,12 @@ class AutomationsPage(QWidget):
         self.table = QTableWidget()
         self.status = QLabel("Ready")
         self.status.setObjectName("StatusText")
-        self.key_edit = QLineEdit()
+        self.current_key = ""
         self.name_edit = QLineEdit()
         self.enabled_check = QCheckBox("Enabled")
         self.trigger_combo = QComboBox()
-        self.trigger_combo.addItems(
-            [
-                "interval",
-                "manual",
-                "look_changed_or_poll",
-                "active_slide_changed",
-                "presentation_state_changed",
-            ]
-        )
+        for spec in TRIGGER_SPECS:
+            self.trigger_combo.addItem(spec.label, spec.trigger_type)
         self.interval_spin = QDoubleSpinBox()
         self.interval_spin.setRange(0, 86400)
         self.interval_spin.setDecimals(2)
@@ -66,8 +56,8 @@ class AutomationsPage(QWidget):
         self.debounce_spin.setDecimals(2)
         self.debounce_spin.setSuffix(" sec")
         self.description_edit = QTextEdit()
-        self.conditions_editor = ConditionSequenceEditor(context)
-        self.actions_editor = ActionSequenceEditor(context)
+        self.rules_editor = RuleTreeEditor(context)
+        self.actions_editor = ActionSequenceEditor(context, self.automation_inputs)
         self._loading = False
         self.build()
         self.reload()
@@ -79,7 +69,7 @@ class AutomationsPage(QWidget):
         root.addWidget(
             title(
                 "Automation Builder",
-                "Create background workflows from plain-language triggers, conditions, and action modules.",
+                "Build complete macros from triggers, nested rules, and the shared action tree.",
             )
         )
 
@@ -143,10 +133,9 @@ class AutomationsPage(QWidget):
         form.setFormAlignment(Qt.AlignmentFlag.AlignTop)
         form.setHorizontalSpacing(14)
         form.setVerticalSpacing(10)
-        form.addRow("Internal key", self.key_edit)
-        form.addRow("Display name", self.name_edit)
-        form.addRow("Trigger", self.trigger_combo)
-        form.addRow("Run every", self.interval_spin)
+        form.addRow("Name", self.name_edit)
+        form.addRow("Run when", self.trigger_combo)
+        form.addRow("Check / run every", self.interval_spin)
         form.addRow("Cooldown after success", self.cooldown_spin)
         form.addRow("Debounce", self.debounce_spin)
         form.addRow("Status", self.enabled_check)
@@ -155,18 +144,18 @@ class AutomationsPage(QWidget):
         self.description_edit.setPlaceholderText("What does this automation do, and when should volunteers enable it?")
         details_layout.addWidget(QLabel("Description"))
         details_layout.addWidget(self.description_edit)
-        helper = QLabel("Interval automations are picked up while the app is running. Add conditions to prevent actions from firing at the wrong time.")
+        helper = QLabel("Event triggers are primed from the current state and then fire once per change. Debounce waits for a stable change before running.")
         helper.setObjectName("HelpText")
         helper.setWordWrap(True)
         details_layout.addWidget(helper)
         editor_layout.addWidget(details_box)
 
-        conditions_box, conditions_layout = self.section("Conditions")
-        self.conditions_editor.setMinimumHeight(260)
-        conditions_layout.addWidget(self.conditions_editor)
-        editor_layout.addWidget(conditions_box)
+        rules_box, rules_layout = self.section("1. Rules — When this macro can run")
+        self.rules_editor.setMinimumHeight(340)
+        rules_layout.addWidget(self.rules_editor)
+        editor_layout.addWidget(rules_box)
 
-        actions_box, actions_layout = self.section("Actions")
+        actions_box, actions_layout = self.section("2. Actions — What this macro does")
         self.actions_editor.setMinimumHeight(360)
         actions_layout.addWidget(self.actions_editor)
         editor_layout.addWidget(actions_box)
@@ -215,6 +204,33 @@ class AutomationsPage(QWidget):
     def definitions(self) -> list[AutomationDefinition]:
         return sorted(self.context.automation_engine.definitions.values(), key=lambda item: item.name.lower())
 
+    def automation_inputs(self) -> list[EndpointInputDefinition]:
+        trigger = normalize_trigger(str(self.trigger_combo.currentData() or self.trigger_combo.currentText()))
+        fields: list[tuple[str, str]] = [("automation_name", "Automation name")]
+        if trigger == "propresenter.look_changed":
+            fields.append(("current_look", "Current ProPresenter look"))
+        elif trigger == "propresenter.presentation_changed":
+            fields.extend(
+                [
+                    ("presentation_uuid", "Presentation UUID"),
+                    ("presentation_name", "Presentation name"),
+                    ("group_count", "Group count"),
+                    ("first_group_name", "First group name"),
+                ]
+            )
+        elif trigger == "propresenter.slide_changed":
+            fields.extend(
+                [
+                    ("slide_index", "Slide index"),
+                    ("presentation_uuid", "Presentation UUID"),
+                    ("presentation_name", "Presentation name"),
+                    ("total_slides", "Total slides"),
+                    ("remaining_slides", "Remaining slides"),
+                    ("has_active_slide", "Has active slide"),
+                ]
+            )
+        return [EndpointInputDefinition(name, label) for name, label in fields]
+
     def automation_snapshot(self) -> list[AutomationDefinition]:
         return [
             AutomationDefinition.from_dict(definition.to_dict())
@@ -262,7 +278,7 @@ class AutomationsPage(QWidget):
                 row,
                 [
                     item.name + ("" if item.enabled else " (disabled)"),
-                    item.trigger,
+                    trigger_spec(item.trigger).label,
                     f"{len(item.conditions)} cond / {len(item.actions)} act",
                 ],
             )
@@ -299,32 +315,33 @@ class AutomationsPage(QWidget):
 
     def load_definition(self, definition: AutomationDefinition) -> None:
         self._loading = True
-        self.key_edit.setText(definition.key)
+        self.current_key = definition.key
         self.name_edit.setText(definition.name)
-        index = self.trigger_combo.findText(definition.trigger)
+        normalized_trigger = normalize_trigger(definition.trigger)
+        index = self.trigger_combo.findData(normalized_trigger)
         if index < 0:
-            self.trigger_combo.addItem(definition.trigger)
-            index = self.trigger_combo.findText(definition.trigger)
+            self.trigger_combo.addItem(normalized_trigger, normalized_trigger)
+            index = self.trigger_combo.findData(normalized_trigger)
         self.trigger_combo.setCurrentIndex(index)
         self.interval_spin.setValue(float(definition.interval_seconds))
         self.cooldown_spin.setValue(float(definition.cooldown_seconds))
         self.debounce_spin.setValue(float(definition.debounce_seconds))
         self.enabled_check.setChecked(definition.enabled)
         self.description_edit.setPlainText(definition.description)
-        self.conditions_editor.set_conditions(definition.conditions)
+        self.rules_editor.set_rules(definition.rules)
         self.actions_editor.set_actions(definition.actions)
         self._loading = False
 
     def new_automation(self) -> None:
         self.table.clearSelection()
         definition = AutomationDefinition(
-            key="new_automation",
+            key=uuid4().hex,
             name="New Automation",
-            trigger="interval",
+            trigger="manual",
             enabled=True,
-            interval_seconds=1,
+            interval_seconds=0,
             description="",
-            conditions=[{"condition_type": "always", "params": {}}],
+            rules={"operator": "and", "children": []},
             actions=[],
         )
         self.load_definition(definition)
@@ -333,7 +350,7 @@ class AutomationsPage(QWidget):
     def duplicate_current(self) -> None:
         try:
             definition = self.current_definition_from_form()
-            definition.key = f"{definition.key}_copy"
+            definition.key = uuid4().hex
             definition.name = f"{definition.name} Copy"
             self.load_definition(definition)
             self.status.setText("Duplicated automation. Save when ready.")
@@ -342,16 +359,15 @@ class AutomationsPage(QWidget):
 
     def current_definition_from_form(self) -> AutomationDefinition:
         name = self.name_edit.text().strip() or "New Automation"
-        key = self.key_edit.text().strip() or keyify(name)
         return AutomationDefinition(
-            key=key,
+            key=self.current_key or uuid4().hex,
             name=name,
-            trigger=self.trigger_combo.currentText(),
+            trigger=str(self.trigger_combo.currentData() or self.trigger_combo.currentText()),
             enabled=self.enabled_check.isChecked(),
             interval_seconds=self.interval_spin.value(),
             cooldown_seconds=self.cooldown_spin.value(),
             debounce_seconds=self.debounce_spin.value(),
-            conditions=self.conditions_editor.conditions(),
+            rules=self.rules_editor.rules(),
             actions=self.actions_editor.actions(),
             description=self.description_edit.toPlainText().strip(),
         )
@@ -360,7 +376,7 @@ class AutomationsPage(QWidget):
         try:
             before = self.automation_snapshot()
             row = self.table.currentRow()
-            old_key = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 and self.table.item(row, 0) else ""
+            old_key = self.current_key
             definition = self.current_definition_from_form()
             if old_key and old_key != definition.key:
                 self.context.automation_engine.definitions.pop(old_key, None)
@@ -386,7 +402,10 @@ class AutomationsPage(QWidget):
         self.status.setText("Running automation once...")
 
         async def run():
-            ok, message = await evaluate_conditions(self.context, definition.conditions)
+            action_context = {"trigger": "manual"}
+            if normalize_trigger(definition.trigger) not in {"manual", "interval"}:
+                _signature, action_context = await trigger_snapshot(self.context, definition.trigger)
+            ok, message = await evaluate_rule_tree(self.context, definition.rules, action_context)
             if not ok:
                 return f"Conditions not met: {message}"
             endpoint = EndpointDefinition(
@@ -395,7 +414,10 @@ class AutomationsPage(QWidget):
                 route="/__automation_test",
                 actions=definition.actions,
             )
-            result = await self.context.endpoint_executor.execute(endpoint, {"automation_key": definition.key})
+            result = await self.context.endpoint_executor.execute(
+                endpoint,
+                {**action_context, "automation_id": definition.key, "automation_name": definition.name},
+            )
             return "Run completed." if result.ok else f"Run failed: {result.error}"
 
         run_background(run, lambda _ok, message: self.status.setText(message))
@@ -407,13 +429,14 @@ class AutomationsPage(QWidget):
             return
         before = self.automation_snapshot()
         key = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        name = str(self.table.item(row, 0).text()).replace(" (disabled)", "")
         self.context.automation_engine.definitions.pop(key, None)
         self.context.automation_engine.states.pop(key, None)
         self.context.config_repository.save_automations(list(self.context.automation_engine.definitions.values()))
         after = self.automation_snapshot()
-        self.record_automation_change(f"Delete automation {key}", before, after)
+        self.record_automation_change(f"Delete automation {name}", before, after)
         self.reload()
-        self.status.setText(f"Deleted automation {key}.")
+        self.status.setText(f"Deleted automation {name}.")
 
     def pause_all(self) -> None:
         self.context.automation_engine.pause_all()
