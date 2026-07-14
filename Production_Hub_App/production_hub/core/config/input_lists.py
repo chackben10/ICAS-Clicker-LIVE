@@ -91,10 +91,10 @@ def default_song_library_list() -> InputListDefinition:
             ),
             row(
                 False,
-                library_name=static_cell("English SOngs"),
+                library_name=static_cell("English Songs"),
                 uuid=static_cell(""),
                 songs=polled_dictionary_cell(
-                    "v1/library/English%Songs",
+                    "v1/library/English%20Songs",
                     "items[].name",
                     "items[].uuid",
                 ),
@@ -286,6 +286,10 @@ def ensure_song_library_dictionary(config: Any) -> bool:
             cell = row_def.cells.get("songs")
             if cell is None:
                 continue
+            library_name = str(row_def.cells.get("library_name", InputListCell()).value or "").strip()
+            if library_name.casefold() == "english songs" and cell.url == "v1/library/English%Songs":
+                cell.url = "v1/library/English%20Songs"
+                changed = True
             if isinstance(cell.value, list):
                 cell.value = {str(name): "" for name in cell.value if str(name).strip()}
                 cell.preview = preview_text(cell.value)
@@ -376,10 +380,16 @@ async def _fetch_json(context: Any, url: str) -> dict[str, Any]:
     return await context.propresenter.client.get_json(path)
 
 
-async def poll_input_list_definition(context: Any, definition: InputListDefinition) -> bool:
+async def poll_input_list_definition(
+    context: Any,
+    definition: InputListDefinition,
+    row_indices: set[int] | None = None,
+) -> bool:
     changed = False
     column_types = {item.key: item.data_type for item in definition.columns}
-    for row_def in definition.rows:
+    for row_index, row_def in enumerate(definition.rows):
+        if row_indices is not None and row_index not in row_indices:
+            continue
         if not row_def.enabled:
             continue
         for column_key, cell in row_def.cells.items():
@@ -428,6 +438,21 @@ async def poll_input_list_by_key(context: Any, key: str) -> bool:
         if definition.key != key:
             continue
         changed = await poll_input_list_definition(context, definition)
+        if changed:
+            context.config.ui.input_lists[index] = definition
+            context.config_repository.save_app_config(context.config)
+        return changed
+    return False
+
+
+async def poll_input_list_row_by_key(context: Any, key: str, row_index: int) -> bool:
+    for index, item in enumerate(context.config.ui.input_lists):
+        definition = InputListDefinition.from_dict(item.to_dict() if hasattr(item, "to_dict") else item)
+        if definition.key != key:
+            continue
+        if row_index < 0 or row_index >= len(definition.rows):
+            return False
+        changed = await poll_input_list_definition(context, definition, {row_index})
         if changed:
             context.config.ui.input_lists[index] = definition
             context.config_repository.save_app_config(context.config)

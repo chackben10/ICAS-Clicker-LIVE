@@ -30,7 +30,15 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from production_hub.core.config.input_lists import all_input_lists, display_cell, poll_input_list_by_key, row_cell, static_cell
+from production_hub.core.config.input_lists import (
+    all_input_lists,
+    display_cell,
+    input_list_by_key,
+    poll_input_list_by_key,
+    poll_input_list_row_by_key,
+    row_cell,
+    static_cell,
+)
 from production_hub.core.config.models import (
     InputListCell,
     InputListColumn,
@@ -101,9 +109,23 @@ def full_preview_text(value: object) -> str:
 
 def one_line_preview(value: object, limit: int = 72) -> str:
     if isinstance(value, dict):
-        text = ", ".join(f"{key}: {item}" for key, item in value.items())
+        parts = []
+        for key, item in value.items():
+            parts.append(f"{key}: {item}")
+            if len(", ".join(parts)) >= limit:
+                break
+        text = ", ".join(parts)
+        if len(parts) < len(value):
+            text += ", …"
     elif isinstance(value, list):
-        text = ", ".join(str(item) for item in value)
+        parts = []
+        for item in value:
+            parts.append(str(item))
+            if len(", ".join(parts)) >= limit:
+                break
+        text = ", ".join(parts)
+        if len(parts) < len(value):
+            text += ", …"
     else:
         text = str(value if value is not None else "")
     return text if len(text) <= limit else f"{text[: limit - 1]}..."
@@ -282,7 +304,6 @@ class ResponsiveInputListsPane(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.reflow()
-        self.sync_content_heights()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -313,23 +334,29 @@ class ResponsiveInputListsPane(QWidget):
         else:
             self.left.setMinimumWidth(420)
             self.left.setMaximumWidth(620)
+            self.editor_layout.addWidget(self.editor, 0, Qt.AlignmentFlag.AlignTop)
+            self.editor_layout.addStretch()
             self.wide_layout.addWidget(self.left, 0, Qt.AlignmentFlag.AlignTop)
-            self.wide_layout.addWidget(self.editor, 1, Qt.AlignmentFlag.AlignTop)
+            self.wide_layout.addWidget(self.editor_scroll, 1)
             self.root.addWidget(self.wide_body)
         self._stacked = stacked
         self.sync_content_heights()
 
     def sync_content_heights(self) -> None:
-        for scroll, body in ((self.editor_scroll, self.editor_body), (self.stacked_scroll, self.stacked_body)):
-            height = max(body.minimumSizeHint().height(), body.sizeHint().height())
-            body.setMinimumHeight(height)
-            body.setMaximumHeight(16777215)
-            body.updateGeometry()
         editor_height = max(self.editor.minimumSizeHint().height(), self.editor.sizeHint().height())
-        left_height = max(self.left.minimumSizeHint().height(), self.left.sizeHint().height())
         self.editor.setMinimumHeight(editor_height)
         self.editor.updateGeometry()
-        self.wide_body.setMinimumHeight(max(editor_height, left_height))
+
+        active_body = self.stacked_body if self._stacked else self.editor_body
+        inactive_body = self.editor_body if self._stacked else self.stacked_body
+        active_height = max(active_body.minimumSizeHint().height(), active_body.sizeHint().height())
+        active_body.setMinimumHeight(active_height)
+        active_body.setMaximumHeight(16777215)
+        active_body.updateGeometry()
+        inactive_body.setMinimumHeight(0)
+        inactive_body.updateGeometry()
+
+        self.wide_body.setMinimumHeight(0)
         self.wide_body.updateGeometry()
         self.editor_scroll.updateGeometry()
         self.stacked_scroll.updateGeometry()
@@ -361,7 +388,7 @@ class InputListsPage(QWidget):
 
     def event(self, event) -> bool:
         result = super().event(event)
-        if event.type() in {QEvent.Type.Show, QEvent.Type.Resize, QEvent.Type.LayoutRequest}:
+        if event.type() in {QEvent.Type.Show, QEvent.Type.Resize}:
             self.schedule_refit()
         return result
 
@@ -704,7 +731,6 @@ class InputListsPage(QWidget):
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setWordWrap(True)
-        table.scrollToTop()
         table.resizeRowsToContents()
         for row in range(table.rowCount()):
             row_height = max(table.sizeHintForRow(row), table.rowHeight(row), 30)
@@ -721,7 +747,6 @@ class InputListsPage(QWidget):
         table.setFixedHeight(height)
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         table.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
-        table.scrollToTop()
         self.fit_section_for_table(table)
 
     def fit_section_for_table(self, table: QTableWidget) -> None:
@@ -738,7 +763,6 @@ class InputListsPage(QWidget):
         if parent is not None and isValid(parent) and parent.layout() is not None:
             parent.layout().invalidate()
             parent.layout().activate()
-            parent.adjustSize()
             parent.updateGeometry()
 
     def refit_tables(self) -> None:
@@ -748,13 +772,11 @@ class InputListsPage(QWidget):
             self.fit_table_height(table)
         for widget in (self.lists_table.parentWidget(), self.columns_table.parentWidget(), self.rows_table.parentWidget()):
             if widget is not None and isValid(widget):
-                widget.adjustSize()
                 widget.updateGeometry()
         editor = self.rows_table.parentWidget().parentWidget() if self.rows_table.parentWidget() is not None else None
         if editor is not None and isValid(editor) and editor.layout() is not None:
             editor.layout().invalidate()
             editor.layout().activate()
-            editor.adjustSize()
             editor.updateGeometry()
         self.updateGeometry()
         pane = self.findChild(ResponsiveInputListsPane)
@@ -863,8 +885,16 @@ class InputListsPage(QWidget):
         if row < self.rows_table.rowCount() and not self._loading and not self._applying_undo:
             before = self._last_ui_definition or self.ui_definition_snapshot()
             self.current_rows = self.rows_from_table()
-            self.record_ui_change("Toggle input-list row", before, self.ui_definition_snapshot())
-            self.status.setText("Row enabled state changed.")
+            after = self.ui_definition_snapshot()
+            was_enabled = row < len(before.rows) and before.rows[row].enabled
+            is_enabled = row < len(after.rows) and after.rows[row].enabled
+            self.record_ui_change("Toggle input-list row", before, after)
+            if is_enabled and not was_enabled and any(
+                cell.mode == "polled" for cell in after.rows[row].cells.values()
+            ):
+                self.poll_enabled_row(after.key, row)
+            else:
+                self.status.setText("Row enabled state changed.")
 
     def show_cell_menu(self, position) -> None:
         row = self.rows_table.indexAt(position).row()
@@ -975,12 +1005,14 @@ class InputListsPage(QWidget):
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(3)
         url = QLabel(f"<b>Polling URL</b><br>{cell.url or 'Polled request not configured'}")
+        url.setObjectName("PollingCellURL")
         url.setTextFormat(Qt.TextFormat.RichText)
         url.setWordWrap(False)
         url.setToolTip(self.cell_tooltip(cell))
         url.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         url.customContextMenuRequested.connect(lambda position: self.show_cell_menu_at(row, column, url.mapToGlobal(position)))
         preview = QLabel(f"<b>Preview</b>  {one_line_preview(cell.value)}")
+        preview.setObjectName("PollingCellPreview")
         preview.setTextFormat(Qt.TextFormat.RichText)
         preview.setWordWrap(False)
         preview.setToolTip(full_preview_text(preview_source(cell.value, cell.preview)))
@@ -994,6 +1026,61 @@ class InputListsPage(QWidget):
         layout.addWidget(url)
         layout.addWidget(preview)
         return widget
+
+    def sync_current_polled_values(self, key: str) -> None:
+        if self.current_key != key:
+            return
+        definition = input_list_by_key(self.context.config, key)
+        if definition is None:
+            return
+        if len(definition.rows) != self.rows_table.rowCount() or [item.key for item in definition.columns] != [
+            item.key for item in self.current_columns
+        ]:
+            self.load_list(definition)
+            return
+
+        self._loading = True
+        try:
+            self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in definition.rows]
+            for row_index, row_def in enumerate(definition.rows):
+                for column_index, column in enumerate(definition.columns, start=1):
+                    cell = row_cell(row_def, column.key)
+                    if cell.mode != "polled":
+                        continue
+                    widget = self.rows_table.cellWidget(row_index, column_index)
+                    item = self.rows_table.item(row_index, column_index)
+                    if widget is not None:
+                        widget.setProperty("cell", cell.to_dict())
+                        widget.setToolTip(self.cell_tooltip(cell))
+                        preview = widget.findChild(QLabel, "PollingCellPreview")
+                        if preview is not None:
+                            preview.setText(f"<b>Preview</b>  {one_line_preview(cell.value)}")
+                            preview.setToolTip(full_preview_text(preview_source(cell.value, cell.preview)))
+                    if item is not None:
+                        item.setData(Qt.ItemDataRole.UserRole, cell.to_dict())
+                        item.setToolTip(self.cell_tooltip(cell))
+            self._last_ui_definition = InputListDefinition.from_dict(definition.to_dict())
+        finally:
+            self._loading = False
+
+    def poll_enabled_row(self, key: str, row: int) -> None:
+        label = "row"
+        if row < len(self.current_rows):
+            label = str(row_cell(self.current_rows[row], "library_name").value or f"row {row + 1}")
+        self.status.setText(f"{label} enabled. Loading its values...")
+
+        async def run():
+            changed = await poll_input_list_row_by_key(self.context, key, row)
+            return "updated" if changed else "unchanged"
+
+        def done(ok: bool, message: str) -> None:
+            if ok:
+                self.sync_current_polled_values(key)
+                self.status.setText(f"{label} enabled. Search data is ready.")
+            else:
+                self.status.setText(f"{label} enabled, but polling failed: {message}")
+
+        run_background(run, done)
 
     def cell_from_table(self, row: int, column: int) -> InputListCell:
         widget = self.rows_table.cellWidget(row, column)
@@ -1114,7 +1201,10 @@ class InputListsPage(QWidget):
         if not self.current_key:
             return
         before = self.config_snapshot()
-        self.save_current()
+        item = self.current_definition()
+        self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in item.rows]
+        self._last_ui_definition = InputListDefinition.from_dict(item.to_dict())
+        self.persist_current_definition(item)
         key = self.current_key
         self.status.setText("Polling list...")
 
@@ -1123,8 +1213,8 @@ class InputListsPage(QWidget):
             return "Poll complete. Values updated." if changed else "Poll complete. No changes."
 
         def done(ok: bool, message: str) -> None:
-            self.refresh_lists(key)
             if ok:
+                self.sync_current_polled_values(key)
                 self.record_config_change(f"Poll input list {key}", before, self.config_snapshot())
             self.status.setText(message if ok else f"Poll failed: {message}")
 

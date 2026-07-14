@@ -7,6 +7,7 @@ from production_hub.core.config.input_lists import (
     column,
     ensure_default_input_lists,
     poll_input_list_definition,
+    poll_input_list_row_by_key,
     polled_cell,
     polled_dictionary_cell,
     row,
@@ -161,6 +162,35 @@ class SongLibrarySearchTests(unittest.TestCase):
         self.assertEqual("", cell.json_path)
         self.assertEqual({"Daivame Nin Sneham": ""}, cell.value)
 
+    def test_existing_english_song_row_repairs_malformed_polling_url(self) -> None:
+        config = AppConfig()
+        config.ui.input_lists_initialized = True
+        config.ui.input_lists = [
+            InputListDefinition(
+                "song_library",
+                "Song Library",
+                columns=[
+                    column("library_name", "Library Name"),
+                    column("songs", "Songs", "dictionary"),
+                ],
+                rows=[
+                    row(
+                        True,
+                        library_name=static_cell("English Songs"),
+                        songs=polled_dictionary_cell(
+                            "v1/library/English%Songs",
+                            "items[].name",
+                            "items[].uuid",
+                        ),
+                    )
+                ],
+            )
+        ]
+
+        self.assertTrue(ensure_default_input_lists(config))
+        songs = config.ui.input_lists[0].rows[0].cells["songs"]
+        self.assertEqual("v1/library/English%20Songs", songs.url)
+
 
 class SongLibraryPollingTests(unittest.IsolatedAsyncioTestCase):
     async def test_dictionary_polling_zips_key_and_value_json_paths(self) -> None:
@@ -195,6 +225,70 @@ class SongLibraryPollingTests(unittest.IsolatedAsyncioTestCase):
             {"Song One": "uuid-1", "Song Two": "uuid-2"},
             definition.rows[0].cells["songs"].value,
         )
+
+    async def test_polling_newly_enabled_row_updates_search_without_repolling_other_rows(self) -> None:
+        config = AppConfig()
+        config.ui.input_lists = [
+            InputListDefinition(
+                "song_library",
+                "Song Library",
+                columns=[
+                    column("library_name", "Library Name"),
+                    column("songs", "Songs", "dictionary"),
+                ],
+                rows=[
+                    row(
+                        True,
+                        library_name=static_cell("Malayalam Songs"),
+                        songs=polled_dictionary_cell(
+                            "v1/library/Malayalam%20Songs",
+                            "items[].name",
+                            "items[].uuid",
+                            {"Existing Song": "existing-uuid"},
+                        ),
+                    ),
+                    row(
+                        True,
+                        library_name=static_cell("English Songs"),
+                        songs=polled_dictionary_cell(
+                            "v1/library/English%20Songs",
+                            "items[].name",
+                            "items[].uuid",
+                        ),
+                    ),
+                ],
+            )
+        ]
+
+        class Client:
+            def __init__(self) -> None:
+                self.paths = []
+
+            async def get_json(self, path):
+                self.paths.append(path)
+                return {"items": [{"name": "Amazing Grace", "uuid": "english-uuid"}]}
+
+        class Repository:
+            def __init__(self) -> None:
+                self.saved = False
+
+            def save_app_config(self, _config) -> None:
+                self.saved = True
+
+        client = Client()
+        repository = Repository()
+        context = SimpleNamespace(
+            config=config,
+            propresenter=SimpleNamespace(client=client),
+            config_repository=repository,
+        )
+
+        self.assertTrue(await poll_input_list_row_by_key(context, "song_library", 1))
+        self.assertEqual(["library/English%20Songs"], client.paths)
+        self.assertTrue(repository.saved)
+        results = search_song_library(context, "Amazing Grace")
+        self.assertEqual("english-uuid", results[0]["uuid"])
+        self.assertEqual("English Songs", results[0]["library"])
 
 
 if __name__ == "__main__":
