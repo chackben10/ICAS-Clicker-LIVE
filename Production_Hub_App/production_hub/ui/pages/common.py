@@ -5,7 +5,7 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QFrame,
@@ -31,6 +31,27 @@ MAX_WIDGET_WIDTH = 16777215
 PAGE_MARGIN = 24
 SECTION_GAP = 16
 PANE_GAP = 18
+
+
+class _BackgroundResultBridge(QObject):
+    completed = Signal(object, bool, str)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.completed.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
+
+    def _deliver(self, callback: Callable[[bool, str], None], ok: bool, message: str) -> None:
+        callback(ok, message)
+
+
+_background_result_bridge: _BackgroundResultBridge | None = None
+
+
+def _result_bridge() -> _BackgroundResultBridge:
+    global _background_result_bridge
+    if _background_result_bridge is None:
+        _background_result_bridge = _BackgroundResultBridge()
+    return _background_result_bridge
 
 
 def scroll_page() -> tuple[QScrollArea, QWidget, QVBoxLayout]:
@@ -305,6 +326,8 @@ def int_from_line_edit(editor: QLineEdit, default: int = 0) -> int:
 
 
 def run_background(coro_factory: Callable[[], Any], on_done: Callable[[bool, str], None] | None = None) -> None:
+    bridge = _result_bridge() if on_done else None
+
     def worker() -> None:
         import asyncio
 
@@ -317,7 +340,7 @@ def run_background(coro_factory: Callable[[], Any], on_done: Callable[[bool, str
         except Exception as exc:
             ok = False
             message = str(exc)
-        if on_done:
-            QTimer.singleShot(0, lambda: on_done(ok, message))
+        if on_done and bridge is not None:
+            bridge.completed.emit(on_done, ok, message)
 
     threading.Thread(target=worker, daemon=True).start()

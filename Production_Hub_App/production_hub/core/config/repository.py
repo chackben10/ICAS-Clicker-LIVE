@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import tempfile
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Generic, TypeVar
 
 from production_hub.core.automation.models import AutomationDefinition
+from production_hub.core.config.backup_service import BackupService
 from production_hub.core.config.defaults import (
     build_default_automations,
     build_default_config,
@@ -37,6 +38,7 @@ class AtomicJsonRepository(Generic[T]):
         self.factory = factory
         self.model_type = model_type
         self.backup_dir = backup_dir
+        self.backup_service = BackupService(backup_dir)
 
     def load(self) -> T:
         if not self.path.exists():
@@ -54,15 +56,13 @@ class AtomicJsonRepository(Generic[T]):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         if create_backup and self.path.exists():
-            stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-            backup = self.backup_dir / f"{self.path.stem}-{stamp}{self.path.suffix}"
-            shutil.copy2(self.path, backup)
+            self.backup_service.snapshot(self.path)
 
         data = model.to_dict()
         fd, tmp_name = tempfile.mkstemp(prefix=f".{self.path.name}.", dir=str(self.path.parent))
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump(data, handle, indent=2, sort_keys=True)
+                json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
@@ -78,6 +78,7 @@ class ListJsonRepository(Generic[T]):
         self.factory = factory
         self.model_type = model_type
         self.backup_dir = backup_dir
+        self.backup_service = BackupService(backup_dir)
 
     def load(self) -> list[T]:
         if not self.path.exists():
@@ -94,13 +95,12 @@ class ListJsonRepository(Generic[T]):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         if create_backup and self.path.exists():
-            stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-            shutil.copy2(self.path, self.backup_dir / f"{self.path.stem}-{stamp}{self.path.suffix}")
+            self.backup_service.snapshot(self.path)
 
         fd, tmp_name = tempfile.mkstemp(prefix=f".{self.path.name}.", dir=str(self.path.parent))
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump([item.to_dict() for item in items], handle, indent=2, sort_keys=True)
+                json.dump([item.to_dict() for item in items], handle, indent=2, sort_keys=True, ensure_ascii=False)
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
@@ -114,6 +114,7 @@ class ConfigRepository:
     def __init__(self, paths: AppPaths) -> None:
         self.paths = paths
         self.paths.ensure()
+        self._app_lock = threading.RLock()
         self.app_repo = AtomicJsonRepository(
             paths.config_dir / "default_profile.json",
             build_default_config,
@@ -134,11 +135,19 @@ class ConfigRepository:
         )
 
     def load_app_config(self) -> AppConfig:
-        return self.app_repo.load()
+        with self._app_lock:
+            return self.app_repo.load()
 
     def save_app_config(self, config: AppConfig) -> None:
-        config.last_saved_at = now_iso()
-        self.app_repo.save(config)
+        with self._app_lock:
+            config.last_saved_at = now_iso()
+            self.app_repo.save(config)
+
+    def save_runtime_app_config(self, config: AppConfig) -> None:
+        """Persist derived runtime values without creating large automatic backups."""
+        with self._app_lock:
+            config.last_saved_at = now_iso()
+            self.app_repo.save(config, create_backup=False)
 
     def load_endpoints(self) -> list[EndpointDefinition]:
         return self.endpoint_repo.load()
@@ -151,4 +160,3 @@ class ConfigRepository:
 
     def save_automations(self, automations: list[AutomationDefinition]) -> None:
         self.automation_repo.save(automations)
-

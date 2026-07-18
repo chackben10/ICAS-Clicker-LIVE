@@ -150,7 +150,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         "input_list.search_songs",
         "Search Song Library",
         "Input Lists",
-        "Return fuzzy and phonetic matches from enabled song-library rows.",
+        "Return fuzzy and phonetic title or lyric matches from enabled song-library rows.",
         (
             FieldSpec("query", "Search text", "text", "{{query}}"),
             FieldSpec("list_key", "Input list key", "text", "song_library"),

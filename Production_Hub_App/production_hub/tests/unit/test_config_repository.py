@@ -33,7 +33,31 @@ class ConfigRepositoryTests(unittest.TestCase):
             backups = list(paths.automatic_backups_dir.glob("default_profile-*.json"))
             self.assertGreaterEqual(len(backups), 1)
 
+    def test_runtime_save_does_not_back_up_derived_polling_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            paths = AppPaths(Path(temp))
+            repo = ConfigRepository(paths)
+            config = repo.load_app_config()
+            config.subtitle = "ആനന്ദം runtime data"
+            repo.save_runtime_app_config(config)
+
+            backups = list(paths.automatic_backups_dir.glob("default_profile-*.json"))
+            self.assertEqual([], backups)
+            self.assertIn("ആനന്ദം", (paths.config_dir / "default_profile.json").read_text(encoding="utf-8"))
+
+    def test_normal_save_prunes_old_automatic_backups(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            paths = AppPaths(Path(temp))
+            repo = ConfigRepository(paths)
+            config = repo.load_app_config()
+            for index in range(30):
+                backup = paths.automatic_backups_dir / f"default_profile-20000101-0000{index:02d}.json"
+                backup.write_text("{}", encoding="utf-8")
+            repo.save_app_config(config)
+
+            backups = list(paths.automatic_backups_dir.glob("default_profile-*.json"))
+            self.assertLessEqual(len(backups), 25)
+
 
 if __name__ == "__main__":
     unittest.main()
-

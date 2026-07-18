@@ -351,8 +351,47 @@ class InputListColumn(JsonModel):
         self.title = _non_empty(self.title, "input_list_column.title")
         self.data_type = str(self.data_type or "string").strip().lower()
         self.role = str(self.role or "").strip().lower()
-        if self.data_type not in {"string", "int", "float", "bool", "array_string", "array_int", "dictionary", "json"}:
+        if self.data_type not in {
+            "string",
+            "int",
+            "float",
+            "bool",
+            "array_string",
+            "array_int",
+            "array_object",
+            "dictionary",
+            "json",
+        }:
             raise ValidationError(f"Unsupported input list column type: {self.data_type}")
+
+
+@dataclass
+class InputListObjectField(JsonModel):
+    key: str
+    source: str = "base"
+    json_path: str = ""
+    url_template: str = ""
+    data_type: str = "string"
+    result_mode: str = "first"
+    separator: str = " "
+    normalize_whitespace: bool = False
+    refresh_seconds: float = 0
+
+    def __post_init__(self) -> None:
+        self.key = _non_empty(self.key, "input_list_object_field.key")
+        self.source = str(self.source or "base").strip().lower()
+        self.json_path = str(self.json_path or "").strip()
+        self.url_template = str(self.url_template or "").strip()
+        self.data_type = str(self.data_type or "string").strip().lower()
+        self.result_mode = str(self.result_mode or "first").strip().lower()
+        self.separator = str(self.separator if self.separator is not None else " ")
+        self.refresh_seconds = max(0, float(self.refresh_seconds or 0))
+        if self.source not in {"base", "request"}:
+            raise ValidationError(f"Unsupported object field source: {self.source}")
+        if self.data_type not in {"string", "int", "float", "bool", "json", "array_string", "array_int"}:
+            raise ValidationError(f"Unsupported object field type: {self.data_type}")
+        if self.result_mode not in {"first", "join", "all"}:
+            raise ValidationError(f"Unsupported object field result mode: {self.result_mode}")
 
 
 @dataclass
@@ -364,6 +403,10 @@ class InputListCell(JsonModel):
     preview: str = ""
     json_key_path: str = ""
     json_value_path: str = ""
+    object_fields: list[InputListObjectField] = field(default_factory=list)
+    object_identity_field: str = "uuid"
+    object_concurrency: int = 4
+    object_enrichment_last_polled: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.mode = str(self.mode or "static").strip().lower()
@@ -372,6 +415,17 @@ class InputListCell(JsonModel):
         self.preview = str(self.preview or "").strip()
         self.json_key_path = str(self.json_key_path or "").strip()
         self.json_value_path = str(self.json_value_path or "").strip()
+        self.object_fields = [
+            item if isinstance(item, InputListObjectField) else InputListObjectField.from_dict(item)
+            for item in self.object_fields
+        ]
+        self.object_identity_field = str(self.object_identity_field or "uuid").strip()
+        self.object_concurrency = max(1, min(16, int(self.object_concurrency or 4)))
+        self.object_enrichment_last_polled = {
+            str(key): max(0, float(value or 0))
+            for key, value in self.object_enrichment_last_polled.items()
+            if str(key).strip()
+        }
         if self.mode not in {"static", "polled"}:
             raise ValidationError(f"Unsupported input list cell mode: {self.mode}")
 

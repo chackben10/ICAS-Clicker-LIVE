@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import build_context
 from production_hub.core.config.defaults import build_default_config
+from production_hub.core.config.input_lists import row, static_cell
+from production_hub.core.config.models import InputListDefinition
 from production_hub.core.config.remote_pages import discover_remote_pages
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
 
@@ -22,6 +24,11 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn('id="searchResultsBody"', html)
         self.assertIn('/song-library/search?query=', html)
         self.assertIn('dom.songSearchInput.addEventListener("input"', html)
+        self.assertIn('.search-result-lyrics', html)
+        self.assertIn('result?.match_field === "lyrics"', html)
+        self.assertIn('typeof result?.lyric_preview === "string"', html)
+        self.assertIn('lyrics.textContent = lyricPreview', html)
+        self.assertIn('row.setAttribute("aria-describedby", lyrics.id)', html)
 
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]
@@ -32,6 +39,43 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn("pads-control.html", paths)
         self.assertIn("scoreboard/large.html", paths)
         self.assertIn("displays/current-audio.html", paths)
+
+    def test_song_search_endpoint_returns_context_for_a_phonetic_lyric_match(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.config.ui.input_lists = [
+                InputListDefinition(
+                    "song_library",
+                    "Song Library",
+                    rows=[
+                        row(
+                            True,
+                            library_name=static_cell("Malayalam Songs"),
+                            songs=static_cell(
+                                [
+                                    {
+                                        "name": "Unrelated Title",
+                                        "uuid": "lyric-match-uuid",
+                                        "lyrics": "Before the line Daivame nin sneham ennum after the line",
+                                    }
+                                ]
+                            ),
+                        )
+                    ],
+                )
+            ]
+            response = TestClient(create_app(context)).get(
+                "/song-library/search",
+                params={"query": "dyvame nin snehem"},
+            )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.json()
+            self.assertIsInstance(payload, list)
+            self.assertEqual("lyric-match-uuid", payload[0]["uuid"])
+            self.assertEqual("lyrics", payload[0]["match_field"])
+            self.assertIn("Daivame nin sneham", payload[0]["lyric_preview"])
+            self.assertNotIn("lyrics", payload[0])
 
     def test_current_audio_root_alias_serves_display_page(self) -> None:
         with TemporaryDirectory() as tmp:

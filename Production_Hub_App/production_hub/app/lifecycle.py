@@ -387,13 +387,14 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     midi_receiver = start_midi_receiver(context, loop)
     trigger_monitor = AutomationTriggerMonitor(context)
     next_list_due: dict[str, float] = {}
+    input_list_poll_tasks: dict[str, asyncio.Task[None]] = {}
     next_reconnect_at = 0.0
 
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
             await _run_due_automations(context, trigger_monitor)
-            await poll_due_input_lists(context, next_list_due)
+            await poll_due_input_lists(context, next_list_due, input_list_poll_tasks)
             import time
 
             now = time.monotonic()
@@ -430,6 +431,10 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
                 if context.config.integrations.visca.enabled and listener is None:
                     listener = await start_visca_listener(context)
     finally:
+        for task in input_list_poll_tasks.values():
+            task.cancel()
+        if input_list_poll_tasks:
+            await asyncio.gather(*input_list_poll_tasks.values(), return_exceptions=True)
         if clicker_listener:
             clicker_listener.stop()
         if midi_receiver:

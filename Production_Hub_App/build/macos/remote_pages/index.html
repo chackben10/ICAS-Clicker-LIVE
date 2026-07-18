@@ -435,6 +435,7 @@
 
     .search-results-scroll {
       max-height: calc(100vh - 112px);
+      max-height: calc(100dvh - 112px);
       overflow: auto;
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -501,6 +502,14 @@
       color: var(--slide-text);
       font-size: 0.95rem;
       font-weight: 600;
+    }
+
+    .search-result-lyrics {
+      margin-top: 6px;
+      color: var(--status-grey);
+      font-size: 0.82rem;
+      font-weight: 400;
+      line-height: 1.4;
     }
 
     .search-result-unavailable {
@@ -768,6 +777,7 @@
             inputmode="search"
             enterkeyhint="search"
             placeholder="Search songs"
+            aria-label="Search songs"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="none"
@@ -949,6 +959,7 @@
     let searchModeActive = false;
     let searchRequestController = null;
     let searchRequestSequence = 0;
+    let searchResultDescriptionSequence = 0;
 
     const thumbCache = Object.create(null);
     const thumbInflight = Object.create(null);
@@ -1743,6 +1754,18 @@
         unavailable.className = "search-result-unavailable";
         unavailable.textContent = "Unavailable";
         name.appendChild(unavailable);
+      }
+
+      const lyricPreview = result?.match_field === "lyrics" && typeof result?.lyric_preview === "string"
+        ? result.lyric_preview.trim()
+        : "";
+      if (lyricPreview) {
+        const lyrics = document.createElement("div");
+        lyrics.className = "search-result-lyrics";
+        lyrics.id = `song-search-lyrics-${++searchResultDescriptionSequence}`;
+        lyrics.textContent = lyricPreview;
+        name.appendChild(lyrics);
+        row.setAttribute("aria-describedby", lyrics.id);
       }
 
       const library = document.createElement("td");

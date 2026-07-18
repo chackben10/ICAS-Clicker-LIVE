@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 from typing import Any
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QScrollArea,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -43,6 +45,7 @@ from production_hub.core.config.models import (
     InputListCell,
     InputListColumn,
     InputListDefinition,
+    InputListObjectField,
     InputListRow,
     MacroMapping,
     ObsLookRuleConfig,
@@ -52,7 +55,17 @@ from production_hub.core.endpoints.catalog import ACTION_SPECS
 from production_hub.ui.pages.common import PAGE_MARGIN, configure_table, run_background, set_table_row, title
 
 
-INPUT_LIST_DATA_TYPES = ["string", "int", "float", "bool", "array_string", "array_int", "dictionary", "json"]
+INPUT_LIST_DATA_TYPES = [
+    "string",
+    "int",
+    "float",
+    "bool",
+    "array_string",
+    "array_int",
+    "array_object",
+    "dictionary",
+    "json",
+]
 
 
 def slugify(text: str) -> str:
@@ -99,12 +112,46 @@ def parse_dictionary(value: object) -> dict[str, Any]:
     return result
 
 
+def parse_object_array(value: object, *, strict: bool = False) -> list[dict[str, Any]]:
+    parsed: Any = value
+    if not isinstance(value, list):
+        text = str(value or "").strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError) as exc:
+            if strict:
+                raise ValueError("Enter a valid JSON array of objects.") from exc
+            return []
+    if not isinstance(parsed, list) or any(not isinstance(item, dict) for item in parsed):
+        if strict:
+            raise ValueError("The value must be a JSON array containing only objects.")
+        return []
+    return [dict(item) for item in parsed]
+
+
 def full_preview_text(value: object) -> str:
     if isinstance(value, dict):
         return "\n".join(f"{key} → {item}" for key, item in value.items())
+    if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+        return json.dumps(value, indent=2, ensure_ascii=False)
     if isinstance(value, list):
         return "\n".join(f"{index}. {item}" for index, item in enumerate(value))
     return str(value if value is not None else "")
+
+
+def compact_preview_detail(value: object, sample_size: int = 8) -> str:
+    if not isinstance(value, list) or not value or not all(isinstance(item, dict) for item in value):
+        return full_preview_text(value)
+    lines = [f"{len(value)} objects"]
+    for index, item in enumerate(value[:sample_size], start=1):
+        name = str(item.get("name") or item.get("label") or f"Object {index}").strip()
+        uuid = str(item.get("uuid") or item.get("UUID") or "").strip()
+        lines.append(f"{index}. {name}" + (f" ({uuid})" if uuid else ""))
+    if len(value) > sample_size:
+        lines.append("…")
+    return "\n".join(lines)
 
 
 def one_line_preview(value: object, limit: int = 72) -> str:
@@ -117,6 +164,14 @@ def one_line_preview(value: object, limit: int = 72) -> str:
         text = ", ".join(parts)
         if len(parts) < len(value):
             text += ", …"
+    elif isinstance(value, list) and value and all(isinstance(item, dict) for item in value):
+        names = [str(item.get("name") or item.get("label") or "").strip() for item in value]
+        names = [name for name in names if name]
+        text = f"{len(value)} objects"
+        if names:
+            text += f": {', '.join(names[:3])}"
+            if len(names) > 3:
+                text += ", …"
     elif isinstance(value, list):
         parts = []
         for item in value:
@@ -167,7 +222,7 @@ class StaticCellDialog(QDialog):
         self.setWindowTitle(title_text)
         self.setMinimumSize(520, 320)
         self.editor = QTextEdit()
-        if isinstance(cell.value, dict):
+        if isinstance(cell.value, (dict, list)):
             self.editor.setPlainText(json.dumps(cell.value, indent=2, ensure_ascii=False))
         else:
             self.editor.setPlainText(str(cell.value if cell.value is not None else ""))
@@ -192,12 +247,13 @@ class PolledCellDialog(QDialog):
     def __init__(self, cell: InputListCell, data_type: str = "string", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Polled Cell")
-        self.setMinimumWidth(720)
+        self.setMinimumSize(760, 520 if data_type == "array_object" else 0)
         self.url = QLineEdit(cell.url)
         self.json_path = QLineEdit(cell.json_path)
         self.json_key_path = QLineEdit(cell.json_key_path or cell.json_path)
         self.json_value_path = QLineEdit(cell.json_value_path)
         self.dictionary_mode = data_type == "dictionary"
+        self.object_mode = data_type == "array_object"
         self.url.setMinimumWidth(480)
         self.json_path.setMinimumWidth(480)
         self.json_key_path.setMinimumWidth(480)
@@ -205,10 +261,37 @@ class PolledCellDialog(QDialog):
         self.url.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.json_path.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.current_value = cell.value
+        self.identity_field = QLineEdit(cell.object_identity_field or "uuid")
+        self.object_concurrency = QSpinBox()
+        self.object_concurrency.setRange(1, 16)
+        self.object_concurrency.setValue(cell.object_concurrency or 4)
+        self.object_fields_table = QTableWidget()
+        self.object_fields_table.setColumnCount(9)
+        self.object_fields_table.setHorizontalHeaderLabels(
+            [
+                "Field",
+                "Source",
+                "JSON path",
+                "Request URL template",
+                "Type",
+                "Result",
+                "Separator",
+                "Clean whitespace",
+                "Refresh (sec)",
+            ]
+        )
+        configure_table(self.object_fields_table)
+        self.object_fields_table.setMinimumHeight(220)
+        self.object_fields_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.object_fields_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.object_fields_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.object_fields_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        for field in cell.object_fields:
+            self.add_object_field(field)
         self.preview = QTextEdit()
         self.preview.setReadOnly(True)
         self.preview.setFixedHeight(160)
-        self.preview.setPlainText(full_preview_text(preview_source(cell.value, cell.preview)))
+        self.preview.setPlainText(compact_preview_detail(preview_source(cell.value, cell.preview)))
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -217,17 +300,39 @@ class PolledCellDialog(QDialog):
         if self.dictionary_mode:
             form.addRow("Key JSON path", self.json_key_path)
             form.addRow("Value JSON path", self.json_value_path)
+        elif self.object_mode:
+            form.addRow("Items JSON path", self.json_path)
+            form.addRow("Identity field", self.identity_field)
+            form.addRow("Concurrent requests", self.object_concurrency)
         else:
             form.addRow("JSON path", self.json_path)
         layout.addLayout(form)
         if self.dictionary_mode:
             message = "Both paths must return arrays in the same order. Production Hub stores each key-path item with the value-path item at the same index."
+        elif self.object_mode:
+            message = (
+                "Base fields are read from every object returned by Items JSON path. Request fields can use "
+                "values such as {uuid} in their URL, and can join nested results into one string. Requests are "
+                "bounded and run in the background."
+            )
         else:
             message = "The URL and JSON path define how Production Hub fills this cell. The preview updates after polling."
         help_text = QLabel(message)
         help_text.setObjectName("HelpText")
         help_text.setWordWrap(True)
         layout.addWidget(help_text)
+        if self.object_mode:
+            layout.addWidget(QLabel("Object Fields"))
+            layout.addWidget(self.object_fields_table)
+            field_buttons = QHBoxLayout()
+            add_field = QPushButton("Add Field")
+            add_field.clicked.connect(lambda: self.add_object_field())
+            delete_field = QPushButton("Delete Field")
+            delete_field.clicked.connect(self.delete_object_field)
+            field_buttons.addWidget(add_field)
+            field_buttons.addWidget(delete_field)
+            field_buttons.addStretch()
+            layout.addLayout(field_buttons)
         layout.addWidget(QLabel("Preview"))
         layout.addWidget(self.preview)
         buttons = QHBoxLayout()
@@ -240,6 +345,78 @@ class PolledCellDialog(QDialog):
         buttons.addWidget(apply)
         layout.addLayout(buttons)
 
+    def add_object_field(self, field: InputListObjectField | None = None) -> None:
+        field = field or InputListObjectField("new_field")
+        row = self.object_fields_table.rowCount()
+        self.object_fields_table.insertRow(row)
+        self.object_fields_table.setItem(row, 0, QTableWidgetItem(field.key))
+        source = QComboBox()
+        source.addItems(["base", "request"])
+        source.setCurrentText(field.source)
+        self.object_fields_table.setCellWidget(row, 1, source)
+        self.object_fields_table.setItem(row, 2, QTableWidgetItem(field.json_path))
+        self.object_fields_table.setItem(row, 3, QTableWidgetItem(field.url_template))
+        data_type = QComboBox()
+        data_type.addItems(["string", "int", "float", "bool", "json", "array_string", "array_int"])
+        data_type.setCurrentText(field.data_type)
+        self.object_fields_table.setCellWidget(row, 4, data_type)
+        result = QComboBox()
+        result.addItems(["first", "join", "all"])
+        result.setCurrentText(field.result_mode)
+        self.object_fields_table.setCellWidget(row, 5, result)
+        self.object_fields_table.setItem(row, 6, QTableWidgetItem(field.separator))
+        normalize = QCheckBox()
+        normalize.setChecked(field.normalize_whitespace)
+        holder = QWidget()
+        holder_layout = QHBoxLayout(holder)
+        holder_layout.setContentsMargins(0, 0, 0, 0)
+        holder_layout.addWidget(normalize, 0, Qt.AlignmentFlag.AlignCenter)
+        self.object_fields_table.setCellWidget(row, 7, holder)
+        self.object_fields_table.setItem(row, 8, QTableWidgetItem(str(field.refresh_seconds or 0)))
+
+    def delete_object_field(self) -> None:
+        row = self.object_fields_table.currentRow()
+        if row >= 0:
+            self.object_fields_table.removeRow(row)
+
+    def object_fields(self) -> list[InputListObjectField]:
+        fields: list[InputListObjectField] = []
+        used: set[str] = set()
+        for row in range(self.object_fields_table.rowCount()):
+            key_item = self.object_fields_table.item(row, 0)
+            key = re.sub(r"[^A-Za-z0-9_]+", "_", key_item.text().strip() if key_item else "").strip("_")
+            key = key or "new_field"
+            if key in used:
+                suffix = 2
+                while f"{key}_{suffix}" in used:
+                    suffix += 1
+                key = f"{key}_{suffix}"
+            used.add(key)
+            source_widget = self.object_fields_table.cellWidget(row, 1)
+            data_type_widget = self.object_fields_table.cellWidget(row, 4)
+            result_widget = self.object_fields_table.cellWidget(row, 5)
+            normalize_holder = self.object_fields_table.cellWidget(row, 7)
+            normalize = normalize_holder.findChild(QCheckBox) if normalize_holder else None
+            refresh_item = self.object_fields_table.item(row, 8)
+            try:
+                refresh_seconds = float(refresh_item.text().strip() if refresh_item else 0)
+            except (TypeError, ValueError):
+                refresh_seconds = 0
+            fields.append(
+                InputListObjectField(
+                    key=key,
+                    source=source_widget.currentText() if isinstance(source_widget, QComboBox) else "base",
+                    json_path=(self.object_fields_table.item(row, 2).text().strip() if self.object_fields_table.item(row, 2) else ""),
+                    url_template=(self.object_fields_table.item(row, 3).text().strip() if self.object_fields_table.item(row, 3) else ""),
+                    data_type=data_type_widget.currentText() if isinstance(data_type_widget, QComboBox) else "string",
+                    result_mode=result_widget.currentText() if isinstance(result_widget, QComboBox) else "first",
+                    separator=(self.object_fields_table.item(row, 6).text() if self.object_fields_table.item(row, 6) else " "),
+                    normalize_whitespace=normalize.isChecked() if normalize else False,
+                    refresh_seconds=refresh_seconds,
+                )
+            )
+        return fields
+
     def cell(self) -> InputListCell:
         return InputListCell(
             mode="polled",
@@ -248,6 +425,10 @@ class PolledCellDialog(QDialog):
             json_path="" if self.dictionary_mode else self.json_path.text().strip(),
             json_key_path=self.json_key_path.text().strip() if self.dictionary_mode else "",
             json_value_path=self.json_value_path.text().strip() if self.dictionary_mode else "",
+            object_fields=self.object_fields() if self.object_mode else [],
+            object_identity_field=self.identity_field.text().strip() or "uuid",
+            object_concurrency=self.object_concurrency.value(),
+            object_enrichment_last_polled={},
         )
 
 
@@ -374,6 +555,7 @@ class InputListsPage(QWidget):
         self.name_edit = QLineEdit()
         self.description_edit = QLineEdit()
         self.polling_rate_edit = QLineEdit()
+        self.poll_now_button: QPushButton | None = None
         self.current_key = ""
         self.current_builtin = False
         self.current_columns: list[InputListColumn] = []
@@ -383,6 +565,10 @@ class InputListsPage(QWidget):
         self._updating_table = False
         self._loading = False
         self._refit_pending = False
+        self._active_poll_keys: set[str] = set()
+        self._poll_refresh_timer = QTimer(self)
+        self._poll_refresh_timer.setInterval(750)
+        self._poll_refresh_timer.timeout.connect(self.refresh_active_poll)
         self.build()
         self.refresh_lists()
 
@@ -530,7 +716,8 @@ class InputListsPage(QWidget):
         editor_layout.addWidget(self.details_section())
         editor_layout.addWidget(self.columns_section())
         editor_layout.addWidget(self.rows_section())
-        self.status.hide()
+        self.status.setContentsMargins(PAGE_MARGIN, 0, PAGE_MARGIN, 0)
+        root.addWidget(self.status)
         root.addWidget(ResponsiveInputListsPane(left, editor, collapse_width=1150), 1)
 
     def configure_lists_table(self) -> None:
@@ -566,11 +753,11 @@ class InputListsPage(QWidget):
         help_text.setObjectName("HelpText")
         help_text.setWordWrap(True)
         layout.addWidget(help_text)
-        poll_now = QPushButton("Poll Now")
-        poll_now.clicked.connect(self.poll_now)
+        self.poll_now_button = QPushButton("Poll Now")
+        self.poll_now_button.clicked.connect(self.poll_now)
         row = QHBoxLayout()
         row.addStretch()
-        row.addWidget(poll_now)
+        row.addWidget(self.poll_now_button)
         layout.addLayout(row)
         return box
 
@@ -664,13 +851,13 @@ class InputListsPage(QWidget):
         self.current_key = item.key
         self.current_builtin = False
         self.current_columns = [InputListColumn.from_dict(column.to_dict()) for column in item.columns]
-        self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in item.rows]
+        self.current_rows = list(item.rows)
         self.name_edit.setText(item.name)
         self.description_edit.setText(item.description)
         self.polling_rate_edit.setText(str(item.polling_rate_seconds or ""))
         self.load_columns_table()
         self.load_rows_table()
-        self._last_ui_definition = self.ui_definition_snapshot()
+        self._last_ui_definition = item
         self._loading = False
         self.status.setText(f"Editing {item.name}.")
         self.schedule_refit()
@@ -785,6 +972,13 @@ class InputListsPage(QWidget):
 
     def cell_tooltip(self, cell: InputListCell) -> str:
         if cell.mode == "polled":
+            if cell.object_fields:
+                request_count = sum(field.source == "request" for field in cell.object_fields)
+                return (
+                    f"GET {cell.url}\nItems JSON path: {cell.json_path}\n"
+                    f"{len(cell.object_fields)} object fields; {request_count} use per-item requests.\n"
+                    "Double-click to inspect."
+                )
             if cell.json_key_path or cell.json_value_path:
                 return (
                     f"GET {cell.url}\nKey JSON path: {cell.json_key_path}\n"
@@ -882,19 +1076,81 @@ class InputListsPage(QWidget):
             self.record_ui_change("Delete input-list row", before, self.ui_definition_snapshot())
 
     def set_row_enabled(self, row: int) -> None:
-        if row < self.rows_table.rowCount() and not self._loading and not self._applying_undo:
-            before = self._last_ui_definition or self.ui_definition_snapshot()
-            self.current_rows = self.rows_from_table()
-            after = self.ui_definition_snapshot()
-            was_enabled = row < len(before.rows) and before.rows[row].enabled
-            is_enabled = row < len(after.rows) and after.rows[row].enabled
-            self.record_ui_change("Toggle input-list row", before, after)
-            if is_enabled and not was_enabled and any(
-                cell.mode == "polled" for cell in after.rows[row].cells.values()
-            ):
-                self.poll_enabled_row(after.key, row)
-            else:
-                self.status.setText("Row enabled state changed.")
+        if row >= self.rows_table.rowCount() or self._loading or self._applying_undo:
+            return
+        holder = self.rows_table.cellWidget(row, 0)
+        checkbox = holder.findChild(QCheckBox) if holder is not None else None
+        if checkbox is None or not self.current_key:
+            return
+        live = input_list_by_key(self.context.config, self.current_key)
+        if live is None or row >= len(live.rows):
+            return
+        was_enabled = live.rows[row].enabled
+        is_enabled = checkbox.isChecked()
+        if was_enabled == is_enabled:
+            return
+
+        label = str(row_cell(live.rows[row], "library_name").value or f"Row {row + 1}").strip()
+        updated = self.apply_row_enabled_state(
+            live.key,
+            row,
+            is_enabled,
+            (
+                f"{label} enabled. Cached data is active."
+                if is_enabled
+                else f"{label} disabled. Cached data was kept."
+            ),
+        )
+        if updated is None:
+            return
+        self.context.undo_manager.record(
+            "Toggle input-list row",
+            lambda: self.apply_row_enabled_state(
+                live.key,
+                row,
+                was_enabled,
+                f"Undid row toggle. {label} is {'enabled' if was_enabled else 'disabled'}.",
+            ),
+            lambda: self.apply_row_enabled_state(
+                live.key,
+                row,
+                is_enabled,
+                f"Redid row toggle. {label} is {'enabled' if is_enabled else 'disabled'}.",
+            ),
+        )
+        if is_enabled and any(cell.mode == "polled" for cell in updated.rows[row].cells.values()):
+            self.poll_enabled_row(updated.key, row)
+
+    def apply_row_enabled_state(
+        self,
+        key: str,
+        row: int,
+        enabled: bool,
+        message: str = "",
+    ) -> InputListDefinition | None:
+        """Persist only a row's enabled flag, retaining the newest polled cache."""
+        live = input_list_by_key(self.context.config, key)
+        if live is None or row < 0 or row >= len(live.rows):
+            return None
+        updated = InputListDefinition.from_dict(live.to_dict())
+        updated.rows[row].enabled = enabled
+        self.persist_current_definition(updated)
+
+        if self.current_key == key:
+            holder = self.rows_table.cellWidget(row, 0)
+            checkbox = holder.findChild(QCheckBox) if holder is not None else None
+            self._loading = True
+            try:
+                if checkbox is not None:
+                    checkbox.setChecked(enabled)
+                self.current_rows = [InputListRow.from_dict(item.to_dict()) for item in updated.rows]
+                self._last_ui_definition = InputListDefinition.from_dict(updated.to_dict())
+            finally:
+                self._loading = False
+            self.sync_current_polled_values(key)
+        if message:
+            self.status.setText(message)
+        return updated
 
     def show_cell_menu(self, position) -> None:
         row = self.rows_table.indexAt(position).row()
@@ -934,6 +1190,8 @@ class InputListsPage(QWidget):
         data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
         if data_type == "dictionary":
             value = parse_dictionary(self.cell_from_table(row, column).value)
+        elif data_type == "array_object":
+            value = parse_object_array(self.cell_from_table(row, column).value)
         else:
             item = self.rows_table.item(row, column)
             value = item.text().splitlines()[-1] if item else ""
@@ -964,7 +1222,6 @@ class InputListsPage(QWidget):
                 widget = self.polled_cell_widget(row, column, cell)
                 self.rows_table.setCellWidget(row, column, widget)
                 item = QTableWidgetItem("")
-                item.setData(Qt.ItemDataRole.UserRole, cell.to_dict())
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 item.setToolTip(self.cell_tooltip(cell))
                 self.rows_table.setItem(row, column, item)
@@ -976,7 +1233,7 @@ class InputListsPage(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, cell.to_dict())
             item.setToolTip(self.cell_tooltip(cell))
             data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
-            if data_type == "dictionary":
+            if data_type in {"dictionary", "array_object"}:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             else:
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
@@ -997,7 +1254,7 @@ class InputListsPage(QWidget):
 
     def polled_cell_widget(self, row: int, column: int, cell: InputListCell) -> QWidget:
         widget = QWidget()
-        widget.setProperty("cell", cell.to_dict())
+        widget._input_list_cell = cell
         widget.setToolTip(self.cell_tooltip(cell))
         widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         widget.customContextMenuRequested.connect(lambda position: self.show_cell_menu_at(row, column, widget.mapToGlobal(position)))
@@ -1015,7 +1272,7 @@ class InputListsPage(QWidget):
         preview.setObjectName("PollingCellPreview")
         preview.setTextFormat(Qt.TextFormat.RichText)
         preview.setWordWrap(False)
-        preview.setToolTip(full_preview_text(preview_source(cell.value, cell.preview)))
+        preview.setToolTip(compact_preview_detail(preview_source(cell.value, cell.preview)))
         preview_font = QFont(preview.font())
         preview_font.setPointSize(max(8, preview_font.pointSize() - 2))
         preview_font.setItalic(True)
@@ -1041,7 +1298,7 @@ class InputListsPage(QWidget):
 
         self._loading = True
         try:
-            self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in definition.rows]
+            self.current_rows = list(definition.rows)
             for row_index, row_def in enumerate(definition.rows):
                 for column_index, column in enumerate(definition.columns, start=1):
                     cell = row_cell(row_def, column.key)
@@ -1050,32 +1307,104 @@ class InputListsPage(QWidget):
                     widget = self.rows_table.cellWidget(row_index, column_index)
                     item = self.rows_table.item(row_index, column_index)
                     if widget is not None:
-                        widget.setProperty("cell", cell.to_dict())
+                        widget._input_list_cell = cell
                         widget.setToolTip(self.cell_tooltip(cell))
                         preview = widget.findChild(QLabel, "PollingCellPreview")
                         if preview is not None:
                             preview.setText(f"<b>Preview</b>  {one_line_preview(cell.value)}")
-                            preview.setToolTip(full_preview_text(preview_source(cell.value, cell.preview)))
+                            preview.setToolTip(compact_preview_detail(preview_source(cell.value, cell.preview)))
                     if item is not None:
-                        item.setData(Qt.ItemDataRole.UserRole, cell.to_dict())
                         item.setToolTip(self.cell_tooltip(cell))
-            self._last_ui_definition = InputListDefinition.from_dict(definition.to_dict())
+            self._last_ui_definition = definition
         finally:
             self._loading = False
 
+    def begin_poll_tracking(self, key: str, message: str) -> bool:
+        if key in self._active_poll_keys:
+            self.status.setText("Polling is already in progress. The table will update automatically.")
+            return False
+        self._active_poll_keys.add(key)
+        if self.poll_now_button is not None:
+            self.poll_now_button.setEnabled(False)
+            self.poll_now_button.setText("Polling…")
+        self.status.setText(message)
+        if not self._poll_refresh_timer.isActive():
+            self._poll_refresh_timer.start()
+        return True
+
+    def finish_poll_tracking(self, key: str) -> None:
+        self._active_poll_keys.discard(key)
+        if not self._active_poll_keys:
+            self._poll_refresh_timer.stop()
+            if self.poll_now_button is not None:
+                self.poll_now_button.setEnabled(True)
+                self.poll_now_button.setText("Poll Now")
+
+    @staticmethod
+    def populated_object_value(value: object) -> bool:
+        return value is not None and value != "" and value != [] and value != {}
+
+    def poll_progress_message(self, key: str) -> str:
+        definition = input_list_by_key(self.context.config, key)
+        if definition is None:
+            return "Polling list…"
+        column_types = {column.key: column.data_type for column in definition.columns}
+        details: list[str] = []
+        for row_def in definition.rows:
+            if not row_def.enabled:
+                continue
+            label = str(row_cell(row_def, "library_name").value or definition.name).strip() or definition.name
+            for column_key, cell in row_def.cells.items():
+                if column_types.get(column_key) != "array_object" or not isinstance(cell.value, list):
+                    continue
+                request_keys = [field.key for field in cell.object_fields if field.source == "request"]
+                if request_keys:
+                    completed = sum(
+                        all(self.populated_object_value(item.get(field_key)) for field_key in request_keys)
+                        for item in cell.value
+                        if isinstance(item, dict)
+                    )
+                    details.append(f"{label}: {completed}/{len(cell.value)} enriched")
+                else:
+                    details.append(f"{label}: {len(cell.value)} items")
+        return "Polling… " + " · ".join(details) if details else "Polling list…"
+
+    def refresh_active_poll(self) -> None:
+        key = self.current_key
+        if not key or key not in self._active_poll_keys:
+            return
+        self.sync_current_polled_values(key)
+        self.status.setText(self.poll_progress_message(key))
+
     def poll_enabled_row(self, key: str, row: int) -> None:
         label = "row"
+        has_cached_data = False
         if row < len(self.current_rows):
             label = str(row_cell(self.current_rows[row], "library_name").value or f"row {row + 1}")
-        self.status.setText(f"{label} enabled. Loading its values...")
+            has_cached_data = any(
+                cell.mode == "polled" and self.populated_object_value(cell.value)
+                for cell in self.current_rows[row].cells.values()
+            )
+        message = (
+            f"{label} enabled. Cached data is active; refreshing…"
+            if has_cached_data
+            else f"{label} enabled. Loading titles and lyrics…"
+        )
+        if not self.begin_poll_tracking(key, message):
+            return
 
         async def run():
             changed = await poll_input_list_row_by_key(self.context, key, row)
             return "updated" if changed else "unchanged"
 
         def done(ok: bool, message: str) -> None:
-            if ok:
-                self.sync_current_polled_values(key)
+            self.finish_poll_tracking(key)
+            self.sync_current_polled_values(key)
+            live = input_list_by_key(self.context.config, key)
+            row_is_enabled = live is not None and row < len(live.rows) and live.rows[row].enabled
+            if not row_is_enabled:
+                self.status.setText(f"{label} disabled. Cached data was kept.")
+            elif ok:
                 self.status.setText(f"{label} enabled. Search data is ready.")
             else:
                 self.status.setText(f"{label} enabled, but polling failed: {message}")
@@ -1084,15 +1413,16 @@ class InputListsPage(QWidget):
 
     def cell_from_table(self, row: int, column: int) -> InputListCell:
         widget = self.rows_table.cellWidget(row, column)
-        if widget and widget.property("cell"):
-            return InputListCell.from_dict(widget.property("cell"))
+        widget_cell = getattr(widget, "_input_list_cell", None) if widget else None
+        if isinstance(widget_cell, InputListCell):
+            return copy.copy(widget_cell)
         item = self.rows_table.item(row, column)
         if item:
             data = item.data(Qt.ItemDataRole.UserRole)
             if isinstance(data, dict):
                 cell = InputListCell.from_dict(data)
                 data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
-                if cell.mode == "static" and data_type != "dictionary":
+                if cell.mode == "static" and data_type not in {"dictionary", "array_object"}:
                     cell.value = item.text().strip()
                 return cell
             return InputListCell("static", item.text().strip())
@@ -1109,7 +1439,17 @@ class InputListsPage(QWidget):
         dialog = StaticCellDialog(header, cell, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             before = self.ui_definition_snapshot()
-            self.set_table_cell(row, column, InputListCell("static", dialog.value()))
+            data_type = self.current_columns[column - 1].data_type if column - 1 < len(self.current_columns) else "string"
+            value: object = dialog.value()
+            if data_type == "array_object":
+                try:
+                    value = parse_object_array(value, strict=True)
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Invalid Object Array", str(exc))
+                    return
+            elif data_type == "dictionary":
+                value = parse_dictionary(value)
+            self.set_table_cell(row, column, InputListCell("static", value))
             self.current_rows = self.rows_from_table()
             self.record_ui_change("Edit input-list static value", before, self.ui_definition_snapshot())
 
@@ -1133,7 +1473,8 @@ class InputListsPage(QWidget):
             cells = {}
             for column_index, column in enumerate(self.current_columns, start=1):
                 cell = self.cell_from_table(row_index, column_index)
-                cell.value = self.coerce_value(cell.value, column.data_type)
+                if cell.mode == "static":
+                    cell.value = self.coerce_value(cell.value, column.data_type)
                 cells[column.key] = cell
             rows.append(InputListRow(enabled, cells))
         return rows
@@ -1145,6 +1486,8 @@ class InputListsPage(QWidget):
             return parse_array(value, "int")
         if data_type == "dictionary":
             return parse_dictionary(value)
+        if data_type == "array_object":
+            return parse_object_array(value)
         if data_type == "int":
             try:
                 return int(str(value).strip())
@@ -1200,21 +1543,28 @@ class InputListsPage(QWidget):
     def poll_now(self) -> None:
         if not self.current_key:
             return
-        before = self.config_snapshot()
-        item = self.current_definition()
-        self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in item.rows]
-        self._last_ui_definition = InputListDefinition.from_dict(item.to_dict())
-        self.persist_current_definition(item)
         key = self.current_key
-        self.status.setText("Polling list...")
+        if not self.begin_poll_tracking(key, "Polling list…"):
+            return
+        try:
+            before = self.config_snapshot()
+            item = self.current_definition()
+            self.current_rows = [InputListRow.from_dict(row.to_dict()) for row in item.rows]
+            self._last_ui_definition = InputListDefinition.from_dict(item.to_dict())
+            self.persist_current_definition(item)
+        except Exception as exc:
+            self.finish_poll_tracking(key)
+            self.status.setText(f"Poll failed: {exc}")
+            return
 
         async def run():
             changed = await poll_input_list_by_key(self.context, key)
             return "Poll complete. Values updated." if changed else "Poll complete. No changes."
 
         def done(ok: bool, message: str) -> None:
+            self.finish_poll_tracking(key)
+            self.sync_current_polled_values(key)
             if ok:
-                self.sync_current_polled_values(key)
                 self.record_config_change(f"Poll input list {key}", before, self.config_snapshot())
             self.status.setText(message if ok else f"Poll failed: {message}")
 
