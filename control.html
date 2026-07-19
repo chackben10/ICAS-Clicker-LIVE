@@ -490,13 +490,17 @@ min-width: 0;
 align-items: center;
 justify-content: space-between;
 gap: 10px;
-padding: calc(11px * var(--btn-scale)) calc(12px * var(--btn-scale));
+padding:
+calc(12px * var(--btn-scale))
+calc(14px * var(--btn-scale))
+calc(12px * var(--btn-scale))
+calc(12px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: clamp(8px, calc(11px * var(--btn-scale)), 14px);
 background: color-mix(in srgb, var(--bg) 92%, transparent);
 color: var(--card-text);
 font: inherit;
-font-size: calc(0.92rem * var(--btn-scale));
+font-size: calc(16px * var(--btn-scale));
 font-weight: 800;
 text-align: left;
 cursor: pointer;
@@ -511,10 +515,10 @@ white-space: nowrap;
 
 .picker-open-action {
 flex: 0 0 auto;
-color: var(--title-color);
-font-size: 0.78em;
-text-transform: uppercase;
-letter-spacing: 0.04em;
+color: var(--card-text);
+font-size: calc(1rem * var(--btn-scale));
+font-weight: 900;
+opacity: 0.8;
 }
 
 .picker-open-btn:disabled {
@@ -905,123 +909,12 @@ box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
 
-body.obs-mode {
-padding-top: 0;
-}
-
-body.obs-mode .wrapper {
-max-width: none;
-padding: 8px;
-}
-
-body.obs-mode .control-header {
-position: sticky;
-top: 0;
-z-index: 30;
-margin: -8px -8px 6px;
-padding: 8px;
-background: color-mix(in srgb, var(--bg) 96%, transparent);
-border-bottom: 1px solid var(--border-color);
-backdrop-filter: blur(10px);
-}
-
-body.obs-mode .page-title {
-font-size: 0.98rem;
-}
-
-body.obs-mode .top-btn {
-padding: 5px 10px;
-font-size: 0.82rem;
-}
-
-body.obs-mode .remote-controls {
-gap: 6px;
-margin-top: 7px;
-}
-
-body.obs-mode .remote-switch {
-padding: 7px 9px;
-border-radius: 9px;
-}
-
-body.obs-mode .remote-switch-label {
-font-size: 0.78rem;
-}
-
-body.obs-mode .presets-header {
-display: none !important;
-}
-
-body.obs-mode .grid {
-grid-template-columns: 1fr;
-gap: 6px;
-margin-top: 6px;
-}
-
-body.obs-mode .preset-main {
-padding: 10px 12px;
-}
-
-body.obs-mode .preset-title {
-font-size: 1rem;
-margin-bottom: 0;
-}
-
-body.obs-mode .preset-sub {
-display: none;
-}
-
-body.obs-mode .preset-addon {
-padding: 9px 11px;
-font-size: 0.9rem;
-}
-
-body.obs-mode .preset-card.has-selector .selector-row {
-padding: 7px;
-}
-
 body.obs-mode .select-wrap {
 display: none;
 }
 
 body.obs-mode .picker-open-btn {
 display: flex;
-}
-
-body.obs-mode .settings-overlay {
-padding: 8px;
-align-items: flex-start;
-}
-
-body.obs-mode .settings-card {
-max-width: none;
-max-height: calc(100vh - 16px);
-max-height: calc(100dvh - 16px);
-padding: 12px;
-border-radius: 10px;
-}
-
-body.obs-mode .audio-grid {
-grid-template-columns: repeat(2, minmax(0, 1fr));
-gap: 7px;
-}
-
-body.obs-mode #audioPlaylistSegment {
-justify-content: flex-start;
-overflow-x: auto;
-overscroll-behavior-x: contain;
-}
-
-body.obs-mode #audioPlaylistSegment button {
-flex: 0 0 auto;
-min-width: 110px;
-padding-left: 12px;
-padding-right: 12px;
-}
-
-body.obs-mode .audio-btn {
-padding: 12px 5px;
-font-size: 0.9rem;
 }
 
 @media (max-width: 350px) {
@@ -1105,7 +998,7 @@ Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</
 </div>
 <button class="picker-open-btn" id="serviceLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="serviceLogoPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 <button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
@@ -1134,7 +1027,7 @@ Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonie
 </div>
 <button class="picker-open-btn" id="testimoniesLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="testimoniesLogoPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 </div>
@@ -1162,7 +1055,7 @@ Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 </div>
 <button class="picker-open-btn" id="macroPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="macroPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 </div>
@@ -1253,7 +1146,7 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 
 <div class="settings-section">
 <div class="settings-label">OBS Dock Mode</div>
-<div class="settings-muted">Use a compact dock layout and reliable in-page pickers instead of browser popup menus.</div>
+<div class="settings-muted">Keep the standard layout, but open logo and macro choices in reliable in-page popup menus.</div>
 
 <div class="pill-row" style="margin-top: 10px;">
 <label class="pill" style="cursor:pointer; user-select:none;">

@@ -63,6 +63,9 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn('icas-control-obs-mode', html)
         self.assertIn('id="pickerOverlay"', html)
         self.assertIn('function openSelectionPicker(', html)
+        self.assertIn('<span class="picker-open-action" aria-hidden="true">▾</span>', html)
+        self.assertNotIn('<span class="picker-open-action">Choose</span>', html)
+        self.assertNotIn('body.obs-mode .grid', html)
         self.assertIn('setInterval(refreshRuntimeState, 10000)', html)
         self.assertNotIn('setInterval(fullRefresh, 10000)', html)
 
