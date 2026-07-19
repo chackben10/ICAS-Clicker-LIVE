@@ -178,6 +178,7 @@ def ensure_builtin_endpoint_defaults(endpoints: list[EndpointDefinition]) -> lis
         "/audio/playlists",
         "/audio/tracks",
         "/auto-show",
+        "/clicker-presentation-activation",
     }
     repaired: list[EndpointDefinition] = []
     for endpoint in endpoints:
@@ -591,12 +592,28 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         return ActionResult(action.action_type, False, "OBS unavailable")
 
     async def runtime_auto_show(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
-        state = context.runtime_state_repo.load()
         if "enabled" in action.params or "enabled" in action_context:
-            enabled = str(param(action, action_context, "enabled", state.auto_show_enabled)).lower() in {"1", "true", "yes", "on"}
-            state.auto_show_enabled = enabled
-            context.runtime_state_repo.save(state)
+            enabled = str(param(action, action_context, "enabled", False)).lower() in {"1", "true", "yes", "on"}
+            state = context.runtime_state_repo.update(
+                lambda current: setattr(current, "auto_show_enabled", enabled)
+            )
+        else:
+            state = context.runtime_state_repo.load()
         return await _action_ok(action, "auto-show state read", {"enabled": state.auto_show_enabled})
+
+    async def runtime_clicker_presentation_activation(
+        action: ActionDefinition,
+        action_context: dict[str, Any],
+    ) -> ActionResult:
+        enabled = str(param(action, action_context, "enabled", True)).lower() in {"1", "true", "yes", "on"}
+        state = context.runtime_state_repo.update(
+            lambda current: setattr(current, "clicker_presentation_activation_enabled", enabled)
+        )
+        return await _action_ok(
+            action,
+            "clicker presentation activation state updated",
+            {"enabled": state.clicker_presentation_activation_enabled},
+        )
 
     async def panasonic_recall_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         preset = int(param(action, action_context, "preset", 0))
@@ -721,6 +738,17 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         state = context.runtime_state_repo.load()
         return await _action_ok(action, "auto-show state read", {"enabled": state.auto_show_enabled})
 
+    async def runtime_get_clicker_presentation_activation(
+        action: ActionDefinition,
+        action_context: dict[str, Any],
+    ) -> ActionResult:
+        state = context.runtime_state_repo.load()
+        return await _action_ok(
+            action,
+            "clicker presentation activation state read",
+            {"enabled": state.clicker_presentation_activation_enabled},
+        )
+
     handlers = {
         "propresenter.next_slide": propresenter_next,
         "propresenter.previous_slide": propresenter_previous,
@@ -759,6 +787,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "obs.set_scene_item_enabled": obs_set_scene_item_enabled,
         "obs.reconnect": obs_reconnect,
         "runtime.auto_show": runtime_auto_show,
+        "runtime.clicker_presentation_activation": runtime_clicker_presentation_activation,
         "panasonic.recall_preset": panasonic_recall_preset,
         "panasonic.save_preset": panasonic_save_preset,
         "panasonic.send_command": panasonic_send_command,
@@ -772,6 +801,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "scoreboard.undo": scoreboard_undo,
         "scoreboard.rename_row": scoreboard_rename_row,
         "runtime.get_auto_show": runtime_get_auto_show,
+        "runtime.get_clicker_presentation_activation": runtime_get_clicker_presentation_activation,
     }
     for action_type, handler in handlers.items():
         router.register(action_type, handler)

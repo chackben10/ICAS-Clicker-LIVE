@@ -4,6 +4,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from production_hub.api.clicker_policy import (
+    is_clicker_presentation_trigger,
+    presentation_activation_disabled_detail,
+    presentation_activation_enabled,
+)
 from production_hub.state.runtime_state import RequestRecord
 from production_hub.core.security.sanitize import redact_secrets
 
@@ -108,6 +113,14 @@ def create_app(context):
     async def configured_endpoint_response(request: Request) -> Response | None:
         if is_remote_page_request(request):
             return None
+        if (
+            is_clicker_presentation_trigger(request.method, request.url.path)
+            and not presentation_activation_enabled(context)
+        ):
+            return JSONResponse(
+                {"detail": presentation_activation_disabled_detail()},
+                status_code=403,
+            )
         seed = await dynamic_context(request, {})
         match = context.endpoint_registry.matching_endpoint(request.url.path, request.method, seed)
         if not match:
@@ -155,6 +168,8 @@ def create_app(context):
                 vary = response.headers.get("Vary", "")
                 if "*" not in allowed_origins and "origin" not in vary.lower():
                     response.headers["Vary"] = f"{vary}, Origin" if vary else "Origin"
+            if request.url.path == "/clicker-presentation-activation":
+                response.headers["Cache-Control"] = "no-store"
             return response
         except Exception as exc:
             error = str(exc)
@@ -162,20 +177,17 @@ def create_app(context):
         finally:
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
             try:
-                state = context.runtime_state_repo.load()
-                state.add_request(
-                    RequestRecord(
-                        timestamp=datetime.now(UTC).isoformat(),
-                        method=request.method,
-                        route=request.url.path,
-                        status_code=status_code,
-                        caller_ip=request.client.host if request.client else "",
-                        duration_ms=duration_ms,
-                        request_id=request_id,
-                        error=error,
-                    )
+                record = RequestRecord(
+                    timestamp=datetime.now(UTC).isoformat(),
+                    method=request.method,
+                    route=request.url.path,
+                    status_code=status_code,
+                    caller_ip=request.client.host if request.client else "",
+                    duration_ms=duration_ms,
+                    request_id=request_id,
+                    error=error,
                 )
-                context.runtime_state_repo.save(state)
+                context.runtime_state_repo.update(lambda state: state.add_request(record))
             except Exception:
                 pass
 

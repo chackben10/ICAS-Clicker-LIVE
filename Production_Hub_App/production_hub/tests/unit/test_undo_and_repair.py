@@ -91,18 +91,27 @@ class UndoAndRepairTests(unittest.TestCase):
                         "/audio/active",
                         [ActionDefinition("propresenter.audio_active")],
                     ),
+                    EndpointDefinition(
+                        "clicker_activation",
+                        "Clicker Presentation Activation",
+                        "/clicker-presentation-activation",
+                        [ActionDefinition("runtime.get_clicker_presentation_activation")],
+                    ),
                 ]
             )
             context = build_context(Path(tmp))
 
             auto_show = context.endpoint_registry.get("auto_show")
             audio_active = context.endpoint_registry.get("audio_active")
+            clicker_activation = context.endpoint_registry.get("clicker_activation")
 
             self.assertIsNotNone(auto_show)
             self.assertIsNotNone(audio_active)
+            self.assertIsNotNone(clicker_activation)
             self.assertEqual(auto_show.response.response_type, "last_action_data")
             self.assertEqual(audio_active.response.response_type, "plain_text")
             self.assertEqual(audio_active.response.success_body, "{{text}}")
+            self.assertEqual(clicker_activation.response.response_type, "last_action_data")
 
     def test_build_context_repairs_audio_trigger_methods(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

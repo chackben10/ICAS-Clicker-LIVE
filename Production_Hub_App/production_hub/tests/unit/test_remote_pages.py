@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -13,6 +14,23 @@ from production_hub.core.config.input_lists import row, static_cell
 from production_hub.core.config.models import InputListDefinition
 from production_hub.core.config.remote_pages import discover_remote_pages
 from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+
+
+class InteractiveNestingParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.button_depth = 0
+        self.selects_inside_buttons = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag == "button":
+            self.button_depth += 1
+        elif tag == "select" and self.button_depth:
+            self.selects_inside_buttons += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "button" and self.button_depth:
+            self.button_depth -= 1
 
 
 class RemotePageDiscoveryTests(unittest.TestCase):
@@ -29,6 +47,28 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn('typeof result?.lyric_preview === "string"', html)
         self.assertIn('lyrics.textContent = lyricPreview', html)
         self.assertIn('row.setAttribute("aria-describedby", lyrics.id)', html)
+        self.assertIn('/clicker-presentation-activation', html)
+        self.assertIn('clickerPresentationActivationEnabled', html)
+        self.assertIn('clicker_presentation_activation_disabled', html)
+        self.assertIn('Song Book Mode', html)
+        self.assertIn('interactionLocked: previewTriggerInFlight || clickerPresentationActivationEnabled !== true', html)
+
+    def test_control_page_has_shared_clicker_toggle_and_obs_safe_pickers(self) -> None:
+        root_control = Path(__file__).resolve().parents[4] / "control.html"
+        html = root_control.read_text(encoding="utf-8")
+
+        self.assertIn('id="clickerActivationToggle"', html)
+        self.assertIn('/clicker-presentation-activation', html)
+        self.assertIn('id="obsModeToggle"', html)
+        self.assertIn('icas-control-obs-mode', html)
+        self.assertIn('id="pickerOverlay"', html)
+        self.assertIn('function openSelectionPicker(', html)
+        self.assertIn('setInterval(refreshRuntimeState, 10000)', html)
+        self.assertNotIn('setInterval(fullRefresh, 10000)', html)
+
+        parser = InteractiveNestingParser()
+        parser.feed(html)
+        self.assertEqual(0, parser.selects_inside_buttons)
 
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]

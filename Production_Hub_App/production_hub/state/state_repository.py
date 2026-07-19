@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import Lock
+from typing import Callable
 
 from production_hub.core.config.repository import AtomicJsonRepository
 from production_hub.state.runtime_state import RuntimeState
@@ -20,3 +21,10 @@ class RuntimeStateRepository:
         with self._lock:
             self._repo.save(state)
 
+    def update(self, mutator: Callable[[RuntimeState], None]) -> RuntimeState:
+        """Atomically load, mutate, and persist runtime state."""
+        with self._lock:
+            state = self._repo.load()
+            mutator(state)
+            self._repo.save(state)
+            return state

@@ -22,6 +22,7 @@ class RequestRecord(JsonModel):
 class RuntimeState(JsonModel):
     schema_version: int = 1
     auto_show_enabled: bool = False
+    clicker_presentation_activation_enabled: bool = True
     current_obs_scene: str = ""
     current_propresenter_look: str = ""
     current_active_audio: str = ""
@@ -34,4 +35,3 @@ class RuntimeState(JsonModel):
         self.endpoint_request_history.append(record)
         if len(self.endpoint_request_history) > max_items:
             self.endpoint_request_history = self.endpoint_request_history[-max_items:]
-

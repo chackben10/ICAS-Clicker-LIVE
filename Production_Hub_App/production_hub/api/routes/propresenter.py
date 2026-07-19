@@ -4,6 +4,11 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response
 
+from production_hub.api.clicker_policy import (
+    presentation_activation_disabled_detail,
+    presentation_activation_enabled,
+)
+
 
 def router(context) -> APIRouter:
     api = APIRouter()
@@ -37,6 +42,8 @@ def router(context) -> APIRouter:
         uuid: str = Path(..., min_length=1),
         index: int = Path(..., ge=0),
     ) -> dict:
+        if not presentation_activation_enabled(context):
+            raise HTTPException(status_code=403, detail=presentation_activation_disabled_detail())
         await context.propresenter.trigger_presentation_slide(uuid, index)
         return {"ok": True, "uuid": uuid, "index": index}
 

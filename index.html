@@ -177,6 +177,10 @@
       outline-offset: 3px;
     }
 
+    .slide-item:disabled:not(.current) {
+      cursor: default;
+    }
+
     .slide-item.disabled-slide {
       background: var(--disabled-slide-bg);
       opacity: var(--disabled-slide-opacity);
@@ -323,6 +327,19 @@
       border: 1px solid var(--border-color);
       border-radius: 12px;
       background: var(--label-bg);
+    }
+
+    .library-preview-banner.song-book-mode {
+      border-color: color-mix(in srgb, #f59e0b 62%, var(--border-color));
+      background: color-mix(in srgb, #f59e0b 12%, var(--label-bg));
+    }
+
+    .library-preview-banner.song-book-mode .library-preview-label {
+      color: color-mix(in srgb, #b45309 82%, var(--slide-text));
+    }
+
+    body.dark .library-preview-banner.song-book-mode .library-preview-label {
+      color: #fbbf24;
     }
 
     .library-preview-copy {
@@ -743,7 +760,7 @@
 
       <div id="libraryPreviewBanner" class="library-preview-banner" hidden>
         <div class="library-preview-copy">
-          <div class="library-preview-label">Library Preview</div>
+          <div id="libraryPreviewLabel" class="library-preview-label">Library Preview</div>
           <div id="libraryPreviewStatus" class="library-preview-status" aria-live="polite">
             Only this device is previewing this presentation.
           </div>
@@ -942,6 +959,7 @@
     const PLACEHOLDER_SIZE_BYTES_MAX = 100;
     const THUMBNAIL_POLL_MS = 650;
     const STATUS_REFRESH_MS = 1000;
+    const ACTIVATION_PERMISSION_REFRESH_MS = 1000;
     const FOCUS_REFRESH_DELAY_MS = 350;
     const ACTIVATION_CONFIRM_TIMEOUT_MS = 3000;
     const ACTIVATION_CONFIRM_POLL_MS = 150;
@@ -956,6 +974,8 @@
     let presentationRequestController = null;
     let presentationRequestSequence = 0;
     let previewTriggerInFlight = false;
+    let clickerPresentationActivationEnabled = null;
+    let activationPermissionRefreshPromise = null;
     let searchModeActive = false;
     let searchRequestController = null;
     let searchRequestSequence = 0;
@@ -980,6 +1000,7 @@
       dom.searchResultsStatus = document.getElementById("searchResultsStatus");
       dom.searchResultsBody = document.getElementById("searchResultsBody");
       dom.libraryPreviewBanner = document.getElementById("libraryPreviewBanner");
+      dom.libraryPreviewLabel = document.getElementById("libraryPreviewLabel");
       dom.libraryPreviewStatus = document.getElementById("libraryPreviewStatus");
       dom.returnToLiveButton = document.getElementById("returnToLiveButton");
 
@@ -1605,6 +1626,50 @@
       return String(presentationFromPayload(payload)?.id?.uuid || "").trim();
     }
 
+    function libraryPreviewPermissionMessage() {
+      if (clickerPresentationActivationEnabled === false) {
+        return "Presentation changes are disabled by the media operator. You can search and read every slide, but cannot take this song live.";
+      }
+      if (clickerPresentationActivationEnabled === null) {
+        return "Checking whether searched presentations can be taken live…";
+      }
+      return "Only this device is previewing this presentation. Select a slide to take it live.";
+    }
+
+    function applyClickerPresentationActivation(enabled) {
+      const nextValue = Boolean(enabled);
+      const changed = clickerPresentationActivationEnabled !== nextValue;
+      clickerPresentationActivationEnabled = nextValue;
+
+      if (changed && presentationViewMode === "library-preview" && libraryPreview) {
+        updateLibraryPreviewUI();
+        renderLibraryPreview();
+      }
+    }
+
+    async function refreshClickerPresentationActivation() {
+      if (activationPermissionRefreshPromise) return activationPermissionRefreshPromise;
+
+      activationPermissionRefreshPromise = (async () => {
+        try {
+          const response = await fetch(`${BASE_URL}/clicker-presentation-activation`, {
+            cache: "no-store"
+          });
+          if (!response.ok) throw new Error(`Activation permission request failed: ${response.status}`);
+          const payload = await response.json();
+          applyClickerPresentationActivation(payload?.enabled === true);
+          return payload?.enabled === true;
+        } catch (error) {
+          console.warn("Could not refresh clicker presentation activation permission", error);
+          return clickerPresentationActivationEnabled === true;
+        } finally {
+          activationPermissionRefreshPromise = null;
+        }
+      })();
+
+      return activationPermissionRefreshPromise;
+    }
+
     function renderLibraryPreview() {
       if (presentationViewMode !== "library-preview" || !libraryPreview) return;
 
@@ -1617,7 +1682,14 @@
 
       clearThumbnailStateForNewPresentation(uuid);
       dom.presentationName.textContent = name;
-      dom.statusText.textContent = `${slides.length} ${slides.length === 1 ? "slide" : "slides"} · Select a slide to take it live`;
+      const slideCount = `${slides.length} ${slides.length === 1 ? "slide" : "slides"}`;
+      if (clickerPresentationActivationEnabled === false) {
+        dom.statusText.textContent = `${slideCount} · Song Book Mode · Viewing only`;
+      } else if (clickerPresentationActivationEnabled === null) {
+        dom.statusText.textContent = `${slideCount} · Checking live activation permission…`;
+      } else {
+        dom.statusText.textContent = `${slideCount} · Select a slide to take it live`;
+      }
 
       renderSlides(
         slides,
@@ -1626,7 +1698,7 @@
           currentIndex: null,
           focused: true,
           mode: "library-preview",
-          interactionLocked: previewTriggerInFlight
+          interactionLocked: previewTriggerInFlight || clickerPresentationActivationEnabled !== true
         },
         getSlideRenderSettings()
       );
@@ -1635,11 +1707,18 @@
     function updateLibraryPreviewUI(message = "") {
       const active = presentationViewMode === "library-preview" && Boolean(libraryPreview);
       dom.libraryPreviewBanner.hidden = !active;
+      dom.libraryPreviewBanner.classList.toggle(
+        "song-book-mode",
+        active && clickerPresentationActivationEnabled === false
+      );
       dom.returnToLiveButton.disabled = active && previewTriggerInFlight;
       dom.searchModeButton.disabled = active && previewTriggerInFlight;
 
       if (active) {
-        dom.libraryPreviewStatus.textContent = message || "Only this device is previewing this presentation.";
+        dom.libraryPreviewLabel.textContent = clickerPresentationActivationEnabled === false
+          ? "Song Book Mode"
+          : "Library Preview";
+        dom.libraryPreviewStatus.textContent = message || libraryPreviewPermissionMessage();
       }
 
       applySearchBarVisibility();
@@ -1660,6 +1739,7 @@
       setSearchMode(false);
       updateLibraryPreviewUI();
       renderLibraryPreview();
+      refreshClickerPresentationActivation();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -1894,9 +1974,17 @@
     async function triggerLibraryPreviewSlide(index) {
       if (presentationViewMode !== "library-preview" || !libraryPreview || previewTriggerInFlight) return;
 
+      await refreshClickerPresentationActivation();
+      if (clickerPresentationActivationEnabled !== true) {
+        updateLibraryPreviewUI();
+        renderLibraryPreview();
+        return;
+      }
+
       const uuid = libraryPreview.uuid;
       const revision = presentationViewRevision;
       let failureMessage = "";
+      let activationDenied = false;
       previewTriggerInFlight = true;
       pendingSelectedIndex = index;
       updateLibraryPreviewUI(`Taking slide ${index + 1} live…`);
@@ -1907,10 +1995,25 @@
           `${BASE_URL}/presentation/${encodeURIComponent(uuid)}/${encodeURIComponent(index)}/trigger`,
           { method: "POST", cache: "no-store" }
         );
-        if (!response.ok) throw new Error(`Slide trigger failed: ${response.status}`);
+        if (!response.ok) {
+          let errorCode = "";
+          try {
+            const payload = await response.json();
+            errorCode = String(payload?.detail?.error || payload?.error || "");
+          } catch {}
+
+          if (response.status === 403 && errorCode === "clicker_presentation_activation_disabled") {
+            activationDenied = true;
+            throw new Error(errorCode);
+          }
+          throw new Error(`Slide trigger failed: ${response.status}`);
+        }
 
         updateLibraryPreviewUI("Waiting for the live presentation to update…");
-        await waitForLivePresentation(uuid, index);
+        const activationConfirmed = await waitForLivePresentation(uuid, index);
+        if (!activationConfirmed) {
+          throw new Error("The triggered presentation did not become active in time");
+        }
 
         if (
           presentationViewMode === "library-preview" &&
@@ -1921,7 +2024,9 @@
         }
       } catch (error) {
         console.error(error);
-        failureMessage = "The slide could not be taken live. Try again.";
+        failureMessage = activationDenied
+          ? "Song Book Mode is on. You can continue reading this presentation, but cannot take it live."
+          : "The slide could not be taken live. Try again.";
       } finally {
         if (
           presentationViewMode === "library-preview" &&
@@ -1930,6 +2035,7 @@
         ) {
           previewTriggerInFlight = false;
           pendingSelectedIndex = null;
+          if (activationDenied) clickerPresentationActivationEnabled = false;
           updateLibraryPreviewUI(failureMessage);
           renderLibraryPreview();
         }
@@ -2103,6 +2209,11 @@
           if (getThemeMode() === "system") applyTheme("system");
         });
       }
+
+      window.addEventListener("focus", refreshClickerPresentationActivation);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) refreshClickerPresentationActivation();
+      });
     }
 
     function init() {
@@ -2111,8 +2222,10 @@
       syncSettingsUI();
       applySearchBarVisibility();
       bindEventListeners();
+      refreshClickerPresentationActivation();
       fetchStatus();
       setInterval(fetchStatus, STATUS_REFRESH_MS);
+      setInterval(refreshClickerPresentationActivation, ACTIVATION_PERMISSION_REFRESH_MS);
     }
 
     document.addEventListener("DOMContentLoaded", init);

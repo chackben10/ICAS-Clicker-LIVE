@@ -324,6 +324,21 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
     ),
     ActionSpec("runtime.get_auto_show", "Get Auto Show", "Runtime", "Return Auto Show Slides state.", path=("Read / Data Modules", "Runtime")),
     ActionSpec(
+        "runtime.clicker_presentation_activation",
+        "Set Clicker Presentation Activation",
+        "Runtime",
+        "Allow or prevent clicker song-book previews from activating a ProPresenter presentation.",
+        (FieldSpec("enabled", "Enabled", "bool", True),),
+        ("Runtime Actions", "State Actions"),
+    ),
+    ActionSpec(
+        "runtime.get_clicker_presentation_activation",
+        "Get Clicker Presentation Activation",
+        "Runtime",
+        "Return whether clicker song-book previews may activate a ProPresenter presentation.",
+        path=("Read / Data Modules", "Runtime"),
+    ),
+    ActionSpec(
         "delay",
         "Wait",
         "Utility",

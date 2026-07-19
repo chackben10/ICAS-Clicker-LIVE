@@ -108,6 +108,11 @@ max-width: 680px;
 padding: 16px;
 }
 
+.control-header {
+position: relative;
+z-index: 20;
+}
+
 /* Top bar */
 .top-row {
 display: flex;
@@ -150,6 +155,88 @@ background: var(--btn-invert-bg);
 color: var(--btn-invert-text);
 box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
+}
+
+.remote-controls {
+display: grid;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 8px;
+margin: 10px 0 4px;
+}
+
+.remote-switch {
+position: relative;
+min-width: 0;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 10px;
+padding: 9px 11px;
+border: 1px solid var(--border-color);
+border-radius: 12px;
+background: var(--card-bg);
+color: var(--card-text);
+cursor: pointer;
+user-select: none;
+-webkit-user-select: none;
+}
+
+.remote-switch-label {
+min-width: 0;
+font-size: 0.86rem;
+font-weight: 800;
+line-height: 1.15;
+}
+
+.switch-input {
+position: absolute;
+width: 1px;
+height: 1px;
+opacity: 0;
+pointer-events: none;
+}
+
+.switch-track {
+position: relative;
+flex: 0 0 auto;
+width: 38px;
+height: 22px;
+border-radius: 999px;
+background: color-mix(in srgb, var(--status-grey) 42%, transparent);
+border: 1px solid color-mix(in srgb, var(--status-grey) 55%, transparent);
+transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.switch-track::after {
+content: "";
+position: absolute;
+width: 16px;
+height: 16px;
+left: 2px;
+top: 2px;
+border-radius: 50%;
+background: #ffffff;
+box-shadow: 0 1px 4px rgba(0,0,0,0.32);
+transition: transform 0.15s ease;
+}
+
+.switch-input:checked + .switch-track {
+background: var(--ok);
+border-color: var(--ok);
+}
+
+.switch-input:checked + .switch-track::after {
+transform: translateX(16px);
+}
+
+.switch-input:focus-visible + .switch-track {
+outline: 3px solid color-mix(in srgb, var(--title-color) 42%, transparent);
+outline-offset: 2px;
+}
+
+.remote-switch:has(.switch-input:disabled) {
+opacity: 0.55;
+cursor: not-allowed;
 }
 
 .panel-title {
@@ -335,6 +422,28 @@ gap: calc(10px * var(--btn-scale));
 align-items: center;
 }
 
+.preset-card.has-selector .selector-row {
+margin-top: 0;
+padding: calc(10px * var(--btn-scale));
+border: 1px solid var(--btn-border);
+border-top-width: 0;
+border-bottom-left-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+border-bottom-right-radius: clamp(8px, calc(12px * var(--btn-scale)), 16px);
+background: var(--btn-bg);
+}
+
+.preset-card.has-selector .preset-main {
+border-bottom-left-radius: 0;
+border-bottom-right-radius: 0;
+border-bottom-width: 0;
+}
+
+.preset-card.has-selector.has-addon .selector-row {
+border-bottom-width: 0;
+border-bottom-left-radius: 0;
+border-bottom-right-radius: 0;
+}
+
 .select-wrap {
 position: relative;
 width: 100%;
@@ -372,6 +481,45 @@ calc(12px * var(--btn-scale))
 calc(12px * var(--btn-scale));
 
 touch-action: pan-y;
+}
+
+.picker-open-btn {
+display: none;
+width: 100%;
+min-width: 0;
+align-items: center;
+justify-content: space-between;
+gap: 10px;
+padding: calc(11px * var(--btn-scale)) calc(12px * var(--btn-scale));
+border: 1px solid var(--border-color);
+border-radius: 10px;
+background: color-mix(in srgb, var(--bg) 92%, transparent);
+color: var(--card-text);
+font: inherit;
+font-size: calc(0.92rem * var(--btn-scale));
+font-weight: 800;
+text-align: left;
+cursor: pointer;
+}
+
+.picker-open-value {
+min-width: 0;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+
+.picker-open-action {
+flex: 0 0 auto;
+color: var(--title-color);
+font-size: 0.78em;
+text-transform: uppercase;
+letter-spacing: 0.04em;
+}
+
+.picker-open-btn:disabled {
+opacity: 0.55;
+cursor: not-allowed;
 }
 
 /* Red filled button style */
@@ -430,6 +578,7 @@ align-items: center;
 justify-content: center;
 z-index: 999;
 padding: 18px;
+overscroll-behavior: contain;
 }
 
 .settings-card {
@@ -442,6 +591,11 @@ padding: 16px;
 box-shadow: 0 18px 40px var(--modal-shadow);
 border: 1px solid var(--border-color);
 transition: background 0.2s ease, color 0.2s ease;
+max-height: calc(100vh - 36px);
+max-height: calc(100dvh - 36px);
+overflow-y: auto;
+overscroll-behavior: contain;
+-webkit-overflow-scrolling: touch;
 }
 
 .settings-title {
@@ -608,6 +762,53 @@ box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
 
+.picker-options {
+display: flex;
+flex-direction: column;
+gap: 8px;
+margin-top: 12px;
+}
+
+.picker-option {
+width: 100%;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+min-height: 48px;
+padding: 11px 13px;
+border: 1px solid var(--border-color);
+border-radius: 10px;
+background: var(--btn-bg);
+color: var(--btn-text);
+font: inherit;
+font-weight: 800;
+text-align: left;
+cursor: pointer;
+}
+
+.picker-option:hover,
+.picker-option:focus-visible {
+background: var(--btn-invert-bg);
+color: var(--btn-invert-text);
+outline: none;
+}
+
+.picker-option.selected::after {
+content: "Selected";
+flex: 0 0 auto;
+color: var(--ok);
+font-size: 0.78rem;
+text-transform: uppercase;
+letter-spacing: 0.04em;
+}
+
+.picker-empty {
+padding: 18px 12px;
+color: var(--status-grey);
+text-align: center;
+}
+
 /* Hide Presets heading + description when toggled off */
 .presets-header[hidden] {
 display: none !important;
@@ -703,21 +904,162 @@ border-color: color-mix(in srgb, var(--danger-invert-text) 55%, var(--btn-border
 box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
+
+body.obs-mode {
+padding-top: 0;
+}
+
+body.obs-mode .wrapper {
+max-width: none;
+padding: 8px;
+}
+
+body.obs-mode .control-header {
+position: sticky;
+top: 0;
+z-index: 30;
+margin: -8px -8px 6px;
+padding: 8px;
+background: color-mix(in srgb, var(--bg) 96%, transparent);
+border-bottom: 1px solid var(--border-color);
+backdrop-filter: blur(10px);
+}
+
+body.obs-mode .page-title {
+font-size: 0.98rem;
+}
+
+body.obs-mode .top-btn {
+padding: 5px 10px;
+font-size: 0.82rem;
+}
+
+body.obs-mode .remote-controls {
+gap: 6px;
+margin-top: 7px;
+}
+
+body.obs-mode .remote-switch {
+padding: 7px 9px;
+border-radius: 9px;
+}
+
+body.obs-mode .remote-switch-label {
+font-size: 0.78rem;
+}
+
+body.obs-mode .presets-header {
+display: none !important;
+}
+
+body.obs-mode .grid {
+grid-template-columns: 1fr;
+gap: 6px;
+margin-top: 6px;
+}
+
+body.obs-mode .preset-main {
+padding: 10px 12px;
+}
+
+body.obs-mode .preset-title {
+font-size: 1rem;
+margin-bottom: 0;
+}
+
+body.obs-mode .preset-sub {
+display: none;
+}
+
+body.obs-mode .preset-addon {
+padding: 9px 11px;
+font-size: 0.9rem;
+}
+
+body.obs-mode .preset-card.has-selector .selector-row {
+padding: 7px;
+}
+
+body.obs-mode .select-wrap {
+display: none;
+}
+
+body.obs-mode .picker-open-btn {
+display: flex;
+}
+
+body.obs-mode .settings-overlay {
+padding: 8px;
+align-items: flex-start;
+}
+
+body.obs-mode .settings-card {
+max-width: none;
+max-height: calc(100vh - 16px);
+max-height: calc(100dvh - 16px);
+padding: 12px;
+border-radius: 10px;
+}
+
+body.obs-mode .audio-grid {
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 7px;
+}
+
+body.obs-mode #audioPlaylistSegment {
+justify-content: flex-start;
+overflow-x: auto;
+overscroll-behavior-x: contain;
+}
+
+body.obs-mode #audioPlaylistSegment button {
+flex: 0 0 auto;
+min-width: 110px;
+padding-left: 12px;
+padding-right: 12px;
+}
+
+body.obs-mode .audio-btn {
+padding: 12px 5px;
+font-size: 0.9rem;
+}
+
+@media (max-width: 350px) {
+.remote-switch-label {
+font-size: 0.75rem;
+}
+
+.switch-track {
+width: 34px;
+}
+
+.switch-input:checked + .switch-track::after {
+transform: translateX(12px);
+}
+}
 </style>
 </head>
 
 <body>
 <div class="wrapper">
+<div class="control-header">
 <div class="top-row">
 <div class="page-title">ICAS Media Control Panel</div>
+<button class="top-btn" id="settingsButton" type="button">Settings</button>
+</div>
 
-<div style="display: flex; gap: 12px; align-items: center;">
-<label style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; user-select: none; color: var(--card-text);">
-<input type="checkbox" id="autoShowToggle" style="transform: scale(1.2);">
-Auto Show
+<div class="remote-controls" aria-label="Remote presentation controls">
+<label class="remote-switch">
+<span class="remote-switch-label">Auto-show slides</span>
+<input class="switch-input" type="checkbox" id="autoShowToggle">
+<span class="switch-track" aria-hidden="true"></span>
 </label>
 
-<button class="top-btn" id="settingsButton" type="button">Settings</button>
+<label class="remote-switch">
+<span class="remote-switch-label">Clicker can present</span>
+<input class="switch-input" type="checkbox" id="clickerActivationToggle">
+<span class="switch-track" aria-hidden="true"></span>
+</label>
 </div>
 </div>
 
@@ -749,19 +1091,23 @@ Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
 <button class="preset-addon danger-fill" id="btnCameraClearSlide" type="button">Camera + Clear Slide</button>
 </div>
 
-<div class="preset-card has-addon" id="cardServiceLogo">
+<div class="preset-card has-selector has-addon" id="cardServiceLogo">
 <button class="preset-main" id="btnServiceLogo" type="button">
 <div class="preset-title">Service Logo</div>
 <div class="preset-sub" id="serviceLogoDesc">
 Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</b> on OBS.
 </div>
+</button>
 
 <div class="selector-row" aria-label="Service Logo selector">
 <div class="select-wrap" style="flex: 1;">
-<select id="serviceLogoSelect" class="select" title="Default Service Logo"></select>
+<select id="serviceLogoSelect" class="select" aria-label="Default Service Logo"></select>
 </div>
-</div>
+<button class="picker-open-btn" id="serviceLogoPickerButton" type="button" aria-haspopup="dialog">
+<span class="picker-open-value" id="serviceLogoPickerValue">—</span>
+<span class="picker-open-action">Choose</span>
 </button>
+</div>
 <button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
 </div>
 
@@ -774,19 +1120,23 @@ Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b
 </button>
 </div>
 
-<div class="preset-card" id="cardTestimonies">
+<div class="preset-card has-selector" id="cardTestimonies">
 <button class="preset-main" id="btnTestimonies" type="button">
 <div class="preset-title">Testimonies</div>
 <div class="preset-sub" id="testimoniesDesc">
 Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonies</b>.
 </div>
+</button>
 
 <div class="selector-row" aria-label="Testimonies selector">
 <div class="select-wrap" style="flex: 1;">
-<select id="testimoniesLogoSelect" class="select" title="Testimonies Service Logo"></select>
+<select id="testimoniesLogoSelect" class="select" aria-label="Testimonies Service Logo"></select>
 </div>
-</div>
+<button class="picker-open-btn" id="testimoniesLogoPickerButton" type="button" aria-haspopup="dialog">
+<span class="picker-open-value" id="testimoniesLogoPickerValue">—</span>
+<span class="picker-open-action">Choose</span>
 </button>
+</div>
 </div>
 
 <div class="preset-card" id="cardEndingStream">
@@ -798,19 +1148,23 @@ Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks
 </button>
 </div>
 
-<div class="preset-card" id="cardSetMacro">
+<div class="preset-card has-selector" id="cardSetMacro">
 <button class="preset-main" id="btnSetMacro" type="button">
 <div class="preset-title">Set Macro</div>
 <div class="preset-sub" id="macroDesc">
 Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 </div>
+</button>
 
 <div class="selector-row" aria-label="Macro selector">
 <div class="select-wrap" style="flex: 1;">
-<select id="macroSelect" class="select" title="Control Macro"></select>
+<select id="macroSelect" class="select" aria-label="Control Macro"></select>
 </div>
-</div>
+<button class="picker-open-btn" id="macroPickerButton" type="button" aria-haspopup="dialog">
+<span class="picker-open-value" id="macroPickerValue">—</span>
+<span class="picker-open-action">Choose</span>
 </button>
+</div>
 </div>
 
 <div class="preset-card" id="cardClearSlide">
@@ -898,6 +1252,18 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 </div>
 
 <div class="settings-section">
+<div class="settings-label">OBS Dock Mode</div>
+<div class="settings-muted">Use a compact dock layout and reliable in-page pickers instead of browser popup menus.</div>
+
+<div class="pill-row" style="margin-top: 10px;">
+<label class="pill" style="cursor:pointer; user-select:none;">
+<input id="obsModeToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
+<span class="status-text" style="font-weight:900;">Enabled</span>
+</label>
+</div>
+</div>
+
+<div class="settings-section">
 <div class="settings-label">Button Size</div>
 <div class="settings-muted" style="margin-bottom: 10px;">Adjust preset button text and spacing.</div>
 <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
@@ -913,6 +1279,14 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 </div>
 
 <button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+</div>
+</div>
+
+<div id="pickerOverlay" class="settings-overlay">
+<div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+<div class="settings-title" id="pickerTitle">Choose an item</div>
+<div class="picker-options" id="pickerOptions"></div>
+<button id="pickerCloseButton" class="settings-close-btn" type="button">Cancel</button>
 </div>
 </div>
 
@@ -933,6 +1307,7 @@ const MACRO_NAME_KEY = "icas-macro-name";
 // Settings
 const BTN_SCALE_KEY = "icas-control-btn-scale";
 const SHOW_DESC_KEY = "icas-control-show-description";
+const OBS_MODE_KEY = "icas-control-obs-mode";
 
 function normalizeBase(u) {
 u = String(u || "").trim();
@@ -960,7 +1335,8 @@ audioTracks: `${base}/audio/tracks`,
 audioTrigger: `${base}/audio/trigger`,
 audioClear: `${base}/audio/clear`,
 audioActive: `${base}/audio/active`,
-autoShow: `${base}/auto-show`
+autoShow: `${base}/auto-show`,
+clickerPresentationActivation: `${base}/clicker-presentation-activation`
 };
 }
 
@@ -1039,6 +1415,21 @@ if (presetsHeader) presetsHeader.hidden = !enabled;
 if (showDescToggle) showDescToggle.checked = !!enabled;
 }
 
+// ====== OBS dock mode ======
+function getObsMode() {
+return localStorage.getItem(OBS_MODE_KEY) === "1";
+}
+
+function applyObsMode(enabled) {
+document.body.classList.toggle("obs-mode", !!enabled);
+if (obsModeToggle) obsModeToggle.checked = !!enabled;
+}
+
+function setObsMode(enabled) {
+localStorage.setItem(OBS_MODE_KEY, enabled ? "1" : "0");
+applyObsMode(enabled);
+}
+
 // ====== UI refs ======
 const backendDot = document.getElementById("backendDot");
 const backendStatus = document.getElementById("backendStatus");
@@ -1050,6 +1441,12 @@ const testBackendBtn = document.getElementById("testBackendBtn");
 const serviceLogoSelect = document.getElementById("serviceLogoSelect");
 const testimoniesLogoSelect = document.getElementById("testimoniesLogoSelect");
 const macroSelect = document.getElementById("macroSelect");
+const serviceLogoPickerButton = document.getElementById("serviceLogoPickerButton");
+const testimoniesLogoPickerButton = document.getElementById("testimoniesLogoPickerButton");
+const macroPickerButton = document.getElementById("macroPickerButton");
+const serviceLogoPickerValue = document.getElementById("serviceLogoPickerValue");
+const testimoniesLogoPickerValue = document.getElementById("testimoniesLogoPickerValue");
+const macroPickerValue = document.getElementById("macroPickerValue");
 
 const serviceLogoDesc = document.getElementById("serviceLogoDesc");
 const testimoniesDesc = document.getElementById("testimoniesDesc");
@@ -1080,26 +1477,27 @@ const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
 // Settings UI
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
 const autoShowToggle = document.getElementById("autoShowToggle");
+const clickerActivationToggle = document.getElementById("clickerActivationToggle");
+const obsModeToggle = document.getElementById("obsModeToggle");
 const settingsOverlay = document.getElementById("settingsOverlay");
 const settingsButton = document.getElementById("settingsButton");
 const settingsCloseButton = document.getElementById("settingsCloseButton");
+const pickerOverlay = document.getElementById("pickerOverlay");
+const pickerTitle = document.getElementById("pickerTitle");
+const pickerOptions = document.getElementById("pickerOptions");
+const pickerCloseButton = document.getElementById("pickerCloseButton");
 
-// Prevent select taps from triggering the main button
-function stopBtnClickWhenSelecting(selectEl) {
-if (!selectEl) return;
-
-["click", "pointerdown", "touchstart", "mousedown"].forEach(evt => {
-selectEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
-});
-}
-
-stopBtnClickWhenSelecting(serviceLogoSelect);
-stopBtnClickWhenSelecting(testimoniesLogoSelect);
-stopBtnClickWhenSelecting(macroSelect);
+let serviceLogoItems = [];
+let macroItems = [];
+let backendAvailable = false;
+let autoShowUpdatePending = false;
+let clickerActivationUpdatePending = false;
+let pickerReturnFocus = null;
 
 function setBackendStatus(ok, text) {
 if (!backendDot || !backendStatus) return;
 
+backendAvailable = !!ok;
 backendDot.classList.toggle("ok", !!ok);
 backendStatus.textContent = text || (ok ? "Backend: Connected" : "Backend: Offline");
 }
@@ -1121,18 +1519,30 @@ btnCameraClearSlide,
 btnServiceLogoClearSlide,
 btnClearSlide,
 btnNSCSetup,
-btnSetMacro,
 btnAudioControl
 ].forEach(button => {
 if (button) button.disabled = !enabled;
 });
 
-if (macroSelect) macroSelect.disabled = !enabled;
+const hasLogos = serviceLogoItems.length > 0;
+const hasMacros = macroItems.length > 0;
+
+if (btnServiceLogo) btnServiceLogo.disabled = !enabled || !hasLogos;
+if (btnTestimonies) btnTestimonies.disabled = !enabled || !hasLogos;
+if (btnServiceLogoClearSlide) btnServiceLogoClearSlide.disabled = !enabled || !hasLogos;
+if (btnSetMacro) btnSetMacro.disabled = !enabled || !hasMacros;
+if (macroSelect) macroSelect.disabled = !enabled || !hasMacros;
 if (refreshLogosBtn) refreshLogosBtn.disabled = !enabled;
 if (testBackendBtn) testBackendBtn.disabled = false;
-if (serviceLogoSelect) serviceLogoSelect.disabled = !enabled;
-if (testimoniesLogoSelect) testimoniesLogoSelect.disabled = !enabled;
-if (autoShowToggle) autoShowToggle.disabled = !enabled;
+if (serviceLogoSelect) serviceLogoSelect.disabled = !enabled || !hasLogos;
+if (testimoniesLogoSelect) testimoniesLogoSelect.disabled = !enabled || !hasLogos;
+if (serviceLogoPickerButton) serviceLogoPickerButton.disabled = !enabled || !hasLogos;
+if (testimoniesLogoPickerButton) testimoniesLogoPickerButton.disabled = !enabled || !hasLogos;
+if (macroPickerButton) macroPickerButton.disabled = !enabled || !hasMacros;
+if (autoShowToggle) autoShowToggle.disabled = !enabled || autoShowUpdatePending;
+if (clickerActivationToggle) {
+clickerActivationToggle.disabled = !enabled || clickerActivationUpdatePending;
+}
 }
 
 function escapeHtml(s) {
@@ -1160,6 +1570,26 @@ const opt = selectEl.options[selectEl.selectedIndex];
 return opt ? (opt.textContent || "—") : "—";
 }
 
+function syncPickerLabels() {
+const serviceName = selectedName(serviceLogoSelect);
+const testimoniesName = selectedName(testimoniesLogoSelect);
+const macroName = selectedName(macroSelect);
+
+if (serviceLogoPickerValue) serviceLogoPickerValue.textContent = serviceName;
+if (testimoniesLogoPickerValue) testimoniesLogoPickerValue.textContent = testimoniesName;
+if (macroPickerValue) macroPickerValue.textContent = macroName;
+
+if (serviceLogoPickerButton) {
+serviceLogoPickerButton.setAttribute("aria-label", `Choose Service Logo. Current: ${serviceName}`);
+}
+if (testimoniesLogoPickerButton) {
+testimoniesLogoPickerButton.setAttribute("aria-label", `Choose Testimonies Logo. Current: ${testimoniesName}`);
+}
+if (macroPickerButton) {
+macroPickerButton.setAttribute("aria-label", `Choose Macro. Current: ${macroName}`);
+}
+}
+
 function syncDescriptions() {
 const sName = selectedName(serviceLogoSelect);
 const tName = selectedName(testimoniesLogoSelect);
@@ -1179,6 +1609,66 @@ if (macroDesc) {
 macroDesc.innerHTML =
 `Triggers ProPresenter Macro: <b>${escapeHtml(mName)}</b> (sets look for In-House TVs + OBS).`;
 }
+
+syncPickerLabels();
+}
+
+function closeSelectionPicker() {
+if (!pickerOverlay) return;
+
+pickerOverlay.style.display = "none";
+if (pickerReturnFocus && typeof pickerReturnFocus.focus === "function") {
+pickerReturnFocus.focus();
+}
+pickerReturnFocus = null;
+}
+
+function openSelectionPicker(title, items, selectedValue, onChoose) {
+if (!pickerOverlay || !pickerTitle || !pickerOptions) return;
+
+pickerReturnFocus = document.activeElement;
+pickerTitle.textContent = title;
+pickerOptions.innerHTML = "";
+
+const choices = Array.isArray(items) ? items : [];
+let firstButton = null;
+let selectedButton = null;
+
+if (choices.length === 0) {
+const empty = document.createElement("div");
+empty.className = "picker-empty";
+empty.textContent = "No choices are available.";
+pickerOptions.appendChild(empty);
+} else {
+choices.forEach(item => {
+const value = String(item?.value || "");
+const label = String(item?.label || "(Unnamed)");
+const button = document.createElement("button");
+button.type = "button";
+button.className = "picker-option";
+button.textContent = label;
+
+if (value === String(selectedValue || "")) {
+button.classList.add("selected");
+button.setAttribute("aria-current", "true");
+selectedButton = button;
+}
+
+button.addEventListener("click", () => {
+if (typeof onChoose === "function") onChoose(value);
+closeSelectionPicker();
+});
+
+if (!firstButton) firstButton = button;
+pickerOptions.appendChild(button);
+});
+}
+
+pickerOverlay.style.display = "flex";
+window.requestAnimationFrame(() => {
+const focusTarget = selectedButton || firstButton || pickerCloseButton;
+if (focusTarget) focusTarget.focus();
+});
 }
 
 async function testBackend() {
@@ -1279,6 +1769,12 @@ if (!res.ok) throw new Error("Bad response");
 
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
+serviceLogoItems = items
+.map(item => ({
+value: String(item?.uuid || ""),
+label: String(item?.name || "(Unnamed)")
+}))
+.filter(item => item.value);
 
 fillSelect(serviceLogoSelect, items, SERVICE_LOGO_UUID_KEY, true);
 fillSelect(testimoniesLogoSelect, items, TESTIMONIES_LOGO_UUID_KEY, true);
@@ -1292,10 +1788,13 @@ setStored(TESTIMONIES_LOGO_UUID_KEY, testimoniesLogoSelect.value);
 }
 
 syncDescriptions();
+setButtonsEnabled(backendAvailable);
 } catch {
+serviceLogoItems = [];
 fillSelect(serviceLogoSelect, [], SERVICE_LOGO_UUID_KEY, true);
 fillSelect(testimoniesLogoSelect, [], TESTIMONIES_LOGO_UUID_KEY, true);
 syncDescriptions();
+setButtonsEnabled(backendAvailable);
 }
 }
 
@@ -1311,6 +1810,7 @@ if (!res.ok) throw new Error("Bad response");
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
 const names = items.map(x => x?.name).filter(Boolean);
+macroItems = names.map(name => ({ value: String(name), label: String(name) }));
 
 fillMacroSelect(macroSelect, names, MACRO_NAME_KEY);
 
@@ -1318,17 +1818,19 @@ const hasAny = names.length > 0;
 if (btnSetMacro) btnSetMacro.disabled = !hasAny;
 macroSelect.disabled = !hasAny;
 } catch {
+macroItems = [];
 fillMacroSelect(macroSelect, [], MACRO_NAME_KEY);
 
 if (btnSetMacro) btnSetMacro.disabled = true;
 macroSelect.disabled = true;
 } finally {
 syncDescriptions();
+setButtonsEnabled(backendAvailable);
 }
 }
 
 async function refreshAutoShow() {
-if (!autoShowToggle) return;
+if (!autoShowToggle || autoShowUpdatePending) return;
 
 const { autoShow } = endpoints();
 
@@ -1342,10 +1844,27 @@ autoShowToggle.checked = !!data.enabled;
 } catch {}
 }
 
+async function refreshClickerActivation() {
+if (!clickerActivationToggle || clickerActivationUpdatePending) return;
+
+const { clickerPresentationActivation } = endpoints();
+
+try {
+const res = await fetch(clickerPresentationActivation, { cache: "no-cache" });
+
+if (res.ok) {
+const data = await res.json();
+clickerActivationToggle.checked = !!data.enabled;
+}
+} catch {}
+}
+
 if (autoShowToggle) {
 autoShowToggle.addEventListener("change", async e => {
 const { autoShow } = endpoints();
 const enabled = e.target.checked;
+autoShowUpdatePending = true;
+setButtonsEnabled(backendAvailable);
 
 try {
 const res = await fetch(autoShow, {
@@ -1356,10 +1875,45 @@ body: JSON.stringify({ enabled })
 
 if (!res.ok) throw new Error("Failed to update auto show");
 
+const data = await res.json();
+e.target.checked = !!data.enabled;
+
 setLastAction(enabled ? "Auto Show Slides Enabled" : "Auto Show Slides Disabled");
 } catch {
 e.target.checked = !enabled;
 setLastAction("Failed to update Auto Show Slides");
+} finally {
+autoShowUpdatePending = false;
+setButtonsEnabled(backendAvailable);
+}
+});
+}
+
+if (clickerActivationToggle) {
+clickerActivationToggle.addEventListener("change", async e => {
+const { clickerPresentationActivation } = endpoints();
+const enabled = e.target.checked;
+clickerActivationUpdatePending = true;
+setButtonsEnabled(backendAvailable);
+
+try {
+const res = await fetch(clickerPresentationActivation, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ enabled })
+});
+
+if (!res.ok) throw new Error("Failed to update clicker presentation access");
+
+const data = await res.json();
+e.target.checked = !!data.enabled;
+setLastAction(data.enabled ? "Clicker Presentation Changes Allowed" : "Clicker Presentation Changes Blocked");
+} catch {
+e.target.checked = !enabled;
+setLastAction("Failed to update Clicker Presentation Access");
+} finally {
+clickerActivationUpdatePending = false;
+setButtonsEnabled(backendAvailable);
 }
 });
 }
@@ -1385,13 +1939,58 @@ syncDescriptions();
 });
 }
 
+if (serviceLogoPickerButton) {
+serviceLogoPickerButton.addEventListener("click", () => {
+openSelectionPicker(
+"Choose Service Logo",
+serviceLogoItems,
+serviceLogoSelect ? serviceLogoSelect.value : getStored(SERVICE_LOGO_UUID_KEY),
+value => {
+if (!serviceLogoSelect) return;
+serviceLogoSelect.value = value;
+serviceLogoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+}
+);
+});
+}
+
+if (testimoniesLogoPickerButton) {
+testimoniesLogoPickerButton.addEventListener("click", () => {
+openSelectionPicker(
+"Choose Testimonies Logo",
+serviceLogoItems,
+testimoniesLogoSelect ? testimoniesLogoSelect.value : getStored(TESTIMONIES_LOGO_UUID_KEY),
+value => {
+if (!testimoniesLogoSelect) return;
+testimoniesLogoSelect.value = value;
+testimoniesLogoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+}
+);
+});
+}
+
+if (macroPickerButton) {
+macroPickerButton.addEventListener("click", () => {
+openSelectionPicker(
+"Choose Macro",
+macroItems,
+macroSelect ? macroSelect.value : getStored(MACRO_NAME_KEY),
+value => {
+if (!macroSelect) return;
+macroSelect.value = value;
+macroSelect.dispatchEvent(new Event("change", { bubbles: true }));
+}
+);
+});
+}
+
 // ====== Fix accidental presses during scroll on touch devices ======
 function attachTapHandler(el, handler) {
 if (!el || typeof handler !== "function") return;
 
 let startX = 0;
 let startY = 0;
-let moved = false;
+let suppressClick = false;
 let activePointerId = null;
 
 const MOVE_PX = 10;
@@ -1401,13 +2000,9 @@ if (el.disabled) return;
 if (e.isPrimary === false) return;
 
 activePointerId = e.pointerId;
-moved = false;
+suppressClick = false;
 startX = e.clientX;
 startY = e.clientY;
-
-try {
-el.setPointerCapture(e.pointerId);
-} catch {}
 });
 
 el.addEventListener("pointermove", e => {
@@ -1416,33 +2011,36 @@ if (activePointerId === null || e.pointerId !== activePointerId) return;
 const dx = Math.abs(e.clientX - startX);
 const dy = Math.abs(e.clientY - startY);
 
-if (dx > MOVE_PX || dy > MOVE_PX) moved = true;
+if (dx > MOVE_PX || dy > MOVE_PX) suppressClick = true;
 });
 
-function finish(e) {
+el.addEventListener("pointerup", e => {
 if (activePointerId === null || e.pointerId !== activePointerId) return;
-
-try {
-el.releasePointerCapture(e.pointerId);
-} catch {}
-
-const shouldFire = !moved;
 activePointerId = null;
 
-if (shouldFire) handler();
+if (suppressClick) {
+window.setTimeout(() => {
+suppressClick = false;
+}, 0);
 }
-
-el.addEventListener("pointerup", finish);
+});
 
 el.addEventListener("pointercancel", () => {
 activePointerId = null;
-moved = false;
+suppressClick = false;
 });
 
 el.addEventListener("click", e => {
+if (el.disabled) return;
+
+if (suppressClick) {
+suppressClick = false;
 e.preventDefault();
-e.stopPropagation();
-}, true);
+return;
+}
+
+handler(e);
+});
 }
 
 // ====== Actions ======
@@ -1618,7 +2216,8 @@ const clean = String(trackName)
 .replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "")
 .trim();
 
-const btn = document.createElement("div");
+const btn = document.createElement("button");
+btn.type = "button";
 btn.className = "audio-btn";
 btn.textContent = clean;
 
@@ -1751,6 +2350,26 @@ if (e.target === settingsOverlay) closeModal();
 });
 }
 
+if (pickerCloseButton) pickerCloseButton.onclick = () => closeSelectionPicker();
+
+if (pickerOverlay) {
+pickerOverlay.addEventListener("click", e => {
+if (e.target === pickerOverlay) closeSelectionPicker();
+});
+}
+
+document.addEventListener("keydown", e => {
+if (e.key !== "Escape") return;
+
+if (pickerOverlay && pickerOverlay.style.display === "flex") {
+closeSelectionPicker();
+} else if (settingsOverlay && settingsOverlay.style.display === "flex") {
+closeModal();
+} else if (audioOverlay && audioOverlay.style.display === "flex") {
+audioOverlay.style.display = "none";
+}
+});
+
 document.querySelectorAll("#themeSegment button").forEach(btn => {
 btn.addEventListener("click", () => {
 const mode = btn.dataset.mode;
@@ -1774,6 +2393,7 @@ if (ok) {
 await refreshServiceLogos();
 await refreshMacros();
 await refreshAutoShow();
+await refreshClickerActivation();
 }
 };
 }
@@ -1804,10 +2424,17 @@ setShowDesc(showDescToggle.checked);
 });
 }
 
+if (obsModeToggle) {
+obsModeToggle.addEventListener("change", () => {
+setObsMode(obsModeToggle.checked);
+});
+}
+
 async function init() {
 loadTheme();
 updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
 applyShowDesc(getShowDesc());
+applyObsMode(getObsMode());
 syncBtnSliderUI();
 
 setButtonsEnabled(false);
@@ -1815,19 +2442,39 @@ setBackendStatus(false, "Backend: Checking…");
 setLastAction("—");
 syncDescriptions();
 
-const fullRefresh = async () => {
+const initialRefresh = async () => {
 const ok = await testBackend();
 
 if (ok) {
 await refreshServiceLogos();
 await refreshMacros();
 await refreshAutoShow();
+await refreshClickerActivation();
 }
 };
 
-await fullRefresh();
+let runtimeRefreshInFlight = false;
+const refreshRuntimeState = async () => {
+if (runtimeRefreshInFlight) return;
+runtimeRefreshInFlight = true;
 
-setInterval(fullRefresh, 10000);
+try {
+const ok = await testBackend();
+
+if (ok) {
+await Promise.all([
+refreshAutoShow(),
+refreshClickerActivation()
+]);
+}
+} finally {
+runtimeRefreshInFlight = false;
+}
+};
+
+await initialRefresh();
+
+setInterval(refreshRuntimeState, 10000);
 
 setInterval(() => {
 if (audioOverlay && audioOverlay.style.display === "flex") {
