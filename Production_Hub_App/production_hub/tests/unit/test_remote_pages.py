@@ -66,12 +66,54 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn('<span class="picker-open-action" aria-hidden="true">▾</span>', html)
         self.assertNotIn('<span class="picker-open-action">Choose</span>', html)
         self.assertNotIn('body.obs-mode .grid', html)
+        for button, preset in {
+            "btnStreamBeginning": "stream_beginning",
+            "btnCamera": "camera",
+            "btnServiceLogo": "service_logo",
+            "btnShowSlides": "show_slides",
+            "btnTestimonies": "testimonies",
+            "btnEndingStream": "ending_stream",
+            "btnClearSlide": "clear_slide",
+            "btnNSCSetup": "nsc_setup",
+        }.items():
+            self.assertIn(
+                f'attachTapHandler({button}, () => runPreset("{preset}"));',
+                html,
+            )
         self.assertIn('setInterval(refreshRuntimeState, 10000)', html)
         self.assertNotIn('setInterval(fullRefresh, 10000)', html)
 
         parser = InteractiveNestingParser()
         parser.feed(html)
         self.assertEqual(0, parser.selects_inside_buttons)
+
+    def test_control_page_interface_scale_covers_main_page_and_settings(self) -> None:
+        root_control = Path(__file__).resolve().parents[4] / "control.html"
+        html = root_control.read_text(encoding="utf-8")
+
+        for selector, property_name in {
+            ".page-title": "font-size",
+            ".top-btn": "font-size",
+            ".remote-switch": "padding",
+            ".remote-switch-label": "font-size",
+            ".switch-track": "width",
+            ".panel-title": "font-size",
+            ".desc": "font-size",
+            ".settings-card": "font-size",
+            ".settings-section": "padding",
+            ".settings-label": "font-size",
+            ".settings-muted": "font-size",
+            ".mini-btn": "font-size",
+            ".segment button": "font-size",
+            ".settings-close-btn": "font-size",
+        }.items():
+            self.assertRegex(
+                html,
+                rf"(?s){selector.replace('.', r'\.') }\s*\{{[^}}]*"
+                rf"{property_name}:\s*[^;]*var\(--btn-scale\)",
+            )
+
+        self.assertIn('<div class="settings-label">Interface Size</div>', html)
 
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]

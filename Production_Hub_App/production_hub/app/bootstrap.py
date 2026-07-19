@@ -183,6 +183,19 @@ def ensure_builtin_endpoint_defaults(endpoints: list[EndpointDefinition]) -> lis
     repaired: list[EndpointDefinition] = []
     for endpoint in endpoints:
         default = defaults.get(endpoint.key)
+        if (
+            default
+            and endpoint.route == default.route
+            and default.match_rules
+            and not endpoint.match_rules
+        ):
+            # Older endpoint files predate shared-route match rules. Without
+            # these rules, the first /preset definition captures every preset
+            # request, making every control-page button run Stream Beginning.
+            endpoint.match_rules = [
+                type(rule).from_dict(rule.to_dict()) for rule in default.match_rules
+            ]
+            endpoint.allowed_methods = list(default.allowed_methods)
         if default and endpoint.key == "debug" and endpoint.route == "/debug":
             endpoint.route = default.route
             endpoint.aliases = list(default.aliases)

@@ -73,6 +73,52 @@ class UndoAndRepairTests(unittest.TestCase):
             reloaded = ConfigRepository(paths).load_endpoints()[0]
             self.assertEqual(reloaded.inputs[0].option_source, "audio_playlists")
 
+    def test_build_context_repairs_legacy_preset_match_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = AppPaths(Path(tmp))
+            repo = ConfigRepository(paths)
+            legacy_presets = []
+            for endpoint in build_default_endpoints():
+                if endpoint.route != "/preset":
+                    continue
+                endpoint.match_rules = []
+                endpoint.allowed_methods = ["GET", "POST"]
+                legacy_presets.append(endpoint)
+            repo.save_endpoints(legacy_presets)
+
+            context = build_context(Path(tmp))
+            expected_keys = {
+                "stream_beginning",
+                "camera",
+                "show_slides",
+                "service_logo",
+                "testimonies",
+                "ending_stream",
+                "clear_slide",
+                "safely_clear_slide",
+                "nsc_setup",
+            }
+
+            for preset_key in expected_keys:
+                match = context.endpoint_registry.matching_endpoint(
+                    "/preset",
+                    "POST",
+                    {"preset": preset_key},
+                )
+                self.assertIsNotNone(match)
+                self.assertEqual(match[0].key, preset_key)
+                self.assertEqual(match[0].allowed_methods, ["POST"])
+
+            reloaded = {
+                endpoint.key: endpoint
+                for endpoint in ConfigRepository(paths).load_endpoints()
+                if endpoint.key in expected_keys
+            }
+            self.assertEqual(set(reloaded), expected_keys)
+            for endpoint in reloaded.values():
+                self.assertEqual(len(endpoint.match_rules), 1)
+                self.assertEqual(endpoint.match_rules[0].value, endpoint.key)
+
     def test_build_context_repairs_page_endpoint_response_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             paths = AppPaths(Path(tmp))

@@ -38,7 +38,7 @@
 
 --ok: #00c853;
 
-/* Button scaling applies only inside preset buttons */
+/* Shared interface scale controlled by the Interface Size slider */
 --btn-scale: 1;
 --grid-gap-base: 10px;
 }
@@ -95,7 +95,7 @@ min-height: 100vh;
 display: flex;
 justify-content: center;
 align-items: flex-start;
-padding-top: 12px;
+padding-top: calc(12px * var(--btn-scale));
 
 transition: background 0.25s ease, color 0.25s ease;
 -webkit-overflow-scrolling: touch;
@@ -105,7 +105,7 @@ touch-action: manipulation;
 .wrapper {
 width: 100%;
 max-width: 680px;
-padding: 16px;
+padding: calc(16px * var(--btn-scale));
 }
 
 .control-header {
@@ -118,22 +118,22 @@ z-index: 20;
 display: flex;
 justify-content: space-between;
 align-items: center;
-margin-bottom: 4px;
-gap: 12px;
+margin-bottom: calc(4px * var(--btn-scale));
+gap: calc(12px * var(--btn-scale));
 }
 
 .page-title {
-font-size: 1.15rem;
+font-size: calc(1.15rem * var(--btn-scale));
 font-weight: 600;
 color: var(--status-grey);
 }
 
 .top-btn {
-font-size: 0.9rem;
+font-size: calc(0.9rem * var(--btn-scale));
 font-weight: 500;
 color: var(--btn-text);
 opacity: 0.9;
-padding: 6px 12px;
+padding: calc(6px * var(--btn-scale)) calc(12px * var(--btn-scale));
 border-radius: 999px;
 border: 1px solid var(--border-color);
 background: transparent;
@@ -160,8 +160,8 @@ transform: translateY(1px) scale(0.995);
 .remote-controls {
 display: grid;
 grid-template-columns: repeat(2, minmax(0, 1fr));
-gap: 8px;
-margin: 10px 0 4px;
+gap: calc(8px * var(--btn-scale));
+margin: calc(10px * var(--btn-scale)) 0 calc(4px * var(--btn-scale));
 }
 
 .remote-switch {
@@ -170,10 +170,10 @@ min-width: 0;
 display: flex;
 align-items: center;
 justify-content: space-between;
-gap: 10px;
-padding: 9px 11px;
+gap: calc(10px * var(--btn-scale));
+padding: calc(9px * var(--btn-scale)) calc(11px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 12px;
+border-radius: calc(12px * var(--btn-scale));
 background: var(--card-bg);
 color: var(--card-text);
 cursor: pointer;
@@ -183,7 +183,7 @@ user-select: none;
 
 .remote-switch-label {
 min-width: 0;
-font-size: 0.86rem;
+font-size: calc(0.86rem * var(--btn-scale));
 font-weight: 800;
 line-height: 1.15;
 }
@@ -199,8 +199,8 @@ pointer-events: none;
 .switch-track {
 position: relative;
 flex: 0 0 auto;
-width: 38px;
-height: 22px;
+width: calc(38px * var(--btn-scale));
+height: calc(22px * var(--btn-scale));
 border-radius: 999px;
 background: color-mix(in srgb, var(--status-grey) 42%, transparent);
 border: 1px solid color-mix(in srgb, var(--status-grey) 55%, transparent);
@@ -210,10 +210,10 @@ transition: background 0.15s ease, border-color 0.15s ease;
 .switch-track::after {
 content: "";
 position: absolute;
-width: 16px;
-height: 16px;
-left: 2px;
-top: 2px;
+width: calc(16px * var(--btn-scale));
+height: calc(16px * var(--btn-scale));
+left: calc(2px * var(--btn-scale));
+top: calc(2px * var(--btn-scale));
 border-radius: 50%;
 background: #ffffff;
 box-shadow: 0 1px 4px rgba(0,0,0,0.32);
@@ -226,7 +226,7 @@ border-color: var(--ok);
 }
 
 .switch-input:checked + .switch-track::after {
-transform: translateX(16px);
+transform: translateX(calc(16px * var(--btn-scale)));
 }
 
 .switch-input:focus-visible + .switch-track {
@@ -241,17 +241,17 @@ cursor: not-allowed;
 
 .panel-title {
 color: var(--title-color);
-font-size: 1.45rem;
+font-size: calc(1.45rem * var(--btn-scale));
 font-weight: 800;
-margin: 6px 0 8px;
+margin: calc(6px * var(--btn-scale)) 0 calc(8px * var(--btn-scale));
 line-height: 1.1;
 }
 
 .desc {
 color: var(--status-grey);
-font-size: 0.98rem;
+font-size: calc(0.98rem * var(--btn-scale));
 line-height: 1.35;
-margin-bottom: 12px;
+margin-bottom: calc(12px * var(--btn-scale));
 }
 
 /* Grid */
@@ -259,7 +259,7 @@ margin-bottom: 12px;
 display: grid;
 grid-template-columns: 1fr;
 gap: calc(var(--grid-gap-base) * var(--btn-scale));
-margin-top: 12px;
+margin-top: calc(12px * var(--btn-scale));
 align-items: stretch;
 }
 
@@ -490,13 +490,17 @@ min-width: 0;
 align-items: center;
 justify-content: space-between;
 gap: 10px;
-padding: calc(11px * var(--btn-scale)) calc(12px * var(--btn-scale));
+padding:
+calc(12px * var(--btn-scale))
+calc(14px * var(--btn-scale))
+calc(12px * var(--btn-scale))
+calc(12px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: clamp(8px, calc(11px * var(--btn-scale)), 14px);
 background: color-mix(in srgb, var(--bg) 92%, transparent);
 color: var(--card-text);
 font: inherit;
-font-size: calc(0.92rem * var(--btn-scale));
+font-size: calc(16px * var(--btn-scale));
 font-weight: 800;
 text-align: left;
 cursor: pointer;
@@ -511,10 +515,10 @@ white-space: nowrap;
 
 .picker-open-action {
 flex: 0 0 auto;
-color: var(--title-color);
-font-size: 0.78em;
-text-transform: uppercase;
-letter-spacing: 0.04em;
+color: var(--card-text);
+font-size: calc(1rem * var(--btn-scale));
+font-weight: 900;
+opacity: 0.8;
 }
 
 .picker-open-btn:disabled {
@@ -586,8 +590,9 @@ width: 100%;
 max-width: 480px;
 background: var(--modal-bg);
 color: var(--settings-text);
-border-radius: 12px;
-padding: 16px;
+border-radius: calc(12px * var(--btn-scale));
+padding: calc(16px * var(--btn-scale));
+font-size: calc(1rem * var(--btn-scale));
 box-shadow: 0 18px 40px var(--modal-shadow);
 border: 1px solid var(--border-color);
 transition: background 0.2s ease, color 0.2s ease;
@@ -599,53 +604,54 @@ overscroll-behavior: contain;
 }
 
 .settings-title {
-font-size: 1.1rem;
+font-size: calc(1.1rem * var(--btn-scale));
 font-weight: 900;
-margin-bottom: 12px;
+margin-bottom: calc(12px * var(--btn-scale));
 }
 
 .settings-section {
 border: 1px solid var(--border-color);
-border-radius: 12px;
-padding: 12px;
-margin-top: 12px;
+border-radius: calc(12px * var(--btn-scale));
+padding: calc(12px * var(--btn-scale));
+margin-top: calc(12px * var(--btn-scale));
 background: transparent;
 }
 
 .settings-label {
 font-weight: 900;
-margin-bottom: 6px;
+font-size: calc(1rem * var(--btn-scale));
+margin-bottom: calc(6px * var(--btn-scale));
 }
 
 .settings-muted {
 color: var(--status-grey);
-font-size: 0.92rem;
+font-size: calc(0.92rem * var(--btn-scale));
 line-height: 1.35;
 }
 
 .pill-row {
 display: flex;
-gap: 8px;
+gap: calc(8px * var(--btn-scale));
 align-items: center;
-margin-top: 10px;
+margin-top: calc(10px * var(--btn-scale));
 flex-wrap: wrap;
 }
 
 .pill {
 display: inline-flex;
 align-items: center;
-gap: 8px;
+gap: calc(8px * var(--btn-scale));
 border: 1px solid var(--border-color);
 border-radius: 999px;
-padding: 8px 12px;
+padding: calc(8px * var(--btn-scale)) calc(12px * var(--btn-scale));
 color: var(--status-grey);
-font-size: 0.92rem;
+font-size: calc(0.92rem * var(--btn-scale));
 background: transparent;
 }
 
 .status-dot {
-width: 10px;
-height: 10px;
+width: calc(10px * var(--btn-scale));
+height: calc(10px * var(--btn-scale));
 border-radius: 999px;
 background: var(--danger);
 }
@@ -662,8 +668,8 @@ color: var(--settings-text);
 
 .mini-row {
 display: flex;
-gap: 10px;
-margin-top: 10px;
+gap: calc(10px * var(--btn-scale));
+margin-top: calc(10px * var(--btn-scale));
 }
 
 .mini-btn {
@@ -673,8 +679,8 @@ border-radius: 999px;
 background: transparent;
 color: var(--settings-text);
 font-weight: 900;
-font-size: 0.92rem;
-padding: 10px 12px;
+font-size: calc(0.92rem * var(--btn-scale));
+padding: calc(10px * var(--btn-scale)) calc(12px * var(--btn-scale));
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
 touch-action: manipulation;
@@ -704,19 +710,19 @@ box-shadow: none;
 display: flex;
 width: 100%;
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: calc(10px * var(--btn-scale));
 overflow: hidden;
-margin-top: 8px;
+margin-top: calc(8px * var(--btn-scale));
 }
 
 .segment button {
 flex: 1;
-padding: 10px 0;
+padding: calc(10px * var(--btn-scale)) 0;
 background: transparent;
 border: none;
 color: var(--settings-text);
 cursor: pointer;
-font-size: 0.9rem;
+font-size: calc(0.9rem * var(--btn-scale));
 transition: background 0.15s, color 0.15s;
 -webkit-tap-highlight-color: transparent;
 font-weight: 900;
@@ -739,9 +745,9 @@ border: 1px solid var(--border-color);
 border-radius: 999px;
 background: transparent;
 color: var(--settings-text);
-font-size: 0.95rem;
-padding: 12px 0;
-margin-top: 14px;
+font-size: calc(0.95rem * var(--btn-scale));
+padding: calc(12px * var(--btn-scale)) 0;
+margin-top: calc(14px * var(--btn-scale));
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
 font-weight: 900;
@@ -765,8 +771,8 @@ transform: translateY(1px) scale(0.995);
 .picker-options {
 display: flex;
 flex-direction: column;
-gap: 8px;
-margin-top: 12px;
+gap: calc(8px * var(--btn-scale));
+margin-top: calc(12px * var(--btn-scale));
 }
 
 .picker-option {
@@ -774,14 +780,15 @@ width: 100%;
 display: flex;
 align-items: center;
 justify-content: space-between;
-gap: 12px;
-min-height: 48px;
-padding: 11px 13px;
+gap: calc(12px * var(--btn-scale));
+min-height: calc(48px * var(--btn-scale));
+padding: calc(11px * var(--btn-scale)) calc(13px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: calc(10px * var(--btn-scale));
 background: var(--btn-bg);
 color: var(--btn-text);
 font: inherit;
+font-size: calc(1rem * var(--btn-scale));
 font-weight: 800;
 text-align: left;
 cursor: pointer;
@@ -798,15 +805,27 @@ outline: none;
 content: "Selected";
 flex: 0 0 auto;
 color: var(--ok);
-font-size: 0.78rem;
+font-size: calc(0.78rem * var(--btn-scale));
 text-transform: uppercase;
 letter-spacing: 0.04em;
 }
 
 .picker-empty {
-padding: 18px 12px;
+padding: calc(18px * var(--btn-scale)) calc(12px * var(--btn-scale));
 color: var(--status-grey);
+font-size: calc(1rem * var(--btn-scale));
 text-align: center;
+}
+
+.settings-card input[type="checkbox"] {
+width: calc(16px * var(--btn-scale));
+height: calc(16px * var(--btn-scale));
+margin-right: calc(10px * var(--btn-scale)) !important;
+transform: none !important;
+}
+
+.settings-card input[type="range"] {
+min-height: calc(24px * var(--btn-scale));
 }
 
 /* Hide Presets heading + description when toggled off */
@@ -816,18 +835,18 @@ display: none !important;
 
 /* Audio Pads UI Elements */
 .audio-now-playing {
-margin-top: 10px;
-margin-bottom: 12px;
-padding: 10px 12px;
+margin-top: calc(10px * var(--btn-scale));
+margin-bottom: calc(12px * var(--btn-scale));
+padding: calc(10px * var(--btn-scale)) calc(12px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 10px;
+border-radius: calc(10px * var(--btn-scale));
 background: color-mix(in srgb, var(--bg) 92%, transparent);
 color: var(--card-text);
-font-size: 1rem;
+font-size: calc(1rem * var(--btn-scale));
 font-weight: 900;
 line-height: 1.25;
 text-align: center;
-min-height: 42px;
+min-height: calc(42px * var(--btn-scale));
 
 display: flex;
 align-items: center;
@@ -841,19 +860,19 @@ color: var(--title-color);
 .audio-grid {
 display: grid;
 grid-template-columns: repeat(3, 1fr);
-gap: 10px;
-margin-bottom: 20px;
-margin-top: 15px;
+gap: calc(10px * var(--btn-scale));
+margin-bottom: calc(20px * var(--btn-scale));
+margin-top: calc(15px * var(--btn-scale));
 }
 
 .audio-btn {
-padding: 15px 5px;
+padding: calc(15px * var(--btn-scale)) calc(5px * var(--btn-scale));
 border: 1px solid var(--border-color);
-border-radius: 8px;
+border-radius: calc(8px * var(--btn-scale));
 background: var(--btn-bg);
 color: var(--btn-text);
 font-weight: 900;
-font-size: 1.0rem;
+font-size: calc(1rem * var(--btn-scale));
 text-align: center;
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
@@ -880,9 +899,9 @@ border: 1px solid color-mix(in srgb, var(--danger) 70%, var(--btn-border));
 border-radius: 999px;
 background: var(--danger);
 color: #ffffff;
-font-size: 0.95rem;
-padding: 12px 0;
-margin-bottom: 10px;
+font-size: calc(0.95rem * var(--btn-scale));
+padding: calc(12px * var(--btn-scale)) 0;
+margin-bottom: calc(10px * var(--btn-scale));
 cursor: pointer;
 -webkit-tap-highlight-color: transparent;
 font-weight: 900;
@@ -905,81 +924,6 @@ box-shadow: var(--btn-active-shadow);
 transform: translateY(1px) scale(0.995);
 }
 
-body.obs-mode {
-padding-top: 0;
-}
-
-body.obs-mode .wrapper {
-max-width: none;
-padding: 8px;
-}
-
-body.obs-mode .control-header {
-position: sticky;
-top: 0;
-z-index: 30;
-margin: -8px -8px 6px;
-padding: 8px;
-background: color-mix(in srgb, var(--bg) 96%, transparent);
-border-bottom: 1px solid var(--border-color);
-backdrop-filter: blur(10px);
-}
-
-body.obs-mode .page-title {
-font-size: 0.98rem;
-}
-
-body.obs-mode .top-btn {
-padding: 5px 10px;
-font-size: 0.82rem;
-}
-
-body.obs-mode .remote-controls {
-gap: 6px;
-margin-top: 7px;
-}
-
-body.obs-mode .remote-switch {
-padding: 7px 9px;
-border-radius: 9px;
-}
-
-body.obs-mode .remote-switch-label {
-font-size: 0.78rem;
-}
-
-body.obs-mode .presets-header {
-display: none !important;
-}
-
-body.obs-mode .grid {
-grid-template-columns: 1fr;
-gap: 6px;
-margin-top: 6px;
-}
-
-body.obs-mode .preset-main {
-padding: 10px 12px;
-}
-
-body.obs-mode .preset-title {
-font-size: 1rem;
-margin-bottom: 0;
-}
-
-body.obs-mode .preset-sub {
-display: none;
-}
-
-body.obs-mode .preset-addon {
-padding: 9px 11px;
-font-size: 0.9rem;
-}
-
-body.obs-mode .preset-card.has-selector .selector-row {
-padding: 7px;
-}
-
 body.obs-mode .select-wrap {
 display: none;
 }
@@ -988,53 +932,17 @@ body.obs-mode .picker-open-btn {
 display: flex;
 }
 
-body.obs-mode .settings-overlay {
-padding: 8px;
-align-items: flex-start;
-}
-
-body.obs-mode .settings-card {
-max-width: none;
-max-height: calc(100vh - 16px);
-max-height: calc(100dvh - 16px);
-padding: 12px;
-border-radius: 10px;
-}
-
-body.obs-mode .audio-grid {
-grid-template-columns: repeat(2, minmax(0, 1fr));
-gap: 7px;
-}
-
-body.obs-mode #audioPlaylistSegment {
-justify-content: flex-start;
-overflow-x: auto;
-overscroll-behavior-x: contain;
-}
-
-body.obs-mode #audioPlaylistSegment button {
-flex: 0 0 auto;
-min-width: 110px;
-padding-left: 12px;
-padding-right: 12px;
-}
-
-body.obs-mode .audio-btn {
-padding: 12px 5px;
-font-size: 0.9rem;
-}
-
 @media (max-width: 350px) {
 .remote-switch-label {
-font-size: 0.75rem;
+font-size: calc(0.75rem * var(--btn-scale));
 }
 
 .switch-track {
-width: 34px;
+width: calc(34px * var(--btn-scale));
 }
 
 .switch-input:checked + .switch-track::after {
-transform: translateX(12px);
+transform: translateX(calc(12px * var(--btn-scale)));
 }
 }
 </style>
@@ -1105,7 +1013,7 @@ Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</
 </div>
 <button class="picker-open-btn" id="serviceLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="serviceLogoPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 <button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
@@ -1134,7 +1042,7 @@ Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonie
 </div>
 <button class="picker-open-btn" id="testimoniesLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="testimoniesLogoPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 </div>
@@ -1162,7 +1070,7 @@ Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 </div>
 <button class="picker-open-btn" id="macroPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="macroPickerValue">—</span>
-<span class="picker-open-action">Choose</span>
+<span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
 </div>
@@ -1234,7 +1142,7 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 <button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
 </div>
 
-<div class="settings-muted" style="margin-top: 10px;">
+<div class="settings-muted" style="margin-top: calc(10px * var(--btn-scale));">
 Backend: <b>local Production Hub when served locally; hosted fallback otherwise</b>
 </div>
 </div>
@@ -1243,7 +1151,7 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 <div class="settings-label">Show Description</div>
 <div class="settings-muted">Hide/show the “Presets” header and description on the main page.</div>
 
-<div class="pill-row" style="margin-top: 10px;">
+<div class="pill-row" style="margin-top: calc(10px * var(--btn-scale));">
 <label class="pill" style="cursor:pointer; user-select:none;">
 <input id="showDescToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
 <span class="status-text" style="font-weight:900;">Enabled</span>
@@ -1253,9 +1161,9 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 
 <div class="settings-section">
 <div class="settings-label">OBS Dock Mode</div>
-<div class="settings-muted">Use a compact dock layout and reliable in-page pickers instead of browser popup menus.</div>
+<div class="settings-muted">Keep the standard layout, but open logo and macro choices in reliable in-page popup menus.</div>
 
-<div class="pill-row" style="margin-top: 10px;">
+<div class="pill-row" style="margin-top: calc(10px * var(--btn-scale));">
 <label class="pill" style="cursor:pointer; user-select:none;">
 <input id="obsModeToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
 <span class="status-text" style="font-weight:900;">Enabled</span>
@@ -1264,8 +1172,8 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 </div>
 
 <div class="settings-section">
-<div class="settings-label">Button Size</div>
-<div class="settings-muted" style="margin-bottom: 10px;">Adjust preset button text and spacing.</div>
+<div class="settings-label">Interface Size</div>
+<div class="settings-muted" style="margin-bottom: calc(10px * var(--btn-scale));">Adjust the main page, toggles, preset buttons, and settings.</div>
 <input type="range" id="btnTextSizeSlider" min="40" max="200" step="10" style="width:100%;">
 </div>
 
@@ -1373,7 +1281,7 @@ const stored = localStorage.getItem(THEME_KEY) || "system";
 if (stored === "system") applyTheme("system");
 });
 
-// ====== Button scale ======
+// ====== Interface scale ======
 function clamp(n, lo, hi) {
 return Math.max(lo, Math.min(hi, n));
 }
