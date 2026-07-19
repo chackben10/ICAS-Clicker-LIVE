@@ -196,6 +196,19 @@ def ensure_builtin_endpoint_defaults(endpoints: list[EndpointDefinition]) -> lis
                 type(rule).from_dict(rule.to_dict()) for rule in default.match_rules
             ]
             endpoint.allowed_methods = list(default.allowed_methods)
+        if default and endpoint.route == default.route and endpoint.key in {"camera", "service_logo"}:
+            existing_conditional_actions = {
+                (action.action_type, action.condition) for action in endpoint.actions if action.condition
+            }
+            for default_action in default.actions:
+                signature = (default_action.action_type, default_action.condition)
+                if not default_action.condition or signature in existing_conditional_actions:
+                    continue
+                # Preserve configured preset actions while restoring the
+                # optional Clear Slide and Safe Clear Slide behaviors added to
+                # these built-in endpoints after older profiles were created.
+                endpoint.actions.append(ActionDefinition.from_dict(default_action.to_dict()))
+                existing_conditional_actions.add(signature)
         if default and endpoint.key == "debug" and endpoint.route == "/debug":
             endpoint.route = default.route
             endpoint.aliases = list(default.aliases)

@@ -73,7 +73,7 @@ class UndoAndRepairTests(unittest.TestCase):
             reloaded = ConfigRepository(paths).load_endpoints()[0]
             self.assertEqual(reloaded.inputs[0].option_source, "audio_playlists")
 
-    def test_build_context_repairs_legacy_preset_match_rules(self) -> None:
+    def test_build_context_repairs_legacy_preset_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             paths = AppPaths(Path(tmp))
             repo = ConfigRepository(paths)
@@ -83,6 +83,12 @@ class UndoAndRepairTests(unittest.TestCase):
                     continue
                 endpoint.match_rules = []
                 endpoint.allowed_methods = ["GET", "POST"]
+                if endpoint.key in {"camera", "service_logo"}:
+                    endpoint.actions = [
+                        action
+                        for action in endpoint.actions
+                        if action.action_type != "propresenter.clear_slide"
+                    ]
                 legacy_presets.append(endpoint)
             repo.save_endpoints(legacy_presets)
 
@@ -118,6 +124,14 @@ class UndoAndRepairTests(unittest.TestCase):
             for endpoint in reloaded.values():
                 self.assertEqual(len(endpoint.match_rules), 1)
                 self.assertEqual(endpoint.match_rules[0].value, endpoint.key)
+
+            for endpoint_key in {"camera", "service_logo"}:
+                clear_conditions = [
+                    action.condition
+                    for action in reloaded[endpoint_key].actions
+                    if action.action_type == "propresenter.clear_slide"
+                ]
+                self.assertCountEqual(clear_conditions, ["{{clearslide}}", "{{safeclear}}"])
 
     def test_build_context_repairs_page_endpoint_response_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

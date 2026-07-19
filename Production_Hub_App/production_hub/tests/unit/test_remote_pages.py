@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -13,7 +15,7 @@ from production_hub.core.config.defaults import build_default_config
 from production_hub.core.config.input_lists import row, static_cell
 from production_hub.core.config.models import InputListDefinition
 from production_hub.core.config.remote_pages import discover_remote_pages
-from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition
+from production_hub.core.endpoints.models import ActionDefinition, EndpointDefinition, EndpointInputDefinition
 
 
 class InteractiveNestingParser(HTMLParser):
@@ -21,8 +23,15 @@ class InteractiveNestingParser(HTMLParser):
         super().__init__()
         self.button_depth = 0
         self.selects_inside_buttons = 0
+        self.ids: set[str] = set()
+        self.duplicate_ids: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs) -> None:
+        element_id = next((value for key, value in attrs if key == "id"), None)
+        if element_id:
+            if element_id in self.ids:
+                self.duplicate_ids.add(element_id)
+            self.ids.add(element_id)
         if tag == "button":
             self.button_depth += 1
         elif tag == "select" and self.button_depth:
@@ -82,10 +91,29 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             )
         self.assertIn('setInterval(refreshRuntimeState, 10000)', html)
         self.assertNotIn('setInterval(fullRefresh, 10000)', html)
+        self.assertIn('const payload = { preset: presetName, clearslide: true };', html)
+        self.assertIn('const payload = { macro_name: name, name };', html)
 
         parser = InteractiveNestingParser()
         parser.feed(html)
         self.assertEqual(0, parser.selects_inside_buttons)
+        self.assertEqual(set(), parser.duplicate_ids)
+
+        referenced_ids = set(re.findall(r'document\.getElementById\("([^"]+)"\)', html))
+        self.assertEqual(set(), referenced_ids - parser.ids)
+
+        for interaction in [
+            'attachTapHandler(btnSetMacro, () => runMacro());',
+            'attachTapHandler(btnCameraClearSlide, () => runPresetClearSlide("camera"));',
+            'attachTapHandler(btnServiceLogoClearSlide, () => runPresetClearSlide("service_logo"));',
+            'attachTapHandler(btnAudioControl, () => openAudioModal());',
+            'attachTapHandler(btnClearAudio, async () => {',
+            'autoShowToggle.addEventListener("change"',
+            'clickerActivationToggle.addEventListener("change"',
+            'obsModeToggle.addEventListener("change"',
+            'btnTextSizeSlider.addEventListener("input"',
+        ]:
+            self.assertIn(interaction, html)
 
     def test_control_page_interface_scale_covers_main_page_and_settings(self) -> None:
         root_control = Path(__file__).resolve().parents[4] / "control.html"
@@ -114,6 +142,104 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             )
 
         self.assertIn('<div class="settings-label">Interface Size</div>', html)
+
+    def test_control_macro_payload_works_with_legacy_required_input(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.endpoint_registry.replace_all(
+                [
+                    EndpointDefinition(
+                        "trigger_macro",
+                        "Trigger Macro",
+                        "/macro",
+                        [ActionDefinition("propresenter.trigger_macro")],
+                        allowed_methods=["POST"],
+                        inputs=[
+                            EndpointInputDefinition(
+                                "macro_name",
+                                "Macro",
+                                "select",
+                                required=True,
+                            )
+                        ],
+                    )
+                ]
+            )
+            context.propresenter.trigger_macro = AsyncMock(return_value=True)
+
+            response = TestClient(create_app(context)).post(
+                "/macro",
+                json={"macro_name": "Stage Display", "name": "Stage Display"},
+            )
+
+            self.assertEqual(200, response.status_code)
+            context.propresenter.trigger_macro.assert_awaited_once_with("Stage Display")
+
+    def test_all_control_page_backend_contracts_execute(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.propresenter.trigger_presentation_label = AsyncMock(return_value=True)
+            context.propresenter.clear_announcements = AsyncMock(return_value=True)
+            context.propresenter.trigger_service_logo = AsyncMock(return_value=True)
+            context.propresenter.clear_slide = AsyncMock(return_value=True)
+            context.propresenter.trigger_macro = AsyncMock(return_value=True)
+            context.obs.set_scene = AsyncMock(return_value=True)
+            context.propresenter.audio.playlists = AsyncMock(return_value=["Pads"])
+            context.propresenter.audio.playlist_tracks = AsyncMock(return_value=["Peace.mp3"])
+            context.propresenter.audio.active_text = AsyncMock(return_value="Peace.mp3")
+            context.propresenter.audio.find_track_in_playlist = AsyncMock(return_value=None)
+            context.propresenter.audio.trigger = AsyncMock(return_value=True)
+            context.propresenter.audio.clear = AsyncMock(return_value=True)
+            client = TestClient(create_app(context))
+
+            for route in [
+                "/health",
+                "/service_logos",
+                "/macros",
+                "/audio/playlists",
+                "/audio/tracks?playlist=Pads",
+                "/audio/active",
+                "/auto-show",
+                "/clicker-presentation-activation",
+            ]:
+                with self.subTest(method="GET", route=route):
+                    self.assertEqual(200, client.get(route).status_code)
+
+            preset_payloads = [
+                {"preset": "stream_beginning"},
+                {"preset": "camera"},
+                {"preset": "service_logo", "service_logo_uuid": "service-logo-uuid"},
+                {"preset": "show_slides"},
+                {"preset": "testimonies", "service_logo_uuid": "testimony-logo-uuid"},
+                {"preset": "ending_stream"},
+                {"preset": "clear_slide"},
+                {"preset": "nsc_setup"},
+                {"preset": "camera", "clearslide": True},
+                {
+                    "preset": "service_logo",
+                    "service_logo_uuid": "service-logo-uuid",
+                    "clearslide": True,
+                },
+            ]
+            for payload in preset_payloads:
+                with self.subTest(method="POST", route="/preset", payload=payload):
+                    self.assertEqual(200, client.post("/preset", json=payload).status_code)
+
+            post_requests = [
+                ("/macro", {"macro_name": "Stage Display", "name": "Stage Display"}),
+                ("/audio/trigger", {"playlist": "Pads", "track": "Peace.mp3"}),
+                ("/audio/clear", None),
+                ("/auto-show", {"enabled": True}),
+                ("/clicker-presentation-activation", {"enabled": False}),
+            ]
+            for route, payload in post_requests:
+                with self.subTest(method="POST", route=route):
+                    response = client.post(route, json=payload) if payload is not None else client.post(route)
+                    self.assertEqual(200, response.status_code)
+
+            context.propresenter.trigger_macro.assert_awaited_with("Stage Display")
+            context.propresenter.audio.trigger.assert_awaited_with("Pads", "Peace.mp3")
+            context.propresenter.audio.clear.assert_awaited_once()
 
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]

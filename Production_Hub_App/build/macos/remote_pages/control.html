@@ -2012,7 +2012,7 @@ return;
 
 const { preset } = endpoints();
 const url = `${preset}?clearslide=true`;
-const payload = { preset: presetName };
+const payload = { preset: presetName, clearslide: true };
 
 if (presetName === "service_logo") {
 const uuid = getStored(SERVICE_LOGO_UUID_KEY) || (serviceLogoSelect ? serviceLogoSelect.value : "");
@@ -2061,10 +2061,11 @@ return;
 setLastAction(`Running macro: ${name}`);
 
 try {
+const payload = { macro_name: name, name };
 const res = await fetch(macro, {
 method: "POST",
 headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ name })
+body: JSON.stringify(payload)
 });
 
 if (!res.ok) throw new Error("Bad response");
@@ -2113,6 +2114,7 @@ const { audioTracks } = endpoints();
 
 try {
 const res = await fetch(`${audioTracks}?playlist=${encodeURIComponent(name)}`);
+if (!res.ok) throw new Error("Failed to load audio tracks");
 const data = await res.json();
 const items = Array.isArray(data?.items) ? data.items : [];
 
@@ -2143,7 +2145,7 @@ setLastAction(`Playing Pad: ${trackName}`);
 const { audioTrigger } = endpoints();
 
 try {
-await fetch(audioTrigger, {
+const res = await fetch(audioTrigger, {
 method: "POST",
 body: JSON.stringify({
 playlist: playlistName,
@@ -2153,9 +2155,11 @@ headers: {
 "Content-Type": "application/json"
 }
 });
+if (!res.ok) throw new Error("Failed to trigger audio");
 
 setTimeout(refreshNowPlayingAudio, 300);
 } catch (err) {
+setLastAction(`Failed Pad: ${trackName}`);
 console.error(err);
 }
 };
@@ -2169,7 +2173,10 @@ refreshNowPlayingAudio();
 const { audioPlaylists } = endpoints();
 
 fetch(audioPlaylists)
-.then(res => res.json())
+.then(res => {
+if (!res.ok) throw new Error("Failed to load audio playlists");
+return res.json();
+})
 .then(data => {
 const items = Array.isArray(data?.items) ? data.items : [];
 
@@ -2216,14 +2223,17 @@ attachTapHandler(btnNSCSetup, () => runPreset("nsc_setup"));
 attachTapHandler(btnAudioControl, () => openAudioModal());
 
 attachTapHandler(btnClearAudio, async () => {
-setLastAction("Cleared Ambient Audio");
+setLastAction("Clearing Ambient Audio");
 
 const { audioClear } = endpoints();
 
 try {
-await fetch(audioClear, { method: "POST" });
+const res = await fetch(audioClear, { method: "POST" });
+if (!res.ok) throw new Error("Failed to clear audio");
+setLastAction("Cleared Ambient Audio");
 setTimeout(refreshNowPlayingAudio, 300);
 } catch (err) {
+setLastAction("Failed to Clear Ambient Audio");
 console.error(err);
 }
 });
