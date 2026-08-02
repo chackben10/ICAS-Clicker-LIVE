@@ -385,6 +385,174 @@
       opacity: 0.6;
     }
 
+    .playlist-controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 0.85fr) minmax(0, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .playlist-nav-btn,
+    .playlist-menu-btn {
+      min-width: 0;
+      min-height: 58px;
+      padding: 9px 11px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--slide-bg);
+      color: var(--slide-text);
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .playlist-nav-btn:hover,
+    .playlist-nav-btn:focus-visible,
+    .playlist-menu-btn:hover,
+    .playlist-menu-btn:focus-visible {
+      background: var(--label-bg);
+      border-color: #007aff;
+      outline: none;
+    }
+
+    .playlist-nav-direction,
+    .playlist-menu-context {
+      display: block;
+      color: var(--status-grey);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .playlist-nav-title,
+    .playlist-menu-name {
+      display: block;
+      margin-top: 4px;
+      overflow: hidden;
+      font-size: 0.86rem;
+      font-weight: 650;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .playlist-menu-btn {
+      text-align: center;
+    }
+
+    .playlist-controls-status {
+      grid-column: 1 / -1;
+      min-height: 0;
+      color: var(--status-grey);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    .playlist-dialog-card {
+      width: min(100%, 440px);
+    }
+
+    .playlist-dialog-context {
+      margin: -5px 0 12px;
+      color: var(--status-grey);
+      font-size: 0.86rem;
+    }
+
+    .playlist-menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .playlist-menu-item,
+    .playlist-menu-placeholder,
+    .playlist-menu-header {
+      width: 100%;
+      border-radius: 9px;
+      text-align: left;
+    }
+
+    .playlist-menu-item {
+      padding: 10px 11px;
+      border: 1px solid var(--border-color);
+      background: var(--slide-bg);
+      color: var(--slide-text);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .playlist-menu-item:hover,
+    .playlist-menu-item:focus-visible {
+      background: var(--label-bg);
+      border-color: #007aff;
+      outline: none;
+    }
+
+    .playlist-menu-item.current {
+      border-color: #007aff;
+      box-shadow: inset 3px 0 #007aff;
+    }
+
+    .playlist-menu-header {
+      margin-top: 5px;
+      padding: 8px 10px 6px;
+      border-left: 4px solid var(--status-grey);
+      color: var(--status-grey);
+      font-size: 0.76rem;
+      font-weight: 750;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .playlist-menu-placeholder {
+      padding: 9px 11px;
+      border: 1px dashed var(--border-color);
+      color: var(--status-grey);
+      font-size: 0.86rem;
+      opacity: 0.72;
+    }
+
+    .playlist-disabled-label {
+      float: right;
+      margin-left: 8px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .dialog-message {
+      color: var(--status-grey);
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      margin-top: 18px;
+    }
+
+    .dialog-action-btn {
+      min-height: 40px;
+      padding: 8px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--settings-text);
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    .dialog-action-btn.primary {
+      border-color: #ff5252;
+      background: #ff5252;
+      color: #ffffff;
+    }
+
     .search-view {
       width: 100%;
     }
@@ -562,6 +730,23 @@
       }
 
       .return-live-btn {
+        width: 100%;
+      }
+
+      .playlist-controls {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .playlist-menu-btn {
+        grid-column: 1 / -1;
+        grid-row: 1;
+      }
+
+      .dialog-actions {
+        flex-direction: column-reverse;
+      }
+
+      .dialog-action-btn {
         width: 100%;
       }
     }
@@ -766,7 +951,7 @@
           </div>
         </div>
         <button id="returnToLiveButton" class="return-live-btn" type="button">
-          Return to Live Presentation
+          Return to Active Presentation
         </button>
       </div>
 
@@ -777,6 +962,22 @@
       </div>
 
       <div id="slidesContainer" class="slides-list"></div>
+
+      <div id="playlistControls" class="playlist-controls" aria-label="Playlist presentation controls" hidden>
+        <button id="previousPresentationButton" class="playlist-nav-btn" type="button">
+          <span class="playlist-nav-direction">← Previous</span>
+          <span id="previousPresentationTitle" class="playlist-nav-title"></span>
+        </button>
+        <button id="playlistMenuButton" class="playlist-menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="playlistMenuOverlay">
+          <span class="playlist-menu-context">Playlist</span>
+          <span id="playlistMenuName" class="playlist-menu-name"></span>
+        </button>
+        <button id="nextPresentationButton" class="playlist-nav-btn" type="button">
+          <span class="playlist-nav-direction">Next →</span>
+          <span id="nextPresentationTitle" class="playlist-nav-title"></span>
+        </button>
+        <div id="playlistControlsStatus" class="playlist-controls-status" aria-live="polite"></div>
+      </div>
     </main>
 
     <section id="searchView" class="search-view" aria-label="Song Library Search" hidden>
@@ -907,9 +1108,38 @@
           </label>
         </div>
         <div class="settings-subtitle">Shows slide labels at the lower-right of each slide card</div>
+
+        <div class="settings-row" style="margin-top: 12px;">
+          <span>Playlist Controls</span>
+          <label class="switch" aria-label="Playlist Controls">
+            <input type="checkbox" id="playlistControlsToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="settings-subtitle">Shows playlist navigation below the active presentation</div>
       </div>
 
       <button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+    </div>
+  </div>
+
+  <div id="playlistMenuOverlay" class="settings-overlay" aria-hidden="true">
+    <div class="settings-card playlist-dialog-card" role="dialog" aria-modal="true" aria-labelledby="playlistMenuTitle">
+      <div id="playlistMenuTitle" class="settings-title">Playlist</div>
+      <div id="playlistMenuContext" class="playlist-dialog-context"></div>
+      <div id="playlistMenuItems" class="playlist-menu-list"></div>
+      <button id="playlistMenuCloseButton" class="settings-close-btn" type="button">Close</button>
+    </div>
+  </div>
+
+  <div id="switchConfirmationOverlay" class="settings-overlay" aria-hidden="true">
+    <div class="settings-card" role="alertdialog" aria-modal="true" aria-labelledby="switchConfirmationTitle" aria-describedby="switchConfirmationMessage">
+      <div id="switchConfirmationTitle" class="settings-title">Switch presentation?</div>
+      <div id="switchConfirmationMessage" class="dialog-message"></div>
+      <div class="dialog-actions">
+        <button id="switchConfirmationCancel" class="dialog-action-btn" type="button">Cancel</button>
+        <button id="switchConfirmationConfirm" class="dialog-action-btn primary" type="button">Switch Presentation</button>
+      </div>
     </div>
   </div>
 
@@ -940,6 +1170,7 @@
       showNotes: "icas-show-slide-notes",
       showDisabledSlides: "icas-show-disabled-slides",
       showLabels: "icas-show-slide-labels",
+      playlistControls: "icas-playlist-controls-visible",
       advancedOpen: "icas-advanced-settings-open"
     });
 
@@ -953,6 +1184,7 @@
       showNotes: false,
       showDisabledSlides: false,
       showLabels: false,
+      playlistControls: true,
       advancedOpen: false
     });
 
@@ -961,12 +1193,13 @@
     const STATUS_REFRESH_MS = 1000;
     const ACTIVATION_PERMISSION_REFRESH_MS = 1000;
     const FOCUS_REFRESH_DELAY_MS = 350;
-    const ACTIVATION_CONFIRM_TIMEOUT_MS = 3000;
+    const ACTIVATION_CONFIRM_TIMEOUT_MS = 6000;
     const ACTIVATION_CONFIRM_POLL_MS = 150;
 
     let pendingSelectedIndex = null;
     let lastSlideIndexForAutoScroll = null;
     let currentPresentationUuid = null;
+    let livePresentationUuid = null;
     let presentationViewMode = "live";
     let libraryPreview = null;
     let presentationViewRevision = 0;
@@ -980,6 +1213,11 @@
     let searchRequestController = null;
     let searchRequestSequence = 0;
     let searchResultDescriptionSequence = 0;
+    let playlistState = null;
+    let playlistRefreshPromise = null;
+    let playlistPreviewLoadInFlight = false;
+    let switchConfirmationResolve = null;
+    let switchConfirmationPreviousFocus = null;
 
     const thumbCache = Object.create(null);
     const thumbInflight = Object.create(null);
@@ -1004,6 +1242,25 @@
       dom.libraryPreviewStatus = document.getElementById("libraryPreviewStatus");
       dom.returnToLiveButton = document.getElementById("returnToLiveButton");
 
+      dom.playlistControls = document.getElementById("playlistControls");
+      dom.previousPresentationButton = document.getElementById("previousPresentationButton");
+      dom.previousPresentationTitle = document.getElementById("previousPresentationTitle");
+      dom.playlistMenuButton = document.getElementById("playlistMenuButton");
+      dom.playlistMenuName = document.getElementById("playlistMenuName");
+      dom.nextPresentationButton = document.getElementById("nextPresentationButton");
+      dom.nextPresentationTitle = document.getElementById("nextPresentationTitle");
+      dom.playlistControlsStatus = document.getElementById("playlistControlsStatus");
+      dom.playlistMenuOverlay = document.getElementById("playlistMenuOverlay");
+      dom.playlistMenuTitle = document.getElementById("playlistMenuTitle");
+      dom.playlistMenuContext = document.getElementById("playlistMenuContext");
+      dom.playlistMenuItems = document.getElementById("playlistMenuItems");
+      dom.playlistMenuCloseButton = document.getElementById("playlistMenuCloseButton");
+
+      dom.switchConfirmationOverlay = document.getElementById("switchConfirmationOverlay");
+      dom.switchConfirmationMessage = document.getElementById("switchConfirmationMessage");
+      dom.switchConfirmationCancel = document.getElementById("switchConfirmationCancel");
+      dom.switchConfirmationConfirm = document.getElementById("switchConfirmationConfirm");
+
       dom.settingsButton = document.getElementById("settingsButton");
       dom.settingsOverlay = document.getElementById("settingsOverlay");
       dom.settingsCloseButton = document.getElementById("settingsCloseButton");
@@ -1014,6 +1271,7 @@
       dom.showNotesToggle = document.getElementById("showNotesToggle");
       dom.showDisabledSlidesToggle = document.getElementById("showDisabledSlidesToggle");
       dom.showLabelsToggle = document.getElementById("showLabelsToggle");
+      dom.playlistControlsToggle = document.getElementById("playlistControlsToggle");
 
       dom.textSizeSlider = document.getElementById("textSizeSlider");
       dom.textSizeValue = document.getElementById("textSizeValue");
@@ -1107,6 +1365,14 @@
       setStoredBool(STORAGE_KEYS.showLabels, value);
     }
 
+    function getPlaylistControlsEnabled() {
+      return getStoredBool(STORAGE_KEYS.playlistControls, DEFAULTS.playlistControls);
+    }
+
+    function setPlaylistControlsEnabled(value) {
+      setStoredBool(STORAGE_KEYS.playlistControls, value);
+    }
+
     function getAdvancedOpen() {
       return getStoredBool(STORAGE_KEYS.advancedOpen, DEFAULTS.advancedOpen);
     }
@@ -1186,6 +1452,7 @@
       dom.showNotesToggle.checked = getShowNotes();
       dom.showDisabledSlidesToggle.checked = getShowDisabledSlides();
       dom.showLabelsToggle.checked = getShowLabels();
+      dom.playlistControlsToggle.checked = getPlaylistControlsEnabled();
 
       updateSegmentUI(dom.previewPreferenceButtons, "pref", getPreviewPreference());
       updateSegmentUI(dom.themeButtons, "mode", getThemeMode());
@@ -1522,7 +1789,7 @@
       item.addEventListener("click", () => {
         if (settings.viewerMode || isCurrent || state.interactionLocked) return;
         if (state.mode === "library-preview") {
-          triggerLibraryPreviewSlide(index);
+          triggerPreviewSlide(index);
           return;
         }
         focusSlide(index);
@@ -1626,12 +1893,208 @@
       return String(presentationFromPayload(payload)?.id?.uuid || "").trim();
     }
 
+    function playlistItemIndex(item) {
+      const rawValue = item?.id?.index;
+      if (rawValue === null || rawValue === undefined || rawValue === "") return null;
+      const value = Number(rawValue);
+      return Number.isInteger(value) && value >= 0 ? value : null;
+    }
+
+    function playlistPresentationUuid(item) {
+      return String(item?.presentation_info?.presentation_uuid || "").trim();
+    }
+
+    function isAllowedPlaylistPresentation(item) {
+      return item?.type === "presentation" &&
+        item?.destination === "presentation" &&
+        item?.is_hidden === false &&
+        Boolean(playlistPresentationUuid(item));
+    }
+
+    function eligiblePlaylistItems() {
+      if (!playlistState || !Array.isArray(playlistState.items)) return [];
+      return playlistState.items
+        .filter(isAllowedPlaylistPresentation)
+        .filter(item => playlistItemIndex(item) !== null)
+        .sort((left, right) => playlistItemIndex(left) - playlistItemIndex(right));
+    }
+
+    function playlistNeighbors() {
+      const focusedIndex = playlistState?.focusedIndex;
+      if (!Number.isInteger(focusedIndex)) return { previous: null, next: null };
+      const eligible = eligiblePlaylistItems();
+      return {
+        previous: [...eligible].reverse().find(item => playlistItemIndex(item) < focusedIndex) || null,
+        next: eligible.find(item => playlistItemIndex(item) > focusedIndex) || null
+      };
+    }
+
+    function setPlaylistControlsStatus(message = "") {
+      dom.playlistControlsStatus.textContent = message;
+    }
+
+    function renderPlaylistControls() {
+      const visible = getPlaylistControlsEnabled() &&
+        presentationViewMode === "live" &&
+        Boolean(playlistState?.uuid) &&
+        Number.isInteger(playlistState?.focusedIndex);
+      dom.playlistControls.hidden = !visible;
+      if (!visible) return;
+
+      const { previous, next } = playlistNeighbors();
+      dom.previousPresentationButton.hidden = !previous;
+      dom.nextPresentationButton.hidden = !next;
+      dom.previousPresentationTitle.textContent = String(previous?.id?.name || "");
+      dom.nextPresentationTitle.textContent = String(next?.id?.name || "");
+      dom.previousPresentationButton.title = previous ? `Preview ${String(previous?.id?.name || "previous presentation")}` : "";
+      dom.nextPresentationButton.title = next ? `Preview ${String(next?.id?.name || "next presentation")}` : "";
+      dom.playlistMenuName.textContent = playlistState.name || "Current Playlist";
+      dom.previousPresentationButton.disabled = playlistPreviewLoadInFlight;
+      dom.nextPresentationButton.disabled = playlistPreviewLoadInFlight;
+      dom.playlistMenuButton.disabled = playlistPreviewLoadInFlight;
+    }
+
+    function clearPlaylistState() {
+      playlistState = null;
+      setPlaylistControlsStatus();
+      renderPlaylistControls();
+      closePlaylistMenu({ restoreFocus: false });
+    }
+
+    function playlistHeaderColor(item) {
+      const color = item?.header_color;
+      if (!color || typeof color !== "object") return "";
+      const channel = value => Math.round(Math.min(1, Math.max(0, Number(value) || 0)) * 255);
+      return `rgba(${channel(color.red)}, ${channel(color.green)}, ${channel(color.blue)}, ${Math.min(1, Math.max(0, Number(color.alpha) || 1))})`;
+    }
+
+    function renderPlaylistMenuItems() {
+      dom.playlistMenuItems.replaceChildren();
+      if (!playlistState || !Array.isArray(playlistState.items)) return;
+
+      playlistState.items.forEach(item => {
+        const type = String(item?.type || "");
+        const name = String(item?.id?.name || (type === "placeholder" ? "Placeholder" : "Untitled"));
+
+        if (type === "header") {
+          const header = document.createElement("div");
+          header.className = "playlist-menu-header";
+          header.textContent = name;
+          const color = playlistHeaderColor(item);
+          if (color) header.style.borderLeftColor = color;
+          dom.playlistMenuItems.appendChild(header);
+          return;
+        }
+
+        if (type === "placeholder") {
+          const placeholder = document.createElement("div");
+          placeholder.className = "playlist-menu-placeholder";
+          placeholder.textContent = name;
+          const label = document.createElement("span");
+          label.className = "playlist-disabled-label";
+          label.textContent = "Placeholder · unavailable";
+          placeholder.appendChild(label);
+          dom.playlistMenuItems.appendChild(placeholder);
+          return;
+        }
+
+        if (!isAllowedPlaylistPresentation(item)) return;
+
+        const button = document.createElement("button");
+        button.className = "playlist-menu-item";
+        button.type = "button";
+        button.textContent = name;
+        const itemIndex = playlistItemIndex(item);
+        button.classList.toggle("current", itemIndex === playlistState.focusedIndex);
+        if (itemIndex === playlistState.focusedIndex) {
+          button.setAttribute("aria-current", "true");
+        }
+        button.addEventListener("click", () => selectPlaylistPresentation(item));
+        dom.playlistMenuItems.appendChild(button);
+      });
+    }
+
+    function closePlaylistMenu(options = {}) {
+      if (!dom.playlistMenuOverlay) return;
+      const wasOpen = dom.playlistMenuOverlay.style.display === "flex";
+      dom.playlistMenuOverlay.style.display = "none";
+      dom.playlistMenuOverlay.setAttribute("aria-hidden", "true");
+      dom.playlistMenuButton?.setAttribute("aria-expanded", "false");
+      if (wasOpen && options.restoreFocus !== false) dom.playlistMenuButton?.focus();
+    }
+
+    async function openPlaylistMenu() {
+      await refreshPlaylistContext(true);
+      if (!playlistState || presentationViewMode !== "live") return;
+      renderPlaylistMenuItems();
+      dom.playlistMenuTitle.textContent = playlistState.name || "Playlist";
+      dom.playlistMenuContext.textContent = "Choose a presentation to preview. Headers and placeholders are not selectable.";
+      dom.playlistMenuOverlay.style.display = "flex";
+      dom.playlistMenuOverlay.setAttribute("aria-hidden", "false");
+      dom.playlistMenuButton.setAttribute("aria-expanded", "true");
+      (dom.playlistMenuItems.querySelector("button") || dom.playlistMenuCloseButton).focus();
+    }
+
+    async function refreshPlaylistContext(forcePlaylist = false) {
+      if (!getPlaylistControlsEnabled() || presentationViewMode !== "live") {
+        renderPlaylistControls();
+        return;
+      }
+      if (playlistRefreshPromise) {
+        await playlistRefreshPromise;
+        if (forcePlaylist) return refreshPlaylistContext(true);
+        return;
+      }
+
+      playlistRefreshPromise = (async () => {
+        try {
+          const focused = await fetchJson(`${BASE_URL}/playlist/focused`);
+          const playlist = focused?.playlist;
+          const item = focused?.item;
+          const uuid = String(playlist?.uuid || "").trim();
+          const rawFocusedIndex = item?.index;
+          const focusedIndex = rawFocusedIndex === null || rawFocusedIndex === undefined || rawFocusedIndex === ""
+            ? Number.NaN
+            : Number(rawFocusedIndex);
+          if (!uuid || !Number.isInteger(focusedIndex)) {
+            clearPlaylistState();
+            return;
+          }
+
+          let payload = playlistState?.uuid === uuid ? playlistState.payload : null;
+          if (forcePlaylist || !payload) {
+            payload = await fetchJson(`${BASE_URL}/playlist/${encodeURIComponent(uuid)}`);
+          }
+          playlistState = {
+            uuid,
+            name: String(playlist?.name || payload?.id?.name || "Current Playlist"),
+            focusedIndex,
+            items: Array.isArray(payload?.items) ? payload.items : [],
+            payload
+          };
+          setPlaylistControlsStatus();
+          renderPlaylistControls();
+        } catch (error) {
+          console.warn("Playlist controls are temporarily unavailable", error);
+          if (playlistState) {
+            setPlaylistControlsStatus("Playlist information could not be refreshed. Try opening the menu again.");
+            renderPlaylistControls();
+          } else {
+            dom.playlistControls.hidden = true;
+          }
+        } finally {
+          playlistRefreshPromise = null;
+        }
+      })();
+      return playlistRefreshPromise;
+    }
+
     function libraryPreviewPermissionMessage() {
       if (clickerPresentationActivationEnabled === false) {
-        return "Presentation changes are disabled by the media operator. You can search and read every slide, but cannot take this song live.";
+        return "Presentation changes are disabled by the media operator. You can read every slide, but cannot take this presentation live.";
       }
       if (clickerPresentationActivationEnabled === null) {
-        return "Checking whether searched presentations can be taken live…";
+        return "Checking whether this presentation can be taken live…";
       }
       return "Only this device is previewing this presentation. Select a slide to take it live.";
     }
@@ -1715,22 +2178,27 @@
       dom.searchModeButton.disabled = active && previewTriggerInFlight;
 
       if (active) {
+        const sourceLabel = libraryPreview?.source?.kind === "playlist" ? "Playlist Preview" : "Library Preview";
         dom.libraryPreviewLabel.textContent = clickerPresentationActivationEnabled === false
           ? "Song Book Mode"
-          : "Library Preview";
+          : sourceLabel;
         dom.libraryPreviewStatus.textContent = message || libraryPreviewPermissionMessage();
       }
 
       applySearchBarVisibility();
+      renderPlaylistControls();
     }
 
-    function showLibraryPreview(result, payload) {
+    function showLibraryPreview(result, payload, source = { kind: "library" }) {
       const requestedUuid = String(result?.uuid || "").trim();
       const returnedUuid = presentationUuid(payload);
       libraryPreview = {
         uuid: returnedUuid || requestedUuid,
         name: String(presentationFromPayload(payload)?.id?.name || result?.name || "Untitled Song"),
-        payload
+        payload,
+        source,
+        isDifferentPresentation: !livePresentationUuid ||
+          (returnedUuid || requestedUuid).toLowerCase() !== livePresentationUuid.toLowerCase()
       };
       presentationViewMode = "library-preview";
       presentationViewRevision += 1;
@@ -1774,18 +2242,30 @@
       return [];
     }
 
-    async function selectSongResult(result) {
+    async function loadPresentationPreview(result, source) {
       const uuid = String(result?.uuid || "").trim();
       if (!uuid) {
-        dom.searchResultsStatus.textContent = "This song does not have a presentation UUID yet.";
+        if (source?.kind === "playlist") {
+          setPlaylistControlsStatus("This playlist item does not have a presentation UUID.");
+        } else {
+          dom.searchResultsStatus.textContent = "This song does not have a presentation UUID yet.";
+        }
         return;
       }
 
       const sequence = ++presentationRequestSequence;
       presentationRequestController?.abort();
       presentationRequestController = new AbortController();
-      dom.searchResultsStatus.textContent = `Loading “${String(result?.name || "song")}”…`;
-      dom.searchView.setAttribute("aria-busy", "true");
+      const fromPlaylist = source?.kind === "playlist";
+      if (fromPlaylist) {
+        closePlaylistMenu({ restoreFocus: false });
+        playlistPreviewLoadInFlight = true;
+        setPlaylistControlsStatus(`Loading “${String(result?.name || "presentation")}”…`);
+        renderPlaylistControls();
+      } else {
+        dom.searchResultsStatus.textContent = `Loading “${String(result?.name || "song")}”…`;
+        dom.searchView.setAttribute("aria-busy", "true");
+      }
 
       try {
         const payload = await fetchJson(
@@ -1801,16 +2281,47 @@
           throw new Error("Presentation response UUID did not match the selected song");
         }
 
-        showLibraryPreview(result, payload);
+        showLibraryPreview(result, payload, source);
       } catch (error) {
         if (error?.name === "AbortError" || sequence !== presentationRequestSequence) return;
         console.error(error);
-        dom.searchResultsStatus.textContent = "This presentation could not be loaded. Choose another song or try again.";
+        if (fromPlaylist) {
+          setPlaylistControlsStatus("This presentation could not be loaded. Choose it again to retry.");
+        } else {
+          dom.searchResultsStatus.textContent = "This presentation could not be loaded. Choose another song or try again.";
+        }
       } finally {
         if (sequence === presentationRequestSequence) {
-          dom.searchView.setAttribute("aria-busy", "false");
+          if (fromPlaylist) {
+            playlistPreviewLoadInFlight = false;
+            renderPlaylistControls();
+          } else {
+            dom.searchView.setAttribute("aria-busy", "false");
+          }
         }
       }
+    }
+
+    async function selectSongResult(result) {
+      return loadPresentationPreview(result, { kind: "library" });
+    }
+
+    async function selectPlaylistPresentation(item) {
+      if (playlistPreviewLoadInFlight || !playlistState || !isAllowedPlaylistPresentation(item)) return;
+      const itemIndex = playlistItemIndex(item);
+      if (itemIndex === null) return;
+      return loadPresentationPreview(
+        {
+          uuid: playlistPresentationUuid(item),
+          name: String(item?.id?.name || "Untitled Presentation")
+        },
+        {
+          kind: "playlist",
+          playlistUuid: playlistState.uuid,
+          playlistName: playlistState.name,
+          itemIndex
+        }
+      );
     }
 
     function buildSongResultRow(result) {
@@ -1919,6 +2430,7 @@
 
     function setSearchMode(active) {
       if (active && previewTriggerInFlight) return;
+      const wasActive = searchModeActive;
       searchModeActive = Boolean(active);
       dom.clickerView.hidden = searchModeActive;
       dom.searchView.hidden = !searchModeActive;
@@ -1935,7 +2447,7 @@
 
       searchRequestController?.abort();
       presentationRequestController?.abort();
-      dom.searchModeButton.focus();
+      if (wasActive) dom.searchModeButton.focus();
     }
 
     async function focusSlide(index) {
@@ -1946,6 +2458,30 @@
 
     function wait(milliseconds) {
       return new Promise(resolve => setTimeout(resolve, milliseconds));
+    }
+
+    function finishSwitchConfirmation(confirmed) {
+      if (!switchConfirmationResolve) return;
+      const resolve = switchConfirmationResolve;
+      switchConfirmationResolve = null;
+      dom.switchConfirmationOverlay.style.display = "none";
+      dom.switchConfirmationOverlay.setAttribute("aria-hidden", "true");
+      const previousFocus = switchConfirmationPreviousFocus;
+      switchConfirmationPreviousFocus = null;
+      if (previousFocus?.isConnected) previousFocus.focus();
+      resolve(Boolean(confirmed));
+    }
+
+    function confirmPresentationSwitch(name, index) {
+      if (switchConfirmationResolve) finishSwitchConfirmation(false);
+      switchConfirmationPreviousFocus = document.activeElement;
+      dom.switchConfirmationMessage.textContent = `Switch to “${name}” and take slide ${index + 1} live?`;
+      dom.switchConfirmationOverlay.style.display = "flex";
+      dom.switchConfirmationOverlay.setAttribute("aria-hidden", "false");
+      dom.switchConfirmationCancel.focus();
+      return new Promise(resolve => {
+        switchConfirmationResolve = resolve;
+      });
     }
 
     async function waitForLivePresentation(uuid, index) {
@@ -1971,7 +2507,7 @@
       return false;
     }
 
-    async function triggerLibraryPreviewSlide(index) {
+    async function triggerPreviewSlide(index) {
       if (presentationViewMode !== "library-preview" || !libraryPreview || previewTriggerInFlight) return;
 
       await refreshClickerPresentationActivation();
@@ -1981,7 +2517,19 @@
         return;
       }
 
+      if (libraryPreview.isDifferentPresentation) {
+        const confirmed = await confirmPresentationSwitch(libraryPreview.name, index);
+        if (!confirmed || presentationViewMode !== "library-preview" || !libraryPreview) return;
+        await refreshClickerPresentationActivation();
+        if (clickerPresentationActivationEnabled !== true) {
+          updateLibraryPreviewUI();
+          renderLibraryPreview();
+          return;
+        }
+      }
+
       const uuid = libraryPreview.uuid;
+      const source = libraryPreview.source || { kind: "library" };
       const revision = presentationViewRevision;
       let failureMessage = "";
       let activationDenied = false;
@@ -1991,8 +2539,11 @@
       renderLibraryPreview();
 
       try {
+        const triggerPath = source.kind === "playlist"
+          ? `/playlist/${encodeURIComponent(source.playlistUuid)}/${encodeURIComponent(source.itemIndex)}/${encodeURIComponent(index)}/trigger`
+          : `/presentation/${encodeURIComponent(uuid)}/${encodeURIComponent(index)}/trigger`;
         const response = await fetch(
-          `${BASE_URL}/presentation/${encodeURIComponent(uuid)}/${encodeURIComponent(index)}/trigger`,
+          `${BASE_URL}${triggerPath}`,
           { method: "POST", cache: "no-store" }
         );
         if (!response.ok) {
@@ -2061,6 +2612,7 @@
 
         const presentation = presentationFromPayload(presentationResponse);
         const uuid = presentation?.id?.uuid || null;
+        livePresentationUuid = uuid;
         const name = presentation?.id?.name || "No active presentation";
         const slides = getSlidesFromPresentation(presentation);
         const totalSlides = slides.length;
@@ -2099,6 +2651,7 @@
         ) {
           lastSlideIndexForAutoScroll = indexValue;
         }
+        refreshPlaylistContext();
       } catch (error) {
         if (revision === presentationViewRevision && presentationViewMode === "live") {
           console.error(error);
@@ -2131,6 +2684,18 @@
       dom.searchModeButton.addEventListener("click", () => setSearchMode(true));
       dom.searchBackButton.addEventListener("click", () => setSearchMode(false));
       dom.returnToLiveButton.addEventListener("click", () => returnToLivePresentation());
+      dom.previousPresentationButton.addEventListener("click", () => {
+        const item = playlistNeighbors().previous;
+        if (item) selectPlaylistPresentation(item);
+      });
+      dom.nextPresentationButton.addEventListener("click", () => {
+        const item = playlistNeighbors().next;
+        if (item) selectPlaylistPresentation(item);
+      });
+      dom.playlistMenuButton.addEventListener("click", openPlaylistMenu);
+      dom.playlistMenuCloseButton.addEventListener("click", closePlaylistMenu);
+      dom.switchConfirmationCancel.addEventListener("click", () => finishSwitchConfirmation(false));
+      dom.switchConfirmationConfirm.addEventListener("click", () => finishSwitchConfirmation(true));
       dom.songSearchInput.addEventListener("input", event => {
         fetchSongResults(event.target.value);
       });
@@ -2138,9 +2703,19 @@
       dom.settingsOverlay.addEventListener("click", event => {
         if (event.target === dom.settingsOverlay) closeModal();
       });
+      dom.playlistMenuOverlay.addEventListener("click", event => {
+        if (event.target === dom.playlistMenuOverlay) closePlaylistMenu();
+      });
+      dom.switchConfirmationOverlay.addEventListener("click", event => {
+        if (event.target === dom.switchConfirmationOverlay) finishSwitchConfirmation(false);
+      });
 
       document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && dom.settingsOverlay.style.display === "flex") {
+        if (event.key === "Escape" && switchConfirmationResolve) {
+          finishSwitchConfirmation(false);
+        } else if (event.key === "Escape" && dom.playlistMenuOverlay.style.display === "flex") {
+          closePlaylistMenu();
+        } else if (event.key === "Escape" && dom.settingsOverlay.style.display === "flex") {
           closeModal();
         } else if (event.key === "Escape" && searchModeActive) {
           setSearchMode(false);
@@ -2174,6 +2749,16 @@
       dom.showLabelsToggle.addEventListener("change", event => {
         setShowLabels(event.target.checked);
         refreshDisplayedPresentation();
+      });
+
+      dom.playlistControlsToggle.addEventListener("change", event => {
+        setPlaylistControlsEnabled(event.target.checked);
+        if (event.target.checked) {
+          refreshPlaylistContext(true);
+        } else {
+          closePlaylistMenu();
+          renderPlaylistControls();
+        }
       });
 
       dom.advancedSettingsButton.addEventListener("click", () => {

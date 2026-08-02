@@ -171,6 +171,8 @@ def ensure_builtin_endpoint_defaults(endpoints: list[EndpointDefinition]) -> lis
     defaults = {item.key: item for item in build_default_endpoints()}
     last_action_data_routes = {
         "/active-presentation",
+        "/playlist/focused",
+        "/playlist/{uuid}",
         "/slide-index",
         "/current-base",
         "/service_logos",
@@ -339,6 +341,15 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         data = await context.propresenter.presentation_by_uuid(uuid)
         return await _action_ok(action, "presentation read", data)
 
+    async def propresenter_get_focused_playlist(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        data = await context.propresenter.focused_playlist()
+        return await _action_ok(action, "focused playlist read", data)
+
+    async def propresenter_get_playlist_by_uuid(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        uuid = str(param(action, action_context, "uuid", "")).strip()
+        data = await context.propresenter.playlist_by_uuid(uuid)
+        return await _action_ok(action, "playlist read", data)
+
     async def propresenter_get_slide_index(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         data = await context.propresenter.slide_index()
         return await _action_ok(action, "slide index read", data)
@@ -387,6 +398,25 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         index = int(param(action, action_context, "index", 0))
         await context.propresenter.trigger_presentation_slide(uuid, index)
         return await _action_ok(action, "presentation slide triggered", {"uuid": uuid, "index": index})
+
+    async def propresenter_trigger_playlist_presentation_slide(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
+        playlist_uuid = str(param(action, action_context, "playlist_uuid", "")).strip()
+        item_index = int(param(action, action_context, "item_index", 0))
+        slide_index = int(param(action, action_context, "slide_index", 0))
+        await context.propresenter.trigger_playlist_presentation_slide(
+            playlist_uuid,
+            item_index,
+            slide_index,
+        )
+        return await _action_ok(
+            action,
+            "playlist presentation slide triggered",
+            {
+                "playlist_uuid": playlist_uuid,
+                "item_index": item_index,
+                "slide_index": slide_index,
+            },
+        )
 
     async def trigger_presentation(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         label = str(param(action, action_context, "label", ""))
@@ -780,6 +810,8 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.previous_slide": propresenter_previous,
         "propresenter.get_active_presentation": propresenter_get_active_presentation,
         "propresenter.get_presentation_by_uuid": propresenter_get_presentation_by_uuid,
+        "propresenter.get_focused_playlist": propresenter_get_focused_playlist,
+        "propresenter.get_playlist_by_uuid": propresenter_get_playlist_by_uuid,
         "propresenter.get_slide_index": propresenter_get_slide_index,
         "propresenter.get_current_base": propresenter_get_current_base,
         "propresenter.get_service_logos": propresenter_get_service_logos,
@@ -787,6 +819,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
         "propresenter.get_thumbnail": propresenter_get_thumbnail,
         "propresenter.focus_slide": propresenter_focus,
         "propresenter.trigger_presentation_slide": propresenter_trigger_presentation_slide,
+        "propresenter.trigger_playlist_presentation_slide": propresenter_trigger_playlist_presentation_slide,
         "propresenter.trigger_presentation": trigger_presentation,
         "propresenter.trigger_service_logo": trigger_service_logo,
         "propresenter.clear_announcements": clear_announcements,

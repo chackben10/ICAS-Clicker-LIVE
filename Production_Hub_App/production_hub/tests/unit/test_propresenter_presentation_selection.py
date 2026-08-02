@@ -33,6 +33,11 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_trigger_presentation_slide_targets_uuid_and_index(self) -> None:
+        self.service.focused_playlist = AsyncMock(return_value={"playlist": None, "item": None})
+        self.service.active_presentation = AsyncMock(
+            return_value={"presentation": {"id": {"uuid": "song/uuid"}}}
+        )
+        self.service.focused_presentation = AsyncMock(return_value={})
         self.service.client.trigger = AsyncMock(return_value=True)
 
         result = await self.service.trigger_presentation_slide("song/uuid", 7)
@@ -41,6 +46,255 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         self.service.client.trigger.assert_awaited_once_with(
             "/presentation/song%2Fuuid/7/trigger"
         )
+
+    async def test_playlist_reads_quote_uuid_and_use_focused_endpoint(self) -> None:
+        self.service.client.get_json = AsyncMock(side_effect=[{"playlist": {}}, {"items": []}])
+
+        focused = await self.service.focused_playlist()
+        playlist = await self.service.playlist_by_uuid("service/with spaces")
+
+        self.assertEqual({"playlist": {}}, focused)
+        self.assertEqual({"items": []}, playlist)
+        self.assertEqual(
+            [
+                unittest.mock.call("/playlist/focused"),
+                unittest.mock.call("/playlist/service%2Fwith%20spaces"),
+            ],
+            self.service.client.get_json.await_args_list,
+        )
+
+    @staticmethod
+    def playlist_item(
+        index: int,
+        uuid: str = "song-uuid",
+        *,
+        item_type: str = "presentation",
+        destination: str = "presentation",
+        hidden: bool = False,
+    ) -> dict:
+        item = {
+            "id": {"uuid": f"item-{index}", "name": f"Item {index}", "index": index},
+            "type": item_type,
+            "destination": destination,
+            "is_hidden": hidden,
+        }
+        if item_type == "presentation":
+            item["presentation_info"] = {"presentation_uuid": uuid}
+        return item
+
+    @staticmethod
+    def presentation_payload(uuid: str = "song-uuid", *, first_enabled: bool = True) -> dict:
+        return {
+            "presentation": {
+                "id": {"uuid": uuid, "name": "Song"},
+                "groups": [{"slides": [{"enabled": first_enabled, "text": "First"}]}],
+            }
+        }
+
+    async def test_searched_song_uses_next_eligible_occurrence_in_focused_playlist(self) -> None:
+        self.service.focused_playlist = AsyncMock(
+            return_value={
+                "playlist": {"uuid": "playlist-uuid"},
+                "item": {"index": 5},
+            }
+        )
+        self.service.playlist_by_uuid = AsyncMock(
+            return_value={
+                "items": [
+                    self.playlist_item(2),
+                    self.playlist_item(6, hidden=True),
+                    self.playlist_item(7, destination="announcements"),
+                    self.playlist_item(8),
+                    self.playlist_item(9, item_type="placeholder"),
+                ]
+            }
+        )
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=True)
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 4)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/playlist/playlist-uuid/8/4/trigger"
+        )
+
+    async def test_searched_song_falls_back_to_closest_earlier_occurrence(self) -> None:
+        self.service.focused_playlist = AsyncMock(
+            return_value={
+                "playlist": {"uuid": "playlist-uuid"},
+                "item": {"index": 10},
+            }
+        )
+        self.service.playlist_by_uuid = AsyncMock(
+            return_value={"items": [self.playlist_item(2), self.playlist_item(7)]}
+        )
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=True)
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 3)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/playlist/playlist-uuid/7/3/trigger"
+        )
+
+    async def test_searched_current_playlist_song_uses_current_occurrence_without_warmup(self) -> None:
+        self.service.focused_playlist = AsyncMock(
+            return_value={
+                "playlist": {"uuid": "playlist-uuid"},
+                "item": {"index": 5},
+            }
+        )
+        self.service.playlist_by_uuid = AsyncMock(
+            return_value={"items": [self.playlist_item(5), self.playlist_item(8)]}
+        )
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=False)
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 3)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/playlist/playlist-uuid/5/3/trigger"
+        )
+        self.service.presentation_by_uuid.assert_not_awaited()
+
+    async def test_searched_song_absent_from_playlist_uses_uuid_route(self) -> None:
+        self.service.focused_playlist = AsyncMock(
+            return_value={
+                "playlist": {"uuid": "playlist-uuid"},
+                "item": {"index": 5},
+            }
+        )
+        self.service.playlist_by_uuid = AsyncMock(
+            return_value={"items": [self.playlist_item(6, "different-uuid")]}
+        )
+        self.service.active_presentation = AsyncMock(return_value={})
+        self.service.focused_presentation = AsyncMock(return_value={})
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=True)
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 2)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/presentation/song-uuid/2/trigger"
+        )
+
+    async def test_focused_playlist_load_failure_does_not_fall_back_and_lose_focus(self) -> None:
+        self.service.focused_playlist = AsyncMock(
+            return_value={
+                "playlist": {"uuid": "playlist-uuid"},
+                "item": {"index": 5},
+            }
+        )
+        self.service.playlist_by_uuid = AsyncMock(side_effect=TimeoutError("playlist unavailable"))
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        with self.assertRaisesRegex(TimeoutError, "playlist unavailable"):
+            await self.service.trigger_presentation_slide("song-uuid", 2)
+
+        self.service.client.trigger.assert_not_awaited()
+
+    async def test_playlist_switch_primes_disabled_first_slide_then_triggers_requested_index(self) -> None:
+        item = self.playlist_item(8)
+        self.service.playlist_by_uuid = AsyncMock(return_value={"items": [item]})
+        self.service.focused_playlist = AsyncMock(
+            return_value={"playlist": {"uuid": "playlist-uuid"}, "item": {"index": 5}}
+        )
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=False)
+        )
+        self.service._target_loaded = AsyncMock(return_value=True)
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_playlist_presentation_slide("playlist-uuid", 8, 4)
+
+        self.assertEqual(
+            [
+                unittest.mock.call("/playlist/playlist-uuid/8/0/trigger"),
+                unittest.mock.call("/playlist/playlist-uuid/8/4/trigger"),
+            ],
+            self.service.client.trigger.await_args_list,
+        )
+
+    async def test_switch_timeout_still_triggers_requested_index(self) -> None:
+        self.service.PRESENTATION_SWITCH_WAIT_SECONDS = 0.01
+        self.service.focused_playlist = AsyncMock(return_value={"playlist": None, "item": None})
+        self.service.active_presentation = AsyncMock(return_value={})
+        self.service.focused_presentation = AsyncMock(return_value={})
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=False)
+        )
+        self.service._target_loaded = AsyncMock(return_value=False)
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 5)
+
+        self.assertEqual(
+            [
+                unittest.mock.call("/presentation/song-uuid/0/trigger"),
+                unittest.mock.call("/presentation/song-uuid/5/trigger"),
+            ],
+            self.service.client.trigger.await_args_list,
+        )
+
+    async def test_switch_without_a_first_slide_triggers_requested_index_once(self) -> None:
+        self.service.focused_playlist = AsyncMock(return_value={"playlist": None, "item": None})
+        self.service.active_presentation = AsyncMock(return_value={})
+        self.service.focused_presentation = AsyncMock(return_value={})
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value={"presentation": {"id": {"uuid": "song-uuid"}, "groups": []}}
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_presentation_slide("song-uuid", 5)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/presentation/song-uuid/5/trigger"
+        )
+
+    async def test_current_playlist_item_and_index_zero_skip_warmup(self) -> None:
+        item = self.playlist_item(8)
+        self.service.playlist_by_uuid = AsyncMock(return_value={"items": [item]})
+        self.service.focused_playlist = AsyncMock(
+            return_value={"playlist": {"uuid": "playlist-uuid"}, "item": {"index": 8}}
+        )
+        self.service.presentation_by_uuid = AsyncMock(
+            return_value=self.presentation_payload(first_enabled=False)
+        )
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+        await self.service.trigger_playlist_presentation_slide("playlist-uuid", 8, 0)
+
+        self.service.client.trigger.assert_awaited_once_with(
+            "/playlist/playlist-uuid/8/0/trigger"
+        )
+        self.service.presentation_by_uuid.assert_not_awaited()
+
+    async def test_playlist_trigger_rejects_non_presentable_items(self) -> None:
+        cases = [
+            self.playlist_item(1, item_type="header"),
+            self.playlist_item(2, item_type="placeholder"),
+            self.playlist_item(3, hidden=True),
+            self.playlist_item(4, destination="announcements"),
+        ]
+        self.service.client.trigger = AsyncMock(return_value=True)
+        for item in cases:
+            with self.subTest(item=item):
+                self.service.playlist_by_uuid = AsyncMock(return_value={"items": [item]})
+                with self.assertRaisesRegex(ValueError, "not an allowed presentation"):
+                    await self.service.trigger_playlist_presentation_slide(
+                        "playlist-uuid",
+                        item["id"]["index"],
+                        1,
+                    )
+        self.service.client.trigger.assert_not_awaited()
 
     async def test_trigger_presentation_slide_rejects_negative_index(self) -> None:
         self.service.client.trigger = AsyncMock(return_value=True)
@@ -54,6 +308,9 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         endpoints = {endpoint.key: endpoint for endpoint in build_default_endpoints()}
         read_endpoint = endpoints["presentation_by_uuid"]
         trigger_endpoint = endpoints["trigger_presentation_slide"]
+        focused_playlist = endpoints["focused_playlist"]
+        playlist_by_uuid = endpoints["playlist_by_uuid"]
+        playlist_trigger = endpoints["trigger_playlist_presentation_slide"]
         activation_get = endpoints["clicker_presentation_activation_get"]
         activation_set = endpoints["clicker_presentation_activation_set"]
 
@@ -67,6 +324,20 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["POST"], trigger_endpoint.allowed_methods)
         self.assertEqual(["uuid", "index"], [item.name for item in trigger_endpoint.inputs])
         self.assertEqual("0", trigger_endpoint.inputs[1].min_value)
+        self.assertEqual("/playlist/focused", focused_playlist.route)
+        self.assertEqual(["GET"], focused_playlist.allowed_methods)
+        self.assertEqual("read", focused_playlist.behavior_mode)
+        self.assertEqual("/playlist/{uuid}", playlist_by_uuid.route)
+        self.assertEqual(["GET"], playlist_by_uuid.allowed_methods)
+        self.assertEqual(
+            "/playlist/{playlist_uuid}/{item_index:int}/{slide_index:int}/trigger",
+            playlist_trigger.route,
+        )
+        self.assertEqual(["POST"], playlist_trigger.allowed_methods)
+        self.assertEqual(
+            ["playlist_uuid", "item_index", "slide_index"],
+            [item.name for item in playlist_trigger.inputs],
+        )
         self.assertEqual("/clicker-presentation-activation", activation_get.route)
         self.assertEqual(["GET"], activation_get.allowed_methods)
         self.assertEqual("read", activation_get.behavior_mode)
@@ -86,6 +357,41 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("trigger_presentation_slide", endpoint.key)
         self.assertEqual({"uuid": "song-uuid", "index": 12}, params)
         self.assertEqual([], registry.matches("/presentation/song-uuid/12/trigger", "GET"))
+
+    def test_playlist_trigger_endpoint_matches_three_path_inputs(self) -> None:
+        registry = EndpointRegistry(build_default_endpoints())
+
+        matches = registry.matches("/playlist/service-uuid/8/3/trigger", "POST")
+
+        self.assertEqual(1, len(matches))
+        endpoint, params = matches[0]
+        self.assertEqual("trigger_playlist_presentation_slide", endpoint.key)
+        self.assertEqual(
+            {"playlist_uuid": "service-uuid", "item_index": 8, "slide_index": 3},
+            params,
+        )
+        self.assertEqual([], registry.matches("/playlist/service-uuid/8/3/trigger", "GET"))
+
+    def test_existing_endpoint_profiles_receive_required_playlist_endpoints(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            context = build_context(data_dir)
+            playlist_keys = {
+                "focused_playlist",
+                "playlist_by_uuid",
+                "trigger_playlist_presentation_slide",
+            }
+            context.config_repository.save_endpoints(
+                [
+                    endpoint
+                    for endpoint in context.endpoint_registry.all()
+                    if endpoint.key not in playlist_keys
+                ]
+            )
+
+            repaired = build_context(data_dir)
+
+            self.assertTrue(playlist_keys.issubset({item.key for item in repaired.endpoint_registry.all()}))
 
     def test_configured_trigger_is_forbidden_when_clicker_activation_is_disabled(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -172,6 +478,93 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(200, response.status_code)
             self.assertEqual({"uuid": "song-uuid", "index": 4}, response.json())
             context.propresenter.trigger_presentation_slide.assert_awaited_once_with("song-uuid", 4)
+
+    def test_playlist_trigger_is_forbidden_when_clicker_activation_is_disabled(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.propresenter.trigger_playlist_presentation_slide = AsyncMock(return_value=True)
+            context.runtime_state_repo.update(
+                lambda state: setattr(state, "clicker_presentation_activation_enabled", False)
+            )
+
+            response = TestClient(create_app(context)).post(
+                "/playlist/service-uuid/8/3/trigger"
+            )
+
+            self.assertEqual(403, response.status_code)
+            self.assertEqual(
+                CLICKER_PRESENTATION_ACTIVATION_DISABLED,
+                response.json()["detail"]["error"],
+            )
+            context.propresenter.trigger_playlist_presentation_slide.assert_not_awaited()
+
+    def test_custom_playlist_trigger_cannot_bypass_disabled_clicker_activation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.endpoint_registry.remove("trigger_playlist_presentation_slide")
+            context.endpoint_registry.register(
+                EndpointDefinition(
+                    "custom_playlist_trigger",
+                    "Custom Playlist Trigger",
+                    "/playlist/{playlist_uuid}/{item_index:int}/{slide_index:int}/trigger",
+                    [
+                        ActionDefinition(
+                            "propresenter.trigger_playlist_presentation_slide",
+                            {
+                                "playlist_uuid": "{{playlist_uuid}}",
+                                "item_index": "{{item_index}}",
+                                "slide_index": "{{slide_index}}",
+                            },
+                        )
+                    ],
+                    allowed_methods=["POST"],
+                )
+            )
+            context.propresenter.trigger_playlist_presentation_slide = AsyncMock(return_value=True)
+            context.runtime_state_repo.update(
+                lambda state: setattr(state, "clicker_presentation_activation_enabled", False)
+            )
+
+            response = TestClient(create_app(context)).post(
+                "/playlist/service-uuid/8/3/trigger"
+            )
+
+            self.assertEqual(403, response.status_code)
+            context.propresenter.trigger_playlist_presentation_slide.assert_not_awaited()
+
+    def test_playlist_reads_and_trigger_execute_through_configured_endpoints(self) -> None:
+        with TemporaryDirectory() as tmp:
+            context = build_context(Path(tmp))
+            context.propresenter.focused_playlist = AsyncMock(
+                return_value={"playlist": {"uuid": "service-uuid"}, "item": {"index": 8}}
+            )
+            context.propresenter.playlist_by_uuid = AsyncMock(
+                return_value={"id": {"uuid": "service-uuid"}, "items": []}
+            )
+            context.propresenter.trigger_playlist_presentation_slide = AsyncMock(return_value=True)
+            client = TestClient(create_app(context))
+
+            focused = client.get("/playlist/focused")
+            playlist = client.get("/playlist/service-uuid")
+            triggered = client.post("/playlist/service-uuid/8/3/trigger")
+
+            self.assertEqual(200, focused.status_code)
+            self.assertEqual("service-uuid", focused.json()["playlist"]["uuid"])
+            self.assertEqual(200, playlist.status_code)
+            self.assertEqual("service-uuid", playlist.json()["id"]["uuid"])
+            self.assertEqual(
+                {
+                    "playlist_uuid": "service-uuid",
+                    "item_index": 8,
+                    "slide_index": 3,
+                },
+                triggered.json(),
+            )
+            context.propresenter.trigger_playlist_presentation_slide.assert_awaited_once_with(
+                "service-uuid",
+                8,
+                3,
+            )
 
     def test_fallback_trigger_is_forbidden_when_clicker_activation_is_disabled(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -19,6 +19,17 @@
 - Confirm active/focused presentation fallback behavior.
 - Fetch a valid `/thumbnail`.
 - Confirm blank preview UUID is avoided where relevant.
+- With a focused service playlist, fetch `/playlist/focused` and `/playlist/{uuid}`.
+- Confirm the clicker shows Previous, Next, and the playlist menu only for a non-null focused playlist item.
+- Confirm Previous/Next skip headers, placeholders, hidden presentations, and announcement presentations.
+- Confirm playlist headers and placeholders remain visible but disabled in the menu.
+- Preview a playlist presentation and confirm playlist controls disappear until Return to Active Presentation is used.
+- With Clicker Can Present enabled, select a preview slide and verify the switch confirmation can be cancelled.
+- Confirming a playlist preview must retain playlist focus and trigger the chosen slide.
+- Search for a song in the focused playlist and confirm it also retains playlist focus when triggered.
+- If a searched song occurs more than once, confirm the next occurrence is chosen, falling back to the closest earlier occurrence.
+- Confirm a disabled first slide runs before the requested slide when switching presentations.
+- With Clicker Can Present disabled, previews remain readable and neither UUID nor playlist triggers are allowed.
 
 ## OBS
 
@@ -96,4 +107,3 @@
 - Privileged token settings are visible.
 - Passwords and tokens are not written to logs.
 - Caller IP and route are recorded for remote API requests.
-

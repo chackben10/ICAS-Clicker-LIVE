@@ -37,6 +37,14 @@ def router(context) -> APIRouter:
     async def presentation_by_uuid(uuid: str = Path(..., min_length=1)) -> dict:
         return await context.propresenter.presentation_by_uuid(uuid)
 
+    @api.get("/playlist/focused")
+    async def focused_playlist() -> dict:
+        return await context.propresenter.focused_playlist()
+
+    @api.get("/playlist/{uuid}")
+    async def playlist_by_uuid(uuid: str = Path(..., min_length=1)) -> dict:
+        return await context.propresenter.playlist_by_uuid(uuid)
+
     @api.post("/presentation/{uuid}/{index}/trigger")
     async def trigger_presentation_slide(
         uuid: str = Path(..., min_length=1),
@@ -46,6 +54,29 @@ def router(context) -> APIRouter:
             raise HTTPException(status_code=403, detail=presentation_activation_disabled_detail())
         await context.propresenter.trigger_presentation_slide(uuid, index)
         return {"ok": True, "uuid": uuid, "index": index}
+
+    @api.post("/playlist/{playlist_uuid}/{item_index}/{slide_index}/trigger")
+    async def trigger_playlist_presentation_slide(
+        playlist_uuid: str = Path(..., min_length=1),
+        item_index: int = Path(..., ge=0),
+        slide_index: int = Path(..., ge=0),
+    ) -> dict:
+        if not presentation_activation_enabled(context):
+            raise HTTPException(status_code=403, detail=presentation_activation_disabled_detail())
+        try:
+            await context.propresenter.trigger_playlist_presentation_slide(
+                playlist_uuid,
+                item_index,
+                slide_index,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail={"ok": False, "error": str(exc)}) from exc
+        return {
+            "ok": True,
+            "playlist_uuid": playlist_uuid,
+            "item_index": item_index,
+            "slide_index": slide_index,
+        }
 
     @api.get("/slide-index")
     async def slide_index() -> dict:

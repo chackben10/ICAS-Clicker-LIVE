@@ -5,7 +5,9 @@ from typing import Any
 
 
 CLICKER_PRESENTATION_ACTIVATION_DISABLED = "clicker_presentation_activation_disabled"
-CLICKER_PRESENTATION_TRIGGER_PATH = re.compile(r"^/presentation/[^/]+/\d+/trigger/?$")
+CLICKER_PRESENTATION_TRIGGER_PATH = re.compile(
+    r"^/(?:presentation/[^/]+/\d+|playlist/[^/]+/\d+/\d+)/trigger/?$"
+)
 
 
 def is_clicker_presentation_trigger(method: str, path: str) -> bool:
