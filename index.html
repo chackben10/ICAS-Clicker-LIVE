@@ -387,7 +387,7 @@
 
     .playlist-controls {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(150px, 0.85fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
       margin-top: 16px;
       padding-top: 14px;
@@ -406,6 +406,21 @@
       cursor: pointer;
       text-align: left;
       transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .playlist-nav-btn.unavailable {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #previousPresentationButton {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    #nextPresentationButton {
+      grid-column: 2;
+      grid-row: 1;
     }
 
     .playlist-nav-btn:hover,
@@ -440,6 +455,8 @@
     }
 
     .playlist-menu-btn {
+      grid-column: 1 / -1;
+      grid-row: 2;
       text-align: center;
     }
 
@@ -453,12 +470,6 @@
 
     .playlist-dialog-card {
       width: min(100%, 440px);
-    }
-
-    .playlist-dialog-context {
-      margin: -5px 0 12px;
-      color: var(--status-grey);
-      font-size: 0.86rem;
     }
 
     .playlist-menu-list {
@@ -498,9 +509,9 @@
 
     .playlist-menu-header {
       margin-top: 5px;
-      padding: 8px 10px 6px;
-      border-left: 4px solid var(--status-grey);
-      color: var(--status-grey);
+      padding: 9px 11px;
+      background: var(--label-bg);
+      color: var(--slide-text);
       font-size: 0.76rem;
       font-weight: 750;
       letter-spacing: 0.05em;
@@ -733,15 +744,6 @@
         width: 100%;
       }
 
-      .playlist-controls {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .playlist-menu-btn {
-        grid-column: 1 / -1;
-        grid-row: 1;
-      }
-
       .dialog-actions {
         flex-direction: column-reverse;
       }
@@ -968,13 +970,13 @@
           <span class="playlist-nav-direction">← Previous</span>
           <span id="previousPresentationTitle" class="playlist-nav-title"></span>
         </button>
-        <button id="playlistMenuButton" class="playlist-menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="playlistMenuOverlay">
-          <span class="playlist-menu-context">Playlist</span>
-          <span id="playlistMenuName" class="playlist-menu-name"></span>
-        </button>
         <button id="nextPresentationButton" class="playlist-nav-btn" type="button">
           <span class="playlist-nav-direction">Next →</span>
           <span id="nextPresentationTitle" class="playlist-nav-title"></span>
+        </button>
+        <button id="playlistMenuButton" class="playlist-menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="playlistMenuOverlay">
+          <span class="playlist-menu-context">Playlist</span>
+          <span id="playlistMenuName" class="playlist-menu-name"></span>
         </button>
         <div id="playlistControlsStatus" class="playlist-controls-status" aria-live="polite"></div>
       </div>
@@ -1126,7 +1128,6 @@
   <div id="playlistMenuOverlay" class="settings-overlay" aria-hidden="true">
     <div class="settings-card playlist-dialog-card" role="dialog" aria-modal="true" aria-labelledby="playlistMenuTitle">
       <div id="playlistMenuTitle" class="settings-title">Playlist</div>
-      <div id="playlistMenuContext" class="playlist-dialog-context"></div>
       <div id="playlistMenuItems" class="playlist-menu-list"></div>
       <button id="playlistMenuCloseButton" class="settings-close-btn" type="button">Close</button>
     </div>
@@ -1252,7 +1253,6 @@
       dom.playlistControlsStatus = document.getElementById("playlistControlsStatus");
       dom.playlistMenuOverlay = document.getElementById("playlistMenuOverlay");
       dom.playlistMenuTitle = document.getElementById("playlistMenuTitle");
-      dom.playlistMenuContext = document.getElementById("playlistMenuContext");
       dom.playlistMenuItems = document.getElementById("playlistMenuItems");
       dom.playlistMenuCloseButton = document.getElementById("playlistMenuCloseButton");
 
@@ -1942,15 +1942,19 @@
       if (!visible) return;
 
       const { previous, next } = playlistNeighbors();
-      dom.previousPresentationButton.hidden = !previous;
-      dom.nextPresentationButton.hidden = !next;
+      dom.previousPresentationButton.classList.toggle("unavailable", !previous);
+      dom.nextPresentationButton.classList.toggle("unavailable", !next);
+      dom.previousPresentationButton.setAttribute("aria-hidden", String(!previous));
+      dom.nextPresentationButton.setAttribute("aria-hidden", String(!next));
+      dom.previousPresentationButton.tabIndex = previous ? 0 : -1;
+      dom.nextPresentationButton.tabIndex = next ? 0 : -1;
       dom.previousPresentationTitle.textContent = String(previous?.id?.name || "");
       dom.nextPresentationTitle.textContent = String(next?.id?.name || "");
       dom.previousPresentationButton.title = previous ? `Preview ${String(previous?.id?.name || "previous presentation")}` : "";
       dom.nextPresentationButton.title = next ? `Preview ${String(next?.id?.name || "next presentation")}` : "";
       dom.playlistMenuName.textContent = playlistState.name || "Current Playlist";
-      dom.previousPresentationButton.disabled = playlistPreviewLoadInFlight;
-      dom.nextPresentationButton.disabled = playlistPreviewLoadInFlight;
+      dom.previousPresentationButton.disabled = !previous || playlistPreviewLoadInFlight;
+      dom.nextPresentationButton.disabled = !next || playlistPreviewLoadInFlight;
       dom.playlistMenuButton.disabled = playlistPreviewLoadInFlight;
     }
 
@@ -1961,14 +1965,32 @@
       closePlaylistMenu({ restoreFocus: false });
     }
 
-    function playlistHeaderColor(item) {
+    function playlistHeaderColors(item) {
       const color = item?.header_color;
-      if (!color || typeof color !== "object") return "";
+      if (!color || typeof color !== "object") return null;
       const channel = value => Math.round(Math.min(1, Math.max(0, Number(value) || 0)) * 255);
-      return `rgba(${channel(color.red)}, ${channel(color.green)}, ${channel(color.blue)}, ${Math.min(1, Math.max(0, Number(color.alpha) || 1))})`;
+      const rgb = [channel(color.red), channel(color.green), channel(color.blue)];
+      const linearChannel = value => {
+        const normalized = value / 255;
+        return normalized <= 0.03928
+          ? normalized / 12.92
+          : Math.pow((normalized + 0.055) / 1.055, 2.4);
+      };
+      const luminance = (0.2126 * linearChannel(rgb[0])) +
+        (0.7152 * linearChannel(rgb[1])) +
+        (0.0722 * linearChannel(rgb[2]));
+      const blackContrast = (luminance + 0.05) / 0.05;
+      const whiteContrast = 1.05 / (luminance + 0.05);
+      return {
+        background: `rgb(${rgb.join(", ")})`,
+        foreground: whiteContrast >= blackContrast ? "#fff" : "#000"
+      };
     }
 
-    function renderPlaylistMenuItems() {
+    function renderPlaylistMenuItems(options = {}) {
+      const activeItemIndex = options.preserveFocus
+        ? document.activeElement?.dataset?.playlistItemIndex
+        : null;
       dom.playlistMenuItems.replaceChildren();
       if (!playlistState || !Array.isArray(playlistState.items)) return;
 
@@ -1980,8 +2002,11 @@
           const header = document.createElement("div");
           header.className = "playlist-menu-header";
           header.textContent = name;
-          const color = playlistHeaderColor(item);
-          if (color) header.style.borderLeftColor = color;
+          const colors = playlistHeaderColors(item);
+          if (colors) {
+            header.style.backgroundColor = colors.background;
+            header.style.color = colors.foreground;
+          }
           dom.playlistMenuItems.appendChild(header);
           return;
         }
@@ -2005,6 +2030,7 @@
         button.type = "button";
         button.textContent = name;
         const itemIndex = playlistItemIndex(item);
+        button.dataset.playlistItemIndex = String(itemIndex);
         button.classList.toggle("current", itemIndex === playlistState.focusedIndex);
         if (itemIndex === playlistState.focusedIndex) {
           button.setAttribute("aria-current", "true");
@@ -2012,6 +2038,12 @@
         button.addEventListener("click", () => selectPlaylistPresentation(item));
         dom.playlistMenuItems.appendChild(button);
       });
+
+      if (activeItemIndex !== null && activeItemIndex !== undefined) {
+        const matchingButton = [...dom.playlistMenuItems.querySelectorAll("button")]
+          .find(button => button.dataset.playlistItemIndex === activeItemIndex);
+        matchingButton?.focus();
+      }
     }
 
     function closePlaylistMenu(options = {}) {
@@ -2028,7 +2060,6 @@
       if (!playlistState || presentationViewMode !== "live") return;
       renderPlaylistMenuItems();
       dom.playlistMenuTitle.textContent = playlistState.name || "Playlist";
-      dom.playlistMenuContext.textContent = "Choose a presentation to preview. Headers and placeholders are not selectable.";
       dom.playlistMenuOverlay.style.display = "flex";
       dom.playlistMenuOverlay.setAttribute("aria-hidden", "false");
       dom.playlistMenuButton.setAttribute("aria-expanded", "true");
@@ -2048,6 +2079,7 @@
 
       playlistRefreshPromise = (async () => {
         try {
+          const previousState = playlistState;
           const focused = await fetchJson(`${BASE_URL}/playlist/focused`);
           const playlist = focused?.playlist;
           const item = focused?.item;
@@ -2074,6 +2106,14 @@
           };
           setPlaylistControlsStatus();
           renderPlaylistControls();
+          const menuIsOpen = dom.playlistMenuOverlay.style.display === "flex";
+          const menuChanged = previousState?.uuid !== uuid ||
+            previousState?.focusedIndex !== focusedIndex ||
+            previousState?.payload !== payload;
+          if (menuIsOpen && menuChanged) {
+            dom.playlistMenuTitle.textContent = playlistState.name || "Playlist";
+            renderPlaylistMenuItems({ preserveFocus: true });
+          }
         } catch (error) {
           console.warn("Playlist controls are temporarily unavailable", error);
           if (playlistState) {

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -210,7 +210,7 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
         self.service.presentation_by_uuid = AsyncMock(
             return_value=self.presentation_payload(first_enabled=False)
         )
-        self.service._target_loaded = AsyncMock(return_value=True)
+        self.service._wait_for_target_load = AsyncMock()
         self.service.client.trigger = AsyncMock(return_value=True)
 
         await self.service.trigger_playlist_presentation_slide("playlist-uuid", 8, 4)
@@ -222,6 +222,21 @@ class ProPresenterPresentationSelectionTests(unittest.IsolatedAsyncioTestCase):
             ],
             self.service.client.trigger.await_args_list,
         )
+        self.service._wait_for_target_load.assert_awaited_once_with(
+            "song-uuid", "playlist-uuid", 8
+        )
+
+    async def test_warmup_keeps_full_settling_window_after_target_loads(self) -> None:
+        self.service._target_loaded = AsyncMock(return_value=True)
+
+        with patch(
+            "production_hub.integrations.propresenter.service.asyncio.sleep",
+            new=AsyncMock(),
+        ) as mocked_sleep:
+            await self.service._wait_for_target_load("song-uuid", "playlist-uuid", 8)
+
+        mocked_sleep.assert_awaited_once()
+        self.assertGreater(mocked_sleep.await_args.args[0], 0.9)
 
     async def test_switch_timeout_still_triggers_requested_index(self) -> None:
         self.service.PRESENTATION_SWITCH_WAIT_SECONDS = 0.01

@@ -393,20 +393,27 @@ class ProPresenterService:
     ) -> None:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.PRESENTATION_SWITCH_WAIT_SECONDS
+        loaded = False
         while loop.time() < deadline:
             remaining = deadline - loop.time()
             try:
-                if await asyncio.wait_for(
+                loaded = await asyncio.wait_for(
                     self._target_loaded(presentation_uuid, playlist_uuid, item_index),
                     timeout=max(0.01, remaining),
-                ):
-                    return
+                )
             except (TimeoutError, asyncio.TimeoutError):
-                return
+                break
             remaining = deadline - loop.time()
-            if remaining <= 0:
-                return
+            if loaded or remaining <= 0:
+                break
             await asyncio.sleep(min(self.PRESENTATION_SWITCH_POLL_SECONDS, remaining))
+
+        # Loading/focus can be reported before ProPresenter has finished executing
+        # the disabled setup slide's actions. Preserve the full settling window so
+        # macros, audio, looks, and stage actions can run before the requested cue.
+        remaining = deadline - loop.time()
+        if remaining > 0:
+            await asyncio.sleep(remaining)
 
     async def _switch_presentation_slide(
         self,
