@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>Production Hub - Video to NDI</string>
+    <key>CFBundleExecutable</key>
+    <string>VideoToNDIApp</string>
+    <key>CFBundleIconFile</key>
+    <string>ProductionHub</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.icas.production-hub.video-to-ndi</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Production Hub - Video to NDI</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.video</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_ndi._tcp</string>
+        <string>_ndi._udp</string>
+    </array>
+    <key>NSCameraUsageDescription</key>
+    <string>Production Hub - Video to NDI captures connected cameras and video interfaces so it can publish them as NDI sources.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Production Hub - Video to NDI publishes camera feeds to OBS and Production Hub over the local network.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>

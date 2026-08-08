@@ -1,0 +1,5 @@
+module CNDIShim {
+    header "CNDIShim.h"
+    export *
+}
+
