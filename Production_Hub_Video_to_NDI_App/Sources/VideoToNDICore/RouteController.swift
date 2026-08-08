@@ -20,7 +20,9 @@ private final class RouteEngine {
     private var sentFrames: UInt64 = 0
     private var lastRateDate = Date()
     private var lastRateFrames: UInt64 = 0
+    private var lastStatePublishDate = Date.distantPast
     private var lastPreviewDate = Date.distantPast
+    private var previewConsumerActive = false
     private let stateHandler: (RouteSnapshot, CGImage?) -> Void
     private var snapshot = RouteSnapshot()
     private var isStopped = false
@@ -74,6 +76,12 @@ private final class RouteEngine {
         snapshot.lastFrameDate = frame.capturedAt
         stateLock.unlock()
         pump.submit(frame)
+    }
+
+    func setPreviewConsumerActive(_ active: Bool) {
+        stateLock.lock()
+        previewConsumerActive = active
+        stateLock.unlock()
     }
 
     func fail(_ error: Error) {
@@ -136,8 +144,6 @@ private final class RouteEngine {
                 let fps = Double(outputFrame.frameRateNumerator) / Double(outputFrame.frameRateDenominator)
                 snapshot.negotiatedFormat = "\(outputFrame.width)×\(outputFrame.height) @ \(String(format: "%.2f", fps)) fps"
             }
-            snapshot.droppedFrames = pump.droppedFrameCount
-            snapshot.connectionCount = sender.connectionCount
             let now = Date()
             let elapsed = now.timeIntervalSince(lastRateDate)
             if elapsed >= 1 {
@@ -146,14 +152,25 @@ private final class RouteEngine {
                 lastRateDate = now
             }
 
-            var preview: CGImage?
-            if route.previewEnabled && now.timeIntervalSince(lastPreviewDate) >= 0.2 {
-                preview = imageConverter.makeCGImage(from: outputFrame.pixelBuffer)
-                lastPreviewDate = now
+            let shouldPublishState = sentFrames == 1 || now.timeIntervalSince(lastStatePublishDate) >= 0.5
+            let shouldCreatePreview = route.previewEnabled && previewConsumerActive &&
+                now.timeIntervalSince(lastPreviewDate) >= 0.5
+            if shouldPublishState {
+                snapshot.droppedFrames = pump.droppedFrameCount
+                snapshot.connectionCount = sender.connectionCount
+                lastStatePublishDate = now
             }
+            if shouldCreatePreview { lastPreviewDate = now }
             let value = snapshot
             stateLock.unlock()
-            publish(value, preview: preview)
+
+            var preview: CGImage?
+            if shouldCreatePreview {
+                preview = imageConverter.makeCGImage(from: outputFrame.pixelBuffer)
+            }
+            if shouldPublishState || preview != nil {
+                publish(value, preview: preview)
+            }
         } catch {
             fail(error)
         }
@@ -215,6 +232,7 @@ public final class RouteController: ObservableObject {
     private var configuration: AppConfiguration
     private var engines: [UUID: RouteEngine] = [:]
     private var didInitialize = false
+    private var mainWindowVisible = false
 
     public init(
         configurationStore: ConfigurationStore = ConfigurationStore(),
@@ -269,6 +287,12 @@ public final class RouteController: ObservableObject {
 
     public func preview(for routeID: UUID) -> NSImage? { previews[routeID] }
 
+    public func setMainWindowVisible(_ visible: Bool) {
+        guard mainWindowVisible != visible else { return }
+        mainWindowVisible = visible
+        engines.values.forEach { $0.setPreviewConsumerActive(visible) }
+    }
+
     public func start(_ routeID: UUID) {
         guard engines[routeID] == nil, let route = routes.first(where: { $0.id == routeID }) else { return }
         do {
@@ -292,6 +316,7 @@ public final class RouteController: ObservableObject {
                     }
                 }
             }
+            engine.setPreviewConsumerActive(mainWindowVisible)
             engine.failureHandler = { [weak self, weak engine] error in
                 DispatchQueue.main.async {
                     guard let self, let engine, self.engines[routeID] === engine else { return }

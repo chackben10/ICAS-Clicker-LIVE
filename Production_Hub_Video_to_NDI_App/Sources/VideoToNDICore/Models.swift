@@ -136,10 +136,6 @@ public struct VideoRoute: Codable, Identifiable, Equatable {
         ndiSourceName: "Production Hub - Audience Cam"
     )
 
-    public static let ptzDefault = VideoRoute(
-        name: "PTZ Camera",
-        ndiSourceName: "Production Hub - PTZ Camera"
-    )
 }
 
 public struct AppConfiguration: Codable, Equatable {
@@ -150,7 +146,7 @@ public struct AppConfiguration: Codable, Equatable {
 
     public init(
         schemaVersion: Int = 1,
-        routes: [VideoRoute] = [.audienceDefault, .ptzDefault],
+        routes: [VideoRoute] = [.audienceDefault],
         keepRunningWhenWindowCloses: Bool = true,
         showMenuBarItem: Bool = true
     ) {

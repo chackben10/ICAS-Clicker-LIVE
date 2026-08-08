@@ -21,14 +21,16 @@ struct VideoToNDIApp: App {
     @StateObject private var controller = RouteController()
 
     var body: some Scene {
-        WindowGroup("Production Hub - Video to NDI", id: "main") {
+        Window("Production Hub - Video to NDI", id: "main") {
             MainView()
                 .environmentObject(controller)
                 .frame(minWidth: 920, minHeight: 660)
                 .onAppear {
                     appDelegate.terminationHandler = { controller.stopAll() }
+                    controller.setMainWindowVisible(true)
                     controller.initialize()
                 }
+                .onDisappear { controller.setMainWindowVisible(false) }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1120, height: 760)
@@ -41,6 +43,11 @@ struct VideoToNDIApp: App {
     }
 
     private var menuBarSymbol: String {
-        controller.runningCount > 0 ? "video.fill" : "video"
+        if !controller.ndiStatus.available || controller.snapshots.values.contains(where: {
+            $0.state == .error || $0.state == .busy || $0.state == .missing
+        }) {
+            return "video.slash"
+        }
+        return controller.runningCount > 0 ? "video.fill" : "video"
     }
 }

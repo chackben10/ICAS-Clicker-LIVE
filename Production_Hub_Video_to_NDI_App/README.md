@@ -1,12 +1,12 @@
 # Production Hub - Video to NDI
 
-A standalone macOS helper that opens local cameras and capture interfaces, then publishes each input as an independent NDI source. It is deliberately separate from the Production Hub application.
+A standalone, single-process macOS helper that opens local cameras and capture interfaces, then publishes each configured input as an independent NDI source. It is deliberately separate from the Production Hub application.
 
 The intended setup is:
 
-- This helper owns **Audience Cam** and **PTZ Camera** capture devices on the OBS Mac.
-- OBS receives those devices through NDI instead of competing for exclusive hardware access.
-- Production Hub receives the same NDI sources across the local network for future PTZ automation.
+- This helper publishes **Audience Cam** as `Production Hub - Audience Cam` from the OBS Mac.
+- Production Hub receives Audience Cam over NDI.
+- The PTZ feed can be opened directly by both OBS and Production Hub, so it does not need to pass through this helper.
 
 ## Requirements
 
@@ -14,7 +14,7 @@ The intended setup is:
 - Xcode 15.3 or later with its matching macOS SDK selected. Command Line Tools alone also work when their Swift compiler and SDK versions match.
 - The official NDI Runtime 6, normally installed with [NDI Tools](https://ndi.video/tools/).
 - An NDI receiver in OBS, normally the [DistroAV](https://github.com/DistroAV/DistroAV) plugin.
-- Gigabit Ethernet is strongly recommended for multiple full-bandwidth NDI feeds.
+- Gigabit Ethernet is strongly recommended for the full-bandwidth Audience Cam feed.
 
 The NDI runtime is loaded dynamically and is not bundled or redistributed by this repository.
 
@@ -39,14 +39,12 @@ The build script also contains a direct-compiler fallback when SwiftPM itself is
 
 ## First-time setup
 
-1. Connect the Audience Cam and PTZ capture interfaces.
-2. Quit or temporarily disable OBS sources that directly open those devices.
-3. Open **Production Hub - Video to NDI** and allow Camera and Local Network access.
-4. Edit **Audience Cam**, choose its physical device and desired format, then save.
-5. Edit **PTZ Camera** and do the same.
-6. Click **Start All**. Both cards should show a live preview and green **Running** state.
-7. In OBS, add an NDI Source for each feed and select the helper's advertised sources. NDI receiver menus normally prefix them with the Mac's computer name.
-8. Once OBS works through NDI, enable automatic start on both routes and optionally enable launch at login.
+1. Connect the Audience Cam capture interface.
+2. Open **Production Hub - Video to NDI** and allow Camera and Local Network access.
+3. Edit **Audience Cam**, choose its physical device and desired format, then save.
+4. Start Audience Cam. Its card should show a live preview and green **Running** state.
+5. Receive `Production Hub - Audience Cam` in Production Hub. NDI receiver menus normally prefix it with the source Mac's computer name.
+6. Enable automatic start for Audience Cam and optionally enable launch at login.
 
 You can add more routes for additional capture devices. A test-pattern input is included so NDI and OBS can be checked without camera hardware.
 
@@ -56,10 +54,12 @@ You can add more routes for additional capture devices. A test-pattern input is 
 - Every route can rotate its video by 0°, 90°, 180°, or 270° and flip it horizontally and/or vertically before preview and NDI output.
 - Multiple enabled routes may share a device; the first route started chooses its capture format.
 - Every route has a one-frame queue. Under load, stale frames are dropped to preserve live latency.
-- Closing the window does not stop the feeds. Use the menu-bar camera icon to reopen the app, stop routes, or quit.
+- Closing the window does not stop the feed. It suspends preview conversion to save GPU time; the NDI feed continues uninterrupted.
+- The menu-bar camera icon shows receiver and frame-rate health and provides per-route start/stop controls without opening the main window.
+- UI statistics are published twice per second rather than once per video frame. Every captured frame still reaches the bounded NDI send path.
 - This release publishes video only; it does not capture audio.
 
-If another application already owns a capture interface, its route will show **Busy**. Close that direct source, start the route here, and then use its NDI output in the other application.
+OBS and this helper may open the same capture interface when its driver supports shared access. If a particular interface is exclusive, its route will show **Busy**; close the other direct source or receive the helper's NDI output instead.
 
 ## Configuration and diagnostics
 

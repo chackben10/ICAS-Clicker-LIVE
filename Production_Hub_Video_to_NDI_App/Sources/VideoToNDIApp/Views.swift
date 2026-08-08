@@ -495,15 +495,37 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text("\(controller.runningCount) of \(controller.routes.count) routes running")
+        Text(menuSummary)
+        if !controller.routes.isEmpty {
+            Divider()
+            ForEach(controller.routes) { route in
+                let snapshot = controller.snapshot(for: route.id)
+                Button {
+                    if isActive(snapshot.state) {
+                        controller.stop(route.id)
+                    } else {
+                        controller.start(route.id)
+                    }
+                } label: {
+                    Label(
+                        routeActionTitle(route: route, snapshot: snapshot),
+                        systemImage: isActive(snapshot.state) ? "stop.circle" : "play.circle"
+                    )
+                }
+                .disabled(
+                    !isActive(snapshot.state) &&
+                    (!route.isEnabled || !controller.ndiStatus.available)
+                )
+            }
+        }
         Divider()
         Button("Open Video to NDI") {
             openWindow(id: "main")
             NSApp.activate(ignoringOtherApps: true)
         }
-        if controller.runningCount > 0 {
+        if controller.routes.count > 1 && controller.runningCount > 0 {
             Button("Stop All", role: .destructive) { controller.stopAll() }
-        } else {
+        } else if controller.routes.count > 1 {
             Button("Start All") { controller.startAll() }
                 .disabled(!controller.ndiStatus.available)
         }
@@ -512,5 +534,22 @@ struct MenuBarView: View {
             controller.stopAll()
             NSApp.terminate(nil)
         }
+    }
+
+    private var menuSummary: String {
+        let receiverCount = controller.snapshots.values.reduce(0) { $0 + $1.connectionCount }
+        let receiverText = receiverCount == 1 ? "1 receiver" : "\(receiverCount) receivers"
+        return "\(controller.runningCount) running · \(receiverText)"
+    }
+
+    private func isActive(_ state: RouteState) -> Bool {
+        state == .starting || state == .running || state == .reconnecting
+    }
+
+    private func routeActionTitle(route: VideoRoute, snapshot: RouteSnapshot) -> String {
+        if isActive(snapshot.state) {
+            return "Stop \(route.name) — \(String(format: "%.1f", snapshot.effectiveFPS)) fps"
+        }
+        return "Start \(route.name) — \(snapshot.state.displayName)"
     }
 }

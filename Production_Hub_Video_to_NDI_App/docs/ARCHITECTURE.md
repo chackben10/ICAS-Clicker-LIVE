@@ -3,9 +3,9 @@
 `Production Hub - Video to NDI` is intentionally separate from Production Hub. Its only job is to own local video-capture devices and expose their frames as stable NDI sources.
 
 ```text
-Audience capture device ─┐
-                         ├─ AVFoundation capture hub ─ route queues ─ NDI senders ─┬─ OBS
-PTZ capture device ──────┘                                                        └─ Production Hub
+Audience capture device ─ AVFoundation capture hub ─ route queue ─ NDI sender ─ Production Hub
+
+PTZ capture device ─ direct local capture in OBS and Production Hub (outside this helper)
 ```
 
 ## Main components
@@ -30,8 +30,10 @@ OBS should receive the helper's NDI source instead of opening the same physical 
 - Each route retains only its newest pending frame.
 - Route shutdown removes its capture subscription, drains its send queue, and only then destroys its NDI sender.
 - The app continues running after its main window closes and exposes controls from the macOS menu bar.
+- Closing the main window disables preview rendering while leaving capture and NDI transmission active.
+- Route statistics reach SwiftUI at 2 Hz instead of video frame rate, avoiding needless main-thread rendering work.
 - Route settings are written atomically, with the previous file retained as `routes.backup.json`.
 
 ## Current scope
 
-Version 0.1 publishes video only. Camera audio is intentionally not captured. The app does not perform PTZ tracking or Panasonic control; that belongs in Production Hub after both camera views are available there.
+Version 0.1 publishes video only. Camera audio is intentionally not captured. The app does not perform PTZ tracking or Panasonic control; Production Hub consumes the PTZ feed directly and owns that automation.

@@ -6,10 +6,10 @@ final class ModelTests: XCTestCase {
     func testDefaultRoutesHaveStableOperatorNames() {
         let configuration = AppConfiguration()
 
-        XCTAssertEqual(configuration.routes.map(\.name), ["Audience Cam", "PTZ Camera"])
+        XCTAssertEqual(configuration.routes.map(\.name), ["Audience Cam"])
         XCTAssertEqual(
             configuration.routes.map(\.ndiSourceName),
-            ["Production Hub - Audience Cam", "Production Hub - PTZ Camera"]
+            ["Production Hub - Audience Cam"]
         )
     }
 
@@ -113,4 +113,3 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(decoded.flipVertical)
     }
 }
-
