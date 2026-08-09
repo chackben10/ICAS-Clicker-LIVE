@@ -71,6 +71,23 @@
 - Recall preset 00 Home.
 - Save, recall, and rename a non-zero preset.
 
+## Phase 1 Video
+
+- Install NDI Runtime 6 and start `Production Hub - Audience Cam` on the OBS Mac.
+- Open Camera Control and grant Camera and Local Network permissions.
+- Confirm Audience Cam resolves, displays 1920×1080 video, and stays fresh.
+- Confirm NDI received-frame count rises and dropped-frame count remains zero during a 10-minute test.
+- Select the PTZ capture interface and connect it while ProPresenter is already using that same device.
+- Confirm ProPresenter remains responsive and its PTZ feed does not freeze or renegotiate.
+- Confirm Production Hub shows both previews without increasing latency over time.
+- Disconnect and reconnect Audience NDI; confirm Production Hub recovers automatically.
+- Unplug and reconnect the PTZ interface; confirm a stale/error state is visible and no app crash occurs.
+- Start a diagnostic recording, exercise both feeds, stop it, and confirm two MP4 files and `manifest.json` exist.
+- Replay both saved files from Camera Control and confirm they render without accessing live devices.
+- Close the Production Hub window and confirm configured video services remain active with the app.
+- Quit Production Hub and confirm both video inputs are released immediately.
+- Run a complete service-length soak while watching CPU, memory, ProPresenter responsiveness, and NDI drops.
+
 ## VISCA
 
 - Listener starts on configured UDP port.

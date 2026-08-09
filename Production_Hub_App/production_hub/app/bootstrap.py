@@ -36,6 +36,7 @@ from production_hub.integrations.scoreboard.models import ScoreRow
 from production_hub.integrations.scoreboard.service import ScoreboardService
 from production_hub.state.state_repository import RuntimeStateRepository
 from production_hub.state.undo_manager import UndoManager
+from production_hub.video.service import VideoService
 
 
 @dataclass
@@ -58,6 +59,7 @@ class ApplicationContext:
     log_repository: LogRepository
     logger: StructuredLogger
     undo_manager: UndoManager
+    video: VideoService
 
 
 def _workspace_root() -> Path:
@@ -122,6 +124,7 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     health_monitor = HealthMonitor(config)
     log_repository = LogRepository(paths.logs_dir)
     undo_manager = UndoManager(max_items=100)
+    video = VideoService(config.integrations.video, paths.root, logger)
 
     context = ApplicationContext(
         paths=paths,
@@ -142,6 +145,7 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
         log_repository=log_repository,
         logger=logger,
         undo_manager=undo_manager,
+        video=video,
     )
 
     register_action_handlers(context, router)

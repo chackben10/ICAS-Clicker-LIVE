@@ -304,6 +304,39 @@ class ScoreboardConfig(JsonModel):
 
 
 @dataclass
+class VideoConfig(JsonModel):
+    enabled: bool = True
+    audience_enabled: bool = True
+    audience_ndi_source_name: str = "Production Hub - Audience Cam"
+    audience_highest_bandwidth: bool = True
+    audience_auto_connect: bool = True
+    ptz_enabled: bool = True
+    ptz_device_id: str = ""
+    ptz_auto_connect: bool = False
+    preferred_width: int = 1920
+    preferred_height: int = 1080
+    preferred_fps: float = 30.0
+    preview_fps: float = 12.0
+    stale_after_seconds: float = 1.5
+    recording_fps: float = 10.0
+    recording_max_width: int = 1280
+
+    def __post_init__(self) -> None:
+        self.audience_ndi_source_name = _non_empty(
+            self.audience_ndi_source_name,
+            "video.audience_ndi_source_name",
+        )
+        self.ptz_device_id = str(self.ptz_device_id or "").strip()
+        self.preferred_width = max(320, min(7680, int(self.preferred_width)))
+        self.preferred_height = max(240, min(4320, int(self.preferred_height)))
+        self.preferred_fps = max(1.0, min(120.0, float(self.preferred_fps)))
+        self.preview_fps = max(1.0, min(30.0, float(self.preview_fps)))
+        self.stale_after_seconds = max(0.5, min(30.0, float(self.stale_after_seconds)))
+        self.recording_fps = max(1.0, min(30.0, float(self.recording_fps)))
+        self.recording_max_width = max(320, min(3840, int(self.recording_max_width)))
+
+
+@dataclass
 class IntegrationConfig(JsonModel):
     propresenter: ProPresenterConfig = field(default_factory=ProPresenterConfig)
     obs: ObsConfig = field(default_factory=ObsConfig)
@@ -311,6 +344,7 @@ class IntegrationConfig(JsonModel):
     visca: ViscaConfig = field(default_factory=ViscaConfig)
     scoreboard: ScoreboardConfig = field(default_factory=ScoreboardConfig)
     midi: MidiConfig = field(default_factory=MidiConfig)
+    video: VideoConfig = field(default_factory=VideoConfig)
 
 
 @dataclass

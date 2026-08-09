@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     code = run_desktop_app(context, runtime_handle)
+    context.video.shutdown()
     runtime_handle.stop()
     return int(code)
 

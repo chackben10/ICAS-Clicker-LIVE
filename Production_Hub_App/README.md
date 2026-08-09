@@ -13,9 +13,9 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-The current development environment did not have FastAPI, Uvicorn, PySide6, or
-obsws-python installed, so the core modules and unit tests are dependency-light,
-while the API/UI activate after installing `requirements.txt`.
+The official NDI Runtime 6 must also be installed on the Production Hub Mac.
+Production Hub loads that runtime dynamically; the repository and application
+bundle do not redistribute it.
 
 ## Run
 
@@ -67,6 +67,9 @@ The generated app is written to:
 Production_Hub_App/dist/Production Hub.app
 ```
 
+The build compiles and packages Production Hub's small in-process NDI receiver
+bridge automatically. No NDI helper executable or video subprocess is launched.
+
 When `--install` is used, the script replaces the existing app at:
 
 ```text
@@ -106,8 +109,8 @@ The desktop UI includes:
 - Endpoints, with editable endpoint definition JSON
 - Automations, with editable automation definition JSON and pause/resume
 - Integrations
-- Camera Control, including Panasonic system controls, PTZ/lens controls,
-  VISCA settings, and preset recall/save/rename
+- Camera Control, including local PTZ and Audience NDI previews, bounded video
+  diagnostics, recording/replay, Panasonic PTZ/lens controls, and presets
 - Scoreboard, with native row editing, per-row score controls, queue controls,
   local action history, and undo
 - Remote Pages
@@ -212,10 +215,34 @@ Set `PRODUCTION_HUB_HOME` or pass `--data-dir` to override this. The app creates
 - `state/runtime_state.json`
 - `state/scoreboard.json`
 - `logs/production-hub-YYYY-MM-DD.log`
+- `recordings/YYYYMMDD-HHMMSS/audience.mp4`
+- `recordings/YYYYMMDD-HHMMSS/ptz.mp4`
 - `backups/automatic/`
 - `backups/manual/`
 
 Writes are atomic and existing files are backed up before replacement.
+
+## Phase 1 Video Inputs
+
+The Camera Control page receives `Production Hub - Audience Cam` over NDI and
+opens the PTZ capture device locally through Qt Multimedia. Audience NDI starts
+automatically by default. The PTZ device must be selected once before it can be
+opened, avoiding an accidental grab of an unrelated webcam.
+
+Performance safeguards are intentional:
+
+- NDI receive, local frame conversion, recording, and replay run outside Qt's UI thread.
+- Each source has a one-frame broker slot; stale work is replaced, never queued.
+- The full NDI stream is continuously drained while preview publication is capped.
+- Pixel copying and preview rendering suspend when Camera Control is hidden and
+  no diagnostic recording is active; source health and reconnection continue.
+- Preview delivery is capped at 12 fps. Diagnostic recording defaults to 10 fps
+  and at most 1280 pixels wide through Qt Multimedia's bounded in-process
+  MPEG-4 encoder.
+- Diagnostic files are independent MP4 streams plus a small JSON manifest.
+- Video capture is stopped cleanly when Production Hub quits.
+
+Phase 1 does not detect people or send automated Panasonic movement commands.
 
 ## Tests
 

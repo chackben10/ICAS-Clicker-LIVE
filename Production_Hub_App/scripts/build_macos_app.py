@@ -11,13 +11,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+from build_native_video import build as build_native_video
+
 
 APP_NAME = "Production Hub"
 BUNDLE_ID = "org.icas.productionhub"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = APP_ROOT / "dist"
-BUILD_ROOT = APP_ROOT / "build" / "macos"
+BUILD_ROOT = APP_ROOT / ".build" / "macos"
 INSTALL_TARGET = Path("/Applications/Production Hub.app")
 ICON_SOURCE = APP_ROOT / "Production_hub.icon"
 ICON_OUTPUT = APP_ROOT / "assets" / "ProductionHub.icns"
@@ -196,7 +198,7 @@ def stage_remote_pages() -> Path:
     return staging
 
 
-def build_app(icon_path: Path, remote_pages: Path) -> Path:
+def build_app(icon_path: Path, remote_pages: Path, native_video_bridge: Path) -> Path:
     log("Checking build environment...")
     require_pyinstaller()
     reject_obsolete_pathlib_backport()
@@ -229,8 +231,8 @@ def build_app(icon_path: Path, remote_pages: Path) -> Path:
         f"{remote_pages}:remote_pages",
         "--add-data",
         f"{icon_path}:assets",
-        "--collect-all",
-        "PySide6",
+        "--add-binary",
+        f"{native_video_bridge}:ProductionHubNative",
         "--collect-all",
         "mido",
         "--collect-all",
@@ -280,9 +282,21 @@ def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
     info["CFBundleIconFile"] = "ProductionHub"
     info["CFBundleIconName"] = "ProductionHub"
     info["NSHighResolutionCapable"] = True
+    info["NSCameraUsageDescription"] = (
+        "Production Hub views the directly connected PTZ camera for framing diagnostics and future assisted tracking."
+    )
+    info["NSLocalNetworkUsageDescription"] = (
+        "Production Hub receives the Audience Cam over NDI on the local production network."
+    )
+    info["NSBonjourServices"] = ["_ndi._tcp", "_ndi._udp"]
+    info["NSCameraUseContinuityCameraDeviceType"] = True
     with info_plist.open("wb") as handle:
         plistlib.dump(info, handle)
     run(["/usr/bin/touch", str(app_path)])
+    # PyInstaller signs before we apply the final bundle metadata. Re-sign the
+    # completed artifact so Gatekeeper validates the exact plist and resources
+    # that are delivered. A Developer ID can replace this ad-hoc identity later.
+    run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", str(app_path)])
 
 
 def install_app(app_path: Path, target: Path) -> Path:
@@ -322,8 +336,10 @@ def main() -> int:
             return 0
         if args.install_deps:
             install_dependencies()
+        log("Building the in-process NDI receiver bridge…")
+        native_video_bridge = build_native_video()
         remote_pages = stage_remote_pages()
-        app_path = build_app(icon_path, remote_pages)
+        app_path = build_app(icon_path, remote_pages, native_video_bridge)
         print(f"Built: {app_path}")
         if not args.no_install:
             installed = install_app(app_path, args.install_destination)
