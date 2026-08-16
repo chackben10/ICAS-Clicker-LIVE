@@ -21,6 +21,7 @@ class VideoSourceState(StrEnum):
     RECONNECTING = "reconnecting"
     MISSING = "missing"
     BUSY = "busy"
+    PERMISSION_DENIED = "permission_denied"
     ERROR = "error"
 
 

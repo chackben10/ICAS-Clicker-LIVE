@@ -37,6 +37,7 @@ from production_hub.integrations.scoreboard.service import ScoreboardService
 from production_hub.state.state_repository import RuntimeStateRepository
 from production_hub.state.undo_manager import UndoManager
 from production_hub.video.service import VideoService
+from production_hub.tracking.ptz_automation import PtzAutomationService
 
 
 @dataclass
@@ -60,6 +61,7 @@ class ApplicationContext:
     logger: StructuredLogger
     undo_manager: UndoManager
     video: VideoService
+    ptz_automation: PtzAutomationService
 
 
 def _workspace_root() -> Path:
@@ -84,8 +86,11 @@ async def _action_ok(action: ActionDefinition, message: str, data: dict[str, Any
 
 def build_context(data_dir: Path | None = None) -> ApplicationContext:
     paths = AppPaths(data_dir or default_app_root())
+    ensure_latest_automatic_calibration(paths.root)
     config_repository = ConfigRepository(paths)
     config = config_repository.load_app_config()
+    if ensure_camera_calibration_defaults(config, paths.root):
+        config_repository.save_app_config(config)
     if ensure_midi_defaults(config):
         config_repository.save_app_config(config)
     if ensure_api_cors_origins(config):
@@ -124,7 +129,21 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     health_monitor = HealthMonitor(config)
     log_repository = LogRepository(paths.logs_dir)
     undo_manager = UndoManager(max_items=100)
-    video = VideoService(config.integrations.video, paths.root, logger)
+    video = VideoService(
+        config.integrations.video,
+        paths.root,
+        logger,
+        config.integrations.camera_tracking,
+    )
+    ptz_automation = PtzAutomationService(
+        video,
+        panasonic,
+        config.integrations.camera_tracking,
+        paths.root,
+        logger,
+    )
+    ptz_automation.start()
+    video.add_shutdown_callback(ptz_automation.shutdown)
 
     context = ApplicationContext(
         paths=paths,
@@ -146,6 +165,7 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
         logger=logger,
         undo_manager=undo_manager,
         video=video,
+        ptz_automation=ptz_automation,
     )
 
     register_action_handlers(context, router)
@@ -154,10 +174,48 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     return context
 
 
+def ensure_latest_automatic_calibration(data_root: Path) -> Path | None:
+    """Restore the most recent successful one-button calibration at startup."""
+
+    from production_hub.calibration.store import CalibrationRegistry
+
+    return CalibrationRegistry(data_root).activate_latest_automatic_map()
+
+
 def ensure_required_endpoints(endpoints: list[EndpointDefinition]) -> list[EndpointDefinition]:
     existing = {item.key for item in endpoints}
     additions = [endpoint for endpoint in build_default_endpoints() if endpoint.key not in existing]
     return [*endpoints, *additions]
+
+
+def ensure_camera_calibration_defaults(config, data_root: Path) -> bool:
+    """Migrate drawings and retire failed generated-plane experiments."""
+
+    from production_hub.calibration.review import load_active_calibration_review
+
+    review = load_active_calibration_review(data_root)
+    reference = review.created_at if review is not None else ""
+    changed = False
+    tracking = config.integrations.camera_tracking
+    retained_regions = [
+        region
+        for region in tracking.scene_regions
+        if region.generation_method != "cross_camera_structural_plane"
+    ]
+    if len(retained_regions) != len(tracking.scene_regions):
+        tracking.scene_regions = retained_regions
+        changed = True
+    for region in tracking.scene_regions:
+        if region.id == "suggested-podium-v1" and region.kind == "custom":
+            region.kind = "podium"
+            changed = True
+        if region.source == "audience" and region.coordinate_space != "calibration_reference":
+            region.coordinate_space = "calibration_reference"
+            changed = True
+        if region.source == "audience" and not region.calibration_reference and reference:
+            region.calibration_reference = reference
+            changed = True
+    return changed
 
 
 def ensure_endpoint_input_defaults(endpoints: list[EndpointDefinition]) -> list[EndpointDefinition]:
@@ -677,6 +735,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
 
     async def panasonic_recall_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         preset = int(param(action, action_context, "preset", 0))
+        context.ptz_automation.manual_override(f"Endpoint recalled preset {preset:02d}")
         ok = await context.panasonic.recall_preset(preset)
         if not ok:
             return ActionResult(action.action_type, False, "camera preset recall failed", {"preset": preset})
@@ -684,6 +743,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
 
     async def panasonic_save_preset(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         preset = int(param(action, action_context, "preset", 0))
+        context.ptz_automation.manual_override(f"Endpoint saved preset {preset:02d}")
         ok = await context.panasonic.save_preset(preset)
         if not ok:
             return ActionResult(action.action_type, False, "camera preset save failed", {"preset": preset})
@@ -692,6 +752,7 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
     async def panasonic_send_command(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         command = str(param(action, action_context, "command", ""))
         endpoint = str(param(action, action_context, "endpoint", "aw_ptz"))
+        context.ptz_automation.manual_override(f"Endpoint Panasonic command {command}")
         ok = await context.panasonic.send_command(command, endpoint)
         if not ok:
             return ActionResult(action.action_type, False, "camera command failed", {"command": command, "endpoint": endpoint})

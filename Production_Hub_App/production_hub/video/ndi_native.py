@@ -132,10 +132,16 @@ class NativeNDI:
         finally:
             self.library.ph_ndi_finder_destroy(finder)
 
-    def create_receiver(self, source_name: str, *, highest_bandwidth: bool) -> ctypes.c_void_p:
+    def create_receiver(
+        self,
+        source_name: str,
+        *,
+        highest_bandwidth: bool,
+        receiver_name: str = "Production Hub - Video Receiver",
+    ) -> ctypes.c_void_p:
         receiver = self.library.ph_ndi_receiver_create(
             source_name.encode("utf-8"),
-            b"Production Hub - Audience Receiver",
+            receiver_name.encode("utf-8"),
             bool(highest_bandwidth),
         )
         if not receiver:

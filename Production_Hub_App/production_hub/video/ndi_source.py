@@ -26,12 +26,14 @@ NDI_BGRA = fourcc("BGRA")
 @dataclass(frozen=True, slots=True)
 class NDISourceSettings:
     source_name: str
+    source: VideoSourceKey = VideoSourceKey.AUDIENCE
+    display_name: str = "Audience Cam"
     highest_bandwidth: bool = True
     publish_fps: float = 12.0
     stale_after_seconds: float = 1.5
 
 
-class AudienceNDISource:
+class NDIVideoSource:
     """Continuously drains NDI on one worker and publishes only fresh snapshots."""
 
     def __init__(self, broker: LatestFrameBroker, settings: NDISourceSettings) -> None:
@@ -63,14 +65,14 @@ class AudienceNDISource:
             return
         self._stop_event.clear()
         self.broker.set_status(
-            VideoSourceKey.AUDIENCE,
+            self.settings.source,
             VideoSourceState.STARTING,
             "Loading the NDI receiver…",
             source_name=self.settings.source_name,
         )
         self._thread = threading.Thread(
             target=self._run,
-            name="production-hub-audience-ndi",
+            name=f"production-hub-{self.settings.source.value}-ndi",
             daemon=True,
         )
         self._thread.start()
@@ -88,7 +90,7 @@ class AudienceNDISource:
             thread.join(timeout=3)
         self._thread = None
         self.broker.set_status(
-            VideoSourceKey.AUDIENCE,
+            self.settings.source,
             VideoSourceState.STOPPED,
             "Stopped",
             source_name=self.settings.source_name,
@@ -125,7 +127,7 @@ class AudienceNDISource:
 
     def _discover_and_connect(self, runtime: NativeNDI):
         self.broker.set_status(
-            VideoSourceKey.AUDIENCE,
+            self.settings.source,
             VideoSourceState.DISCOVERING,
             f"Looking for {self.settings.source_name}…",
             source_name=self.settings.source_name,
@@ -136,17 +138,21 @@ class AudienceNDISource:
         match = next((item for item in sources if self._matches_configured_source(item)), None)
         if not match:
             self.broker.set_status(
-                VideoSourceKey.AUDIENCE,
+                self.settings.source,
                 VideoSourceState.MISSING,
                 f"NDI source not found: {self.settings.source_name}",
                 source_name=self.settings.source_name,
             )
             return None
-        receiver = runtime.create_receiver(match, highest_bandwidth=self.settings.highest_bandwidth)
+        receiver = runtime.create_receiver(
+            match,
+            highest_bandwidth=self.settings.highest_bandwidth,
+            receiver_name=f"Production Hub - {self.settings.display_name} Receiver",
+        )
         self.broker.set_status(
-            VideoSourceKey.AUDIENCE,
+            self.settings.source,
             VideoSourceState.STARTING,
-            "Connecting to the Audience Cam…",
+            f"Connecting to {self.settings.display_name}…",
             source_name=match,
         )
         return receiver
@@ -167,7 +173,7 @@ class AudienceNDISource:
             if result < 0:
                 runtime.library.ph_ndi_receiver_destroy(receiver)
                 self.broker.set_status(
-                    VideoSourceKey.AUDIENCE,
+                    self.settings.source,
                     VideoSourceState.RECONNECTING,
                     "NDI capture failed; reconnecting…",
                     last_error=runtime.last_error,
@@ -177,9 +183,9 @@ class AudienceNDISource:
             if result == 0:
                 if now - last_native_frame >= self.settings.stale_after_seconds:
                     self.broker.set_status(
-                        VideoSourceKey.AUDIENCE,
+                        self.settings.source,
                         VideoSourceState.RECONNECTING,
-                        "Audience Cam is connected but video is stale…",
+                        f"{self.settings.display_name} is connected but video is stale…",
                         received_frames=received_frames,
                         dropped_frames=dropped_frames,
                     )
@@ -199,7 +205,7 @@ class AudienceNDISource:
                     last_performance_check = now
                 if now - last_status_publish >= 1.0 and not self._output_active.is_set():
                     self.broker.set_status(
-                        VideoSourceKey.AUDIENCE,
+                        self.settings.source,
                         VideoSourceState.RUNNING,
                         "Receiving video; preview is suspended",
                         received_frames=received_frames,
@@ -217,13 +223,13 @@ class AudienceNDISource:
                     else 0.0
                 )
                 self.broker.publish(
-                    VideoSourceKey.AUDIENCE,
+                    self.settings.source,
                     image,
                     frame_rate=frame_rate,
                     source_timestamp=frame.timestamp,
                     received_frames=received_frames,
                     dropped_frames=dropped_frames,
-                    source_name=self.broker.snapshot(VideoSourceKey.AUDIENCE).source_name,
+                    source_name=self.broker.snapshot(self.settings.source).source_name,
                 )
                 last_publish = now
             finally:
@@ -257,9 +263,13 @@ class AudienceNDISource:
 
     def _set_error(self, message: str) -> None:
         self.broker.set_status(
-            VideoSourceKey.AUDIENCE,
+            self.settings.source,
             VideoSourceState.ERROR,
             message,
             source_name=self.settings.source_name,
             last_error=message,
         )
+
+
+# Backward-compatible name for integrations/tests written against Phase 1.0.
+AudienceNDISource = NDIVideoSource

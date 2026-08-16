@@ -112,6 +112,14 @@ class IntegrationsPage(QWidget):
                 "fields": [
                     ("Listen IP", lambda: cfg.visca.listen_ip),
                     ("UDP port", lambda: str(cfg.visca.udp_port)),
+                    (
+                        "Auto Focus button",
+                        lambda: (
+                            "Toggles Subject Tracking"
+                            if cfg.visca.autofocus_toggles_subject_tracking
+                            else "Controls camera autofocus"
+                        ),
+                    ),
                 ],
                 "configure": self.configure_visca,
             },

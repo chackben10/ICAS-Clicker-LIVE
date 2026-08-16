@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import threading
 import urllib.parse
 import urllib.request
 
@@ -13,6 +14,11 @@ class PanasonicAwpClient(IntegrationBase):
     def __init__(self, config: PanasonicConfig) -> None:
         super().__init__("Panasonic AWP", config.enabled, config.camera_ip)
         self.config = config
+        # Panasonic's CGI interface is command-oriented and some camera
+        # firmware behaves poorly when requests overlap. Serialize the short
+        # HTTP transactions across UI, preset, calibration, and automation
+        # callers without ever blocking the Qt thread.
+        self._request_lock = threading.Lock()
 
     def build_url(self, command: str, endpoint: str = "aw_ptz") -> str:
         path = self.config.aw_cam_path if endpoint == "aw_cam" else self.config.aw_ptz_path
@@ -25,16 +31,26 @@ class PanasonicAwpClient(IntegrationBase):
         request.add_header("Authorization", f"Basic {auth}")
         return request
 
-    async def send(self, command: str, endpoint: str = "aw_ptz") -> bool:
-        def _request() -> None:
-            with urllib.request.urlopen(self.build_request(command, endpoint), timeout=self.config.request_timeout_seconds):
-                return None
+    async def request(self, command: str, endpoint: str = "aw_ptz") -> str:
+        def _request() -> str:
+            with self._request_lock:
+                with urllib.request.urlopen(
+                    self.build_request(command, endpoint),
+                    timeout=self.config.request_timeout_seconds,
+                ) as response:
+                    payload = response.read(512).decode("utf-8", errors="replace").strip()
+                    if payload.casefold().startswith("er"):
+                        raise RuntimeError(f"Panasonic rejected {command}: {payload}")
+                    return payload
 
         try:
-            await asyncio.to_thread(_request)
+            payload = await asyncio.to_thread(_request)
             self.mark_success()
-            return True
+            return payload
         except Exception as exc:
             self.mark_error(str(exc))
             raise
 
+    async def send(self, command: str, endpoint: str = "aw_ptz") -> bool:
+        await self.request(command, endpoint)
+        return True

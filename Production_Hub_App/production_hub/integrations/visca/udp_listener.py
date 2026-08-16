@@ -36,6 +36,10 @@ class ViscaUdpListener:
         self.config = config
         self.handler = handler
         self.transport: asyncio.DatagramTransport | None = None
+        self._shutdown_callbacks: list[Callable[[], None]] = []
+
+    def add_shutdown_callback(self, callback: Callable[[], None]) -> None:
+        self._shutdown_callbacks.append(callback)
 
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
@@ -61,4 +65,6 @@ class ViscaUdpListener:
         if self.transport:
             self.transport.close()
             self.transport = None
-
+        callbacks, self._shutdown_callbacks = self._shutdown_callbacks, []
+        for callback in callbacks:
+            callback()

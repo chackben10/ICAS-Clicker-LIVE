@@ -311,6 +311,33 @@ class SongLibrarySearchTests(unittest.TestCase):
             songs.value,
         )
 
+    def test_existing_audio_playlist_route_is_migrated_without_reseeding(self) -> None:
+        config = AppConfig()
+        config.ui.input_lists_initialized = True
+        config.ui.input_lists = [
+            InputListDefinition(
+                "audio_playlists",
+                "Audio Playlists",
+                columns=[column("tracks", "Tracks", "array_string")],
+                rows=[
+                    row(
+                        True,
+                        tracks=polled_cell(
+                            "http://127.0.0.1:1337/api/propresenter/audio/tracks?playlist=Major%20Pads",
+                            "items[]",
+                        ),
+                    )
+                ],
+            )
+        ]
+
+        self.assertTrue(ensure_default_input_lists(config))
+        self.assertEqual(
+            "http://127.0.0.1:1337/audio/tracks?playlist=Major%20Pads",
+            config.ui.input_lists[0].rows[0].cells["tracks"].url,
+        )
+        self.assertFalse(ensure_default_input_lists(config))
+
     def test_existing_custom_object_mapping_is_not_replaced(self) -> None:
         config = AppConfig()
         config.ui.input_lists_initialized = True
@@ -956,6 +983,38 @@ class SongLibraryPollingTests(unittest.IsolatedAsyncioTestCase):
             {path for path in client.paths if path.startswith("presentation/")},
         )
 
+    async def test_polled_url_percent_encodes_spaces_from_saved_configuration(self) -> None:
+        definition = InputListDefinition(
+            "audio_playlists",
+            "Audio Playlists",
+            columns=[column("tracks", "Tracks", "array_string")],
+            rows=[
+                row(
+                    True,
+                    tracks=polled_cell(
+                        "/api/propresenter/audio/tracks?playlist=Major Pads",
+                        "items[]",
+                    ),
+                )
+            ],
+        )
+
+        class Client:
+            def __init__(self) -> None:
+                self.paths: list[str] = []
+
+            async def get_json(self, path):
+                self.paths.append(path)
+                return {"items": ["C Major Pads"]}
+
+        client = Client()
+        context = SimpleNamespace(propresenter=SimpleNamespace(client=client))
+        self.assertTrue(await poll_input_list_definition(context, definition))
+        self.assertEqual(
+            ["api/propresenter/audio/tracks?playlist=Major%20Pads"],
+            client.paths,
+        )
+
     async def test_base_song_objects_are_saved_before_slow_lyrics_finish(self) -> None:
         config = AppConfig()
         config.ui.input_lists = [
@@ -1138,12 +1197,17 @@ class SongLibraryPollingTests(unittest.IsolatedAsyncioTestCase):
                 return {}
 
         class Logger:
-            def warning(self, *_args, **_kwargs) -> None:
-                pass
+            def __init__(self) -> None:
+                self.warnings: list[tuple[tuple, dict]] = []
 
-        context = SimpleNamespace(propresenter=SimpleNamespace(client=Client()), logger=Logger())
+            def warning(self, *args, **kwargs) -> None:
+                self.warnings.append((args, kwargs))
+
+        logger = Logger()
+        context = SimpleNamespace(propresenter=SimpleNamespace(client=Client()), logger=logger)
         self.assertFalse(await poll_input_list_definition(context, definition))
         self.assertEqual("keep me", definition.rows[0].cells["songs"].value[0]["lyrics"])
+        self.assertEqual([], logger.warnings)
 
     async def test_object_polling_reuses_enrichment_until_refresh_is_due(self) -> None:
         fields = song_object_fields()

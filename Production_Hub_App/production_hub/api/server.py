@@ -24,7 +24,17 @@ def create_app(context):
     except Exception as exc:  # pragma: no cover - exercised only without dependencies
         raise RuntimeError("FastAPI is required to run the embedded API server. Install requirements.txt.") from exc
 
-    from production_hub.api.routes import admin, health, obs, presets, propresenter, remote_pages, remote_state, scoreboard
+    from production_hub.api.routes import (
+        admin,
+        camera_tracking,
+        health,
+        obs,
+        presets,
+        propresenter,
+        remote_pages,
+        remote_state,
+        scoreboard,
+    )
 
     app = FastAPI(title="Production Hub API", version="0.1.0")
     app.add_middleware(
@@ -193,6 +203,7 @@ def create_app(context):
 
     for route_factory in (
         health.router,
+        camera_tracking.router,
         propresenter.router,
         presets.router,
         scoreboard.router,

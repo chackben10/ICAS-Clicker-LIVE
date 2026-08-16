@@ -279,12 +279,21 @@ class ViscaConfig(JsonModel):
     ack_response_enabled: bool = True
     completion_response_enabled: bool = True
     tenveo_compatibility_enabled: bool = True
+    autofocus_toggles_subject_tracking: bool = True
+    tracking_toggle_debounce_seconds: float = 0.75
     port_conflict_behavior: str = "cancel"
     safe_mode_for_port_conflicts: bool = True
 
     def __post_init__(self) -> None:
         self.listen_ip = _non_empty(self.listen_ip, "visca.listen_ip")
         self.udp_port = _port(self.udp_port, "visca.udp_port")
+        self.autofocus_toggles_subject_tracking = bool(
+            self.autofocus_toggles_subject_tracking
+        )
+        self.tracking_toggle_debounce_seconds = max(
+            0.25,
+            min(3.0, float(self.tracking_toggle_debounce_seconds)),
+        )
 
 
 @dataclass
@@ -307,12 +316,17 @@ class ScoreboardConfig(JsonModel):
 class VideoConfig(JsonModel):
     enabled: bool = True
     audience_enabled: bool = True
+    audience_source_type: str = "ndi"
     audience_ndi_source_name: str = "Production Hub - Audience Cam"
+    audience_device_id: str = ""
     audience_highest_bandwidth: bool = True
     audience_auto_connect: bool = True
     ptz_enabled: bool = True
+    ptz_source_type: str = "local"
+    ptz_ndi_source_name: str = "Production Hub - PTZ Cam"
     ptz_device_id: str = ""
-    ptz_auto_connect: bool = False
+    ptz_highest_bandwidth: bool = True
+    ptz_auto_connect: bool = True
     preferred_width: int = 1920
     preferred_height: int = 1080
     preferred_fps: float = 30.0
@@ -322,9 +336,22 @@ class VideoConfig(JsonModel):
     recording_max_width: int = 1280
 
     def __post_init__(self) -> None:
+        self.audience_source_type = self._source_type(
+            self.audience_source_type,
+            "video.audience_source_type",
+        )
         self.audience_ndi_source_name = _non_empty(
             self.audience_ndi_source_name,
             "video.audience_ndi_source_name",
+        )
+        self.audience_device_id = str(self.audience_device_id or "").strip()
+        self.ptz_source_type = self._source_type(
+            self.ptz_source_type,
+            "video.ptz_source_type",
+        )
+        self.ptz_ndi_source_name = _non_empty(
+            self.ptz_ndi_source_name,
+            "video.ptz_ndi_source_name",
         )
         self.ptz_device_id = str(self.ptz_device_id or "").strip()
         self.preferred_width = max(320, min(7680, int(self.preferred_width)))
@@ -334,6 +361,264 @@ class VideoConfig(JsonModel):
         self.stale_after_seconds = max(0.5, min(30.0, float(self.stale_after_seconds)))
         self.recording_fps = max(1.0, min(30.0, float(self.recording_fps)))
         self.recording_max_width = max(320, min(3840, int(self.recording_max_width)))
+
+    @staticmethod
+    def _source_type(value: str, field_name: str) -> str:
+        normalized = str(value or "").strip().casefold()
+        if normalized not in {"ndi", "local"}:
+            raise ValidationError(f"{field_name} must be 'ndi' or 'local'")
+        return normalized
+
+
+@dataclass
+class SceneRegionPoint(JsonModel):
+    x: float
+    y: float
+
+    def __post_init__(self) -> None:
+        self.x = max(0.0, min(1.0, float(self.x)))
+        self.y = max(0.0, min(1.0, float(self.y)))
+
+
+@dataclass
+class CameraSceneRegion(JsonModel):
+    id: str
+    name: str
+    points: list[SceneRegionPoint]
+    kind: str = "custom"
+    source: str = "audience"
+    color: str = "#7c5cff"
+    enabled: bool = True
+    suggested: bool = False
+    coordinate_space: str = "calibration_reference"
+    calibration_reference: str = ""
+    generation_method: str = ""
+    generated_at: str = ""
+    supporting_poses: list[str] = field(default_factory=list)
+    support_points: int = 0
+    confidence: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.id = _non_empty(self.id, "camera_scene_region.id")
+        self.name = _non_empty(self.name, "camera_scene_region.name")
+        self.kind = str(self.kind or "custom").strip().casefold().replace(" ", "_")
+        if self.kind not in {
+            "stage",
+            "front_stage",
+            "altar",
+            "podium",
+            "audience",
+            "custom",
+        }:
+            raise ValidationError(
+                "camera_scene_region.kind must be stage, front_stage, altar, podium, audience, or custom"
+            )
+        self.source = str(self.source or "audience").strip().casefold()
+        if self.source not in {"audience", "ptz"}:
+            raise ValidationError("camera_scene_region.source must be audience or ptz")
+        self.color = str(self.color or "#7c5cff").strip()
+        self.suggested = bool(self.suggested)
+        self.coordinate_space = str(
+            self.coordinate_space or "calibration_reference"
+        ).strip().casefold()
+        if self.coordinate_space not in {"calibration_reference", "live_audience"}:
+            raise ValidationError(
+                "camera_scene_region.coordinate_space must be calibration_reference or live_audience"
+            )
+        self.calibration_reference = str(self.calibration_reference or "").strip()
+        self.generation_method = str(self.generation_method or "").strip()
+        self.generated_at = str(self.generated_at or "").strip()
+        self.supporting_poses = [
+            str(value).strip()
+            for value in self.supporting_poses
+            if str(value).strip()
+        ]
+        self.support_points = max(0, int(self.support_points))
+        self.confidence = max(0.0, min(1.0, float(self.confidence)))
+        if len(self.points) < 3:
+            raise ValidationError("camera_scene_region.points must contain at least three points")
+
+
+@dataclass
+class PtzAutomationConfig(JsonModel):
+    """Framing policy and bounded motion limits; arming is runtime-only."""
+
+    mode: str = "off"
+    podium_zoom_enabled: bool = True
+    decision_fps: float = 4.0
+    minimum_subject_age_frames: int = 2
+    target_padding_x: float = 0.10
+    target_padding_y: float = 0.12
+    single_subject_frame_height: float = 0.72
+    podium_subject_frame_height: float = 0.84
+    group_frame_height: float = 0.76
+    adaptive_subject_framing_enabled: bool = True
+    subject_safety_padding_x: float = 0.05
+    subject_safety_padding_y: float = 0.05
+    subject_center_deadband_x: float = 0.06
+    subject_center_deadband_y: float = 0.09
+    subject_minimum_occupancy: float = 0.74
+    subject_maximum_occupancy: float = 0.88
+    group_minimum_occupancy: float = 0.70
+    group_maximum_occupancy: float = 0.86
+    raised_gesture_maximum_occupancy: float = 0.84
+    click_target_width: float = 0.12
+    click_target_height: float = 0.34
+    target_dwell_seconds: float = 0.35
+    target_loss_hold_seconds: float = 2.5
+    target_loss_disarm_seconds: float = 12.0
+    minimum_command_interval_seconds: float = 0.65
+    pan_deadband_units: int = 80
+    tilt_deadband_units: int = 60
+    zoom_deadband_units: int = 35
+    maximum_pan_step_units: int = 320
+    maximum_tilt_step_units: int = 220
+    maximum_zoom_step_units: int = 100
+    manual_override_pan_units: int = 420
+    manual_override_tilt_units: int = 320
+    manual_override_zoom_units: int = 140
+    manual_override_grace_seconds: float = 2.5
+
+    def __post_init__(self) -> None:
+        self.mode = str(self.mode or "off").strip().casefold().replace("+", "_")
+        if self.mode not in {"off", "subject", "stage", "stage_altar", "click"}:
+            raise ValidationError(
+                "ptz_automation.mode must be off, subject, stage, stage_altar, or click"
+            )
+        self.decision_fps = max(1.0, min(8.0, float(self.decision_fps)))
+        self.minimum_subject_age_frames = max(1, min(30, int(self.minimum_subject_age_frames)))
+        self.target_padding_x = max(0.0, min(0.40, float(self.target_padding_x)))
+        self.target_padding_y = max(0.0, min(0.40, float(self.target_padding_y)))
+        self.single_subject_frame_height = max(
+            0.30, min(0.95, float(self.single_subject_frame_height))
+        )
+        self.podium_subject_frame_height = max(
+            0.40, min(0.98, float(self.podium_subject_frame_height))
+        )
+        self.group_frame_height = max(0.30, min(0.95, float(self.group_frame_height)))
+        self.adaptive_subject_framing_enabled = bool(
+            self.adaptive_subject_framing_enabled
+        )
+        for field_name in (
+            "subject_safety_padding_x",
+            "subject_safety_padding_y",
+        ):
+            setattr(
+                self,
+                field_name,
+                max(0.0, min(0.20, float(getattr(self, field_name)))),
+            )
+        self.subject_center_deadband_x = max(
+            0.0, min(0.25, float(self.subject_center_deadband_x))
+        )
+        self.subject_center_deadband_y = max(
+            0.0, min(0.25, float(self.subject_center_deadband_y))
+        )
+        self.subject_minimum_occupancy = max(
+            0.30, min(0.95, float(self.subject_minimum_occupancy))
+        )
+        self.subject_maximum_occupancy = max(
+            self.subject_minimum_occupancy,
+            min(0.98, float(self.subject_maximum_occupancy)),
+        )
+        self.group_minimum_occupancy = max(
+            0.30, min(0.95, float(self.group_minimum_occupancy))
+        )
+        self.group_maximum_occupancy = max(
+            self.group_minimum_occupancy,
+            min(0.98, float(self.group_maximum_occupancy)),
+        )
+        self.raised_gesture_maximum_occupancy = max(
+            0.50, min(0.95, float(self.raised_gesture_maximum_occupancy))
+        )
+        self.click_target_width = max(0.02, min(0.60, float(self.click_target_width)))
+        self.click_target_height = max(0.05, min(0.80, float(self.click_target_height)))
+        self.target_dwell_seconds = max(0.0, min(5.0, float(self.target_dwell_seconds)))
+        self.target_loss_hold_seconds = max(
+            0.5, min(30.0, float(self.target_loss_hold_seconds))
+        )
+        self.target_loss_disarm_seconds = max(
+            self.target_loss_hold_seconds,
+            min(120.0, float(self.target_loss_disarm_seconds)),
+        )
+        self.minimum_command_interval_seconds = max(
+            0.25, min(5.0, float(self.minimum_command_interval_seconds))
+        )
+        for field_name, low, high in (
+            ("pan_deadband_units", 10, 1000),
+            ("tilt_deadband_units", 10, 1000),
+            ("zoom_deadband_units", 5, 500),
+            ("maximum_pan_step_units", 40, 2000),
+            ("maximum_tilt_step_units", 40, 2000),
+            ("maximum_zoom_step_units", 20, 500),
+            ("manual_override_pan_units", 100, 4000),
+            ("manual_override_tilt_units", 100, 4000),
+            ("manual_override_zoom_units", 40, 1000),
+        ):
+            setattr(self, field_name, max(low, min(high, int(getattr(self, field_name)))))
+        self.manual_override_grace_seconds = max(
+            1.0, min(10.0, float(self.manual_override_grace_seconds))
+        )
+
+
+@dataclass
+class CameraTrackingConfig(JsonModel):
+    """Bounded observation and framing policy; runtime arming grants motion authority."""
+
+    enabled: bool = False
+    analyze_audience: bool = True
+    analyze_ptz: bool = True
+    analysis_fps: float = 4.0
+    maximum_analysis_width: int = 960
+    minimum_confidence: float = 0.25
+    upper_body_only: bool = True
+    body_pose_envelope_enabled: bool = True
+    minimum_pose_joint_confidence: float = 0.20
+    minimum_match_iou: float = 0.12
+    maximum_center_distance: float = 0.18
+    maximum_missed_frames: int = 4
+    audience_region_filter_enabled: bool = True
+    audience_region_kinds: list[str] = field(
+        default_factory=lambda: ["stage", "front_stage", "altar", "podium"]
+    )
+    relocalization_enabled: bool = True
+    relocalization_fps: float = 1.0
+    relocalization_maximum_width: int = 1280
+    relocalization_stale_seconds: float = 4.0
+    scene_regions: list[CameraSceneRegion] = field(default_factory=list)
+    automation: PtzAutomationConfig = field(default_factory=PtzAutomationConfig)
+
+    def __post_init__(self) -> None:
+        self.analysis_fps = max(0.5, min(12.0, float(self.analysis_fps)))
+        self.maximum_analysis_width = max(320, min(1920, int(self.maximum_analysis_width)))
+        self.minimum_confidence = max(0.0, min(1.0, float(self.minimum_confidence)))
+        self.minimum_pose_joint_confidence = max(
+            0.05,
+            min(0.90, float(self.minimum_pose_joint_confidence)),
+        )
+        self.minimum_match_iou = max(0.0, min(1.0, float(self.minimum_match_iou)))
+        self.maximum_center_distance = max(
+            0.01,
+            min(1.0, float(self.maximum_center_distance)),
+        )
+        self.maximum_missed_frames = max(0, min(30, int(self.maximum_missed_frames)))
+        allowed_kinds = {"stage", "front_stage", "altar", "podium", "custom"}
+        self.audience_region_kinds = [
+            kind
+            for value in self.audience_region_kinds
+            if (kind := str(value).strip().casefold().replace(" ", "_")) in allowed_kinds
+        ]
+        if not self.audience_region_kinds:
+            self.audience_region_kinds = ["stage", "front_stage", "altar", "podium"]
+        self.relocalization_fps = max(0.25, min(4.0, float(self.relocalization_fps)))
+        self.relocalization_maximum_width = max(
+            640,
+            min(1920, int(self.relocalization_maximum_width)),
+        )
+        self.relocalization_stale_seconds = max(
+            2.0,
+            min(30.0, float(self.relocalization_stale_seconds)),
+        )
 
 
 @dataclass
@@ -345,6 +630,7 @@ class IntegrationConfig(JsonModel):
     scoreboard: ScoreboardConfig = field(default_factory=ScoreboardConfig)
     midi: MidiConfig = field(default_factory=MidiConfig)
     video: VideoConfig = field(default_factory=VideoConfig)
+    camera_tracking: CameraTrackingConfig = field(default_factory=CameraTrackingConfig)
 
 
 @dataclass

@@ -2,16 +2,17 @@
 
 ## Implemented boundary
 
-Phase 1 receives the Audience Cam over NDI, opens a user-selected PTZ capture
-device through Qt Multimedia, displays bounded previews, reports source health,
-and records/replays short diagnostic MP4 files. It does not perform person
+Phase 1 provides independent Audience and PTZ video slots. Each slot can use a
+discovered NDI source or a user-selected local capture device through Qt
+Multimedia. It displays bounded previews, reports source health, and
+records/replays short diagnostic MP4 files. It does not perform person
 detection, calibration, framing decisions, or automated Panasonic movement.
 
 ## Runtime ownership
 
-- `AudienceNDISource` owns one receive thread and continuously releases every
+- Each `NDIVideoSource` owns one receive thread and continuously releases every
   NDI frame. It copies pixels only for an active preview or recording consumer.
-- `LocalPTZCameraSource` owns Qt's native capture session. Its signal handler
+- Each `LocalCameraVideoSource` owns a Qt native capture session. Its signal handler
   performs no pixel conversion; one replaceable `QVideoFrame` is handed to a
   dedicated converter thread.
 - `LatestFrameBroker` retains exactly one immutable `QImage` per source.
@@ -42,9 +43,12 @@ benchmark cannot prove another application's behavior over several hours.
 ## Safe defaults
 
 - Audience NDI auto-connects using full bandwidth.
-- PTZ local capture does not auto-connect until a device has been selected.
+- PTZ local capture auto-connects at startup after a device has been selected and saved.
+- Both slots can be changed between NDI and local camera without restarting the app.
+- Local capture checks and requests macOS Camera permission before opening a device.
 - Preview delivery is capped at 12 fps.
 - Recording is capped at 10 fps and 1280 pixels wide.
-- Hidden previews do not copy or render pixels.
+- Hidden previews do not render pixels; frame copying also suspends unless a
+  recording or later-phase analysis consumer is active.
 - Stale sources are visible and NDI reconnects without operator intervention.
 - Quitting Production Hub stops capture and flushes recordings.

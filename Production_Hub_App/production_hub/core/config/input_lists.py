@@ -8,7 +8,7 @@ import time
 import urllib.request
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from production_hub.core.config.models import (
     InputListCell,
@@ -264,7 +264,7 @@ def default_input_lists(config: Any) -> list[InputListDefinition]:
                     True,
                     playlist_name=static_cell(name),
                     tracks=polled_cell(
-                        f"{base_url}/api/propresenter/audio/tracks?playlist={name}",
+                        f"{base_url}/audio/tracks?playlist={quote(name, safe='')}",
                         "items[]",
                         audio_track_preview(name),
                     ),
@@ -346,7 +346,35 @@ def ensure_default_input_lists(config: Any) -> bool:
         config.ui.input_lists = seeded
         config.ui.input_lists_initialized = True
         changed = True
-    return ensure_song_library_objects(config) or changed
+    return _repair_builtin_input_list_urls(config) or ensure_song_library_objects(config) or changed
+
+
+def _repair_builtin_input_list_urls(config: Any) -> bool:
+    """Migrate built-in URLs without disturbing user-created input lists.
+
+    Audio playlist polling used an early API prefix that was never mounted by
+    the embedded ProPresenter router. Existing installations retain that URL
+    in their saved profile, so changing the seed alone does not repair them.
+    """
+
+    index = _find_input_list_index(config, "audio_playlists")
+    if index < 0:
+        return False
+    definition = _definition_from_config(config.ui.input_lists[index])
+    changed = False
+    for row_def in definition.rows:
+        cell = row_def.cells.get("tracks")
+        if cell is None or cell.mode != "polled":
+            continue
+        repaired = cell.url.replace(
+            "/api/propresenter/audio/tracks", "/audio/tracks"
+        )
+        if repaired != cell.url:
+            cell.url = repaired
+            changed = True
+    if changed:
+        config.ui.input_lists[index] = definition
+    return changed
 
 
 def _collection_path(path: str, fallback_field: str) -> tuple[str, str]:
@@ -742,20 +770,18 @@ async def _poll_object_array_cell(
                     first_error = first_error or str(result)
                     continue
                 updates: dict[str, Any] = {}
-                missing_fields: list[str] = []
                 for field in fields:
                     raw_value = _json_path(result, field.json_path) if field.json_path else result
                     field_value = _coerce_object_field(field, raw_value)
-                    if _is_empty(field_value):
-                        missing_fields.append(field.key)
-                    else:
+                    if not _is_empty(field_value):
                         updates[field.key] = field_value
                 records[index].update(updates)
-                if missing_fields:
-                    failures += 1
-                    first_error = first_error or f"Response did not contain: {', '.join(missing_fields)}"
-                    continue
-                successes += 1
+                # A successful per-object response can legitimately omit an
+                # enrichment value (for example, a ProPresenter presentation
+                # with no lyric text). Preserve any cached value and reserve
+                # warnings for transport, template, and decoding failures.
+                if updates:
+                    successes += 1
             if progress_callback is not None:
                 progress_callback(records, last_polled)
         if successes:
@@ -778,7 +804,7 @@ async def _poll_object_array_cell(
 
 
 async def _fetch_json(context: Any, url: str) -> Any:
-    target = str(url or "").strip()
+    target = _encode_request_url(str(url or "").strip())
     if not target:
         return {}
     if target.startswith("http://") or target.startswith("https://"):
@@ -791,6 +817,18 @@ async def _fetch_json(context: Any, url: str) -> Any:
     if path.startswith("v1/"):
         path = path[3:]
     return await context.propresenter.client.get_json(path)
+
+
+def _encode_request_url(target: str) -> str:
+    """Percent-encode unsafe URL characters without double-encoding saved URLs."""
+
+    if not target:
+        return ""
+    parts = urlsplit(target)
+    path = quote(parts.path, safe="/:@-._~%")
+    query = quote(parts.query, safe="=&/:;,+?@-._~%")
+    fragment = quote(parts.fragment, safe="-._~%")
+    return urlunsplit((parts.scheme, parts.netloc, path, query, fragment))
 
 
 class _InputListRowDisabled(Exception):
@@ -1036,6 +1074,7 @@ async def poll_due_input_lists(
     context: Any,
     next_due: dict[str, float],
     running_tasks: dict[str, asyncio.Task[None]] | None = None,
+    failure_state: dict[str, str] | None = None,
 ) -> None:
     now = time.monotonic()
     if running_tasks is not None:
@@ -1058,7 +1097,25 @@ async def poll_due_input_lists(
         try:
             await poll_input_list_by_key(context, key)
         except Exception as exc:
-            context.logger.warning("input_list_poll_failed", "Input list polling failed", list=name, error=str(exc))
+            error = str(exc)
+            if failure_state is None or failure_state.get(key) != error:
+                context.logger.warning(
+                    "input_list_poll_failed",
+                    "Input list polling failed",
+                    list=name,
+                    error=error,
+                )
+            if failure_state is not None:
+                failure_state[key] = error
+        else:
+            if failure_state is not None and failure_state.pop(key, None) is not None:
+                info = getattr(context.logger, "info", None)
+                if callable(info):
+                    info(
+                        "input_list_poll_recovered",
+                        "Input list polling recovered",
+                        list=name,
+                    )
 
     for item in list(context.config.ui.input_lists):
         definition = _definition_from_config(item)

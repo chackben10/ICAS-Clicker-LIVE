@@ -17,6 +17,9 @@ from production_hub.core.endpoints.models import ActionDefinition, EndpointDefin
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_OFFLINE, STATUS_RECONNECTING
 from production_hub.integrations.panasonic_awp.models import PanasonicCommand
 from production_hub.integrations.visca.udp_listener import ViscaUdpListener
+from production_hub.integrations.visca.tracking_toggle import (
+    ViscaAutofocusTrackingToggle,
+)
 
 
 @dataclass
@@ -157,10 +160,16 @@ async def start_visca_listener(context: ApplicationContext) -> ViscaUdpListener 
     if not context.config.integrations.visca.enabled:
         return None
 
+    tracking_toggle = ViscaAutofocusTrackingToggle(context)
+
     async def handle(command: PanasonicCommand) -> None:
+        if await tracking_toggle.consume(command):
+            return
+        context.ptz_automation.manual_override("VISCA bridge command")
         await context.panasonic.send_command(command.command, command.endpoint)
 
     listener = ViscaUdpListener(context.config.integrations.visca, handle)
+    listener.add_shutdown_callback(tracking_toggle.shutdown)
     try:
         await listener.start()
         target = f"{context.config.integrations.visca.listen_ip}:{context.config.integrations.visca.udp_port}"
@@ -388,13 +397,19 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     trigger_monitor = AutomationTriggerMonitor(context)
     next_list_due: dict[str, float] = {}
     input_list_poll_tasks: dict[str, asyncio.Task[None]] = {}
+    input_list_poll_failures: dict[str, str] = {}
     next_reconnect_at = 0.0
 
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
             await _run_due_automations(context, trigger_monitor)
-            await poll_due_input_lists(context, next_list_due, input_list_poll_tasks)
+            await poll_due_input_lists(
+                context,
+                next_list_due,
+                input_list_poll_tasks,
+                input_list_poll_failures,
+            )
             import time
 
             now = time.monotonic()

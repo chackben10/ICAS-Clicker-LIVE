@@ -4,6 +4,10 @@ Production Hub is the macOS-first backend control plane for ICAS production remo
 It hosts the API used by the existing browser pages, persists configuration/state,
 and provides a desktop admin interface for setup, diagnostics, and health checks.
 
+Camera Control includes stage-gated person detection, calibrated shadow framing,
+and explicitly armed, bounded Panasonic PTZ tracking. See
+[`docs/PTZ_AUTOMATION_PHASE45.md`](docs/PTZ_AUTOMATION_PHASE45.md).
+
 ## Install
 
 ```bash
@@ -109,8 +113,9 @@ The desktop UI includes:
 - Endpoints, with editable endpoint definition JSON
 - Automations, with editable automation definition JSON and pause/resume
 - Integrations
-- Camera Control, including local PTZ and Audience NDI previews, bounded video
-  diagnostics, recording/replay, Panasonic PTZ/lens controls, and presets
+- Camera Control, including independent NDI/local inputs, bounded video
+  diagnostics, Apple Vision person-detection shadow mode, recording/replay,
+  Panasonic PTZ/lens controls, and presets
 - Scoreboard, with native row editing, per-row score controls, queue controls,
   local action history, and undo
 - Remote Pages
@@ -224,10 +229,18 @@ Writes are atomic and existing files are backed up before replacement.
 
 ## Phase 1 Video Inputs
 
-The Camera Control page receives `Production Hub - Audience Cam` over NDI and
-opens the PTZ capture device locally through Qt Multimedia. Audience NDI starts
-automatically by default. The PTZ device must be selected once before it can be
-opened, avoiding an accidental grab of an unrelated webcam.
+The Camera Control page has independent Audience and PTZ video slots. Either
+slot can use a discovered NDI source or any local camera/capture device exposed
+by Qt Multimedia. Audience defaults to `Production Hub - Audience Cam` over
+NDI; PTZ defaults to explicit local-camera selection so Production Hub does not
+accidentally grab an unrelated webcam. Once a PTZ capture device is selected
+and saved, that input auto-connects at application startup.
+
+Local cameras request macOS Camera permission when Production Hub first tries
+to connect (at startup for a saved PTZ input, or after Connect for a newly
+selected input). A denial is shown directly in source health instead of leaving
+the source in a permanent Starting state, and Camera Control links to the
+correct System Settings privacy page.
 
 Performance safeguards are intentional:
 
@@ -235,14 +248,76 @@ Performance safeguards are intentional:
 - Each source has a one-frame broker slot; stale work is replaced, never queued.
 - The full NDI stream is continuously drained while preview publication is capped.
 - Pixel copying and preview rendering suspend when Camera Control is hidden and
-  no diagnostic recording is active; source health and reconnection continue.
+  no diagnostic recording or explicitly active vision workflow needs frames;
+  source health and reconnection continue.
+- Person inference and Audience relocalization sleep on runtime activity events
+  when neither tracking nor calibration/review is actually in use. Persisted
+  enablement alone does not consume inference CPU.
 - Preview delivery is capped at 12 fps. Diagnostic recording defaults to 10 fps
   and at most 1280 pixels wide through Qt Multimedia's bounded in-process
   MPEG-4 encoder.
 - Diagnostic files are independent MP4 streams plus a small JSON manifest.
 - Video capture is stopped cleanly when Production Hub quits.
 
-Phase 1 does not detect people or send automated Panasonic movement commands.
+## Phase 2 Scene Regions and Person Detection
+
+The scene-plane editor supports empty-room setup by letting an operator draw, name, enable,
+redraw, rename, and delete polygonal regions on the fixed Audience view. A
+large Scene Drawing Review window includes ten church-stage candidates and
+shows one selected drawing at a time by default; operators can compare all,
+hide individual drawings, or bulk-delete unwanted candidates. The built-in
+semantic types are Stage, Front of Stage, Altar, Podium, Audience, and Custom.
+Phase 3C stores polygons in approved calibration-reference coordinates and
+projects them into a drifted live Audience view. Both reference `points` and
+locked `livePoints` are published read-only at `GET /api/camera/regions`.
+The same popup can derive unlabeled structural-plane candidates from every
+simultaneous Audience/PTZ image in an approved sweep. Candidates must recur
+across PTZ poses and retain their view count, feature support, and confidence
+for operator review; semantic names are always assigned by the operator.
+
+Phase 2 also adds observation-only person detection through Apple's native
+Vision framework. A single worker analyzes only the newest frame for each
+enabled source, defaults to 4 fps per source and 960 pixels wide, and never
+accumulates an inference queue. Camera Control draws stable short-horizon
+subject IDs and lets an operator select or deselect people that are currently
+detected. A zero-person feed therefore leaves the explicitly named
+`Select All Detected` buttons disabled; region setup remains fully usable.
+These selections do not send Panasonic commands. See `docs/VIDEO_PHASE2.md`
+for the measured baseline and safety boundary. Read-only tracking snapshots
+are available at `GET /api/camera/tracking` and
+`GET /api/camera/tracking/{audience|ptz}` for future dashboards and automation
+observability.
+
+For source development on macOS, `python3 main.py` automatically relaunches the
+GUI through `.build/dev/Production Hub Dev.app`. That small, stable app wrapper
+loads the live source tree while supplying the bundle identity and privacy
+description macOS requires for Camera access. Grant Camera permission once to
+`Production Hub Dev`; source edits do not rebuild or change that identity.
+
+## Phase 3 Calibration, Curation, Relocalization, and Scene Planes
+
+Camera Control now includes a large Tracking Marker Review popup. It loads the
+latest accepted calibration without requiring live cameras, shows each unique
+Audience point beside its mapped PTZ point across eleven structural motor poses,
+and lets an operator select the same marker in either image. Markers can be
+reversibly excluded/restored; edited maps require explicit approval and prior
+approved maps remain available for rollback. The same review is
+available through **Tools → Calibrate PTZ Camera to Audience Camera**.
+
+The calibration button first checks illumination and visible detail in both
+live feeds. If either feed is missing, dark, or featureless, movement is blocked.
+After operator confirmation, the packaged workflow captures a direct reference,
+runs the guarded eleven-pose PTZ sweep, restores the recorded starting pose, and
+builds the composed synchronization map. The standalone read-only
+`scripts/calibrate_camera_views.py` remains available for diagnostics. See
+`docs/CAMERA_CALIBRATION_PHASE3.md` for commands, confidence gates, and the
+single-plane/parallax limitation.
+
+An approved map also drives an activity-gated latest-frame relocalization worker. It
+uses curated landmarks to compensate live Audience-camera drift and reports
+Locked, Degraded, Lost, or Error health at `GET /api/camera/calibration`. Only
+Locked plus approved reports `motionSafe=true`; no Phase 3 service imports the
+Panasonic client or grants camera-motion authority.
 
 ## Tests
 
@@ -256,4 +331,6 @@ python3 -m unittest discover production_hub/tests
 They cover configuration seeding/backups, endpoint sequencing, automation
 cooldown/debounce behavior, audio normalization, OBS look rule mapping,
 Panasonic CGI URL construction, VISCA parsing/mapping/responses, and scoreboard
-revision conflict handling.
+revision conflict handling. Phase 2 tests also cover frame supersession,
+subject association, selection persistence, empty-room scene-region setup, and
+safe configuration defaults.

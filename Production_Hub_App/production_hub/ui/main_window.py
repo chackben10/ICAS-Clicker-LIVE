@@ -3,12 +3,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
     QHBoxLayout,
+    QLabel,
     QListView,
     QListWidget,
     QListWidgetItem,
@@ -41,6 +42,67 @@ NAV_EXPANDED_WIDTH = 220
 NAV_COLLAPSED_WIDTH = 64
 MIN_CONTENT_WIDTH = 720
 MIN_WINDOW_HEIGHT = 620
+TRACKING_INDICATOR_TIMEOUT_MS = 5_000
+
+
+class TrackingStatusIndicator(QWidget):
+    """Brief, non-activating indication of a PTZ tracking state change."""
+
+    def __init__(self) -> None:
+        flags = (
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        super().__init__(None, flags)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        if hasattr(Qt.WidgetAttribute, "WA_MacAlwaysShowToolWindow"):
+            self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow, True)
+        self.setFixedSize(128, 30)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
+        self.label = QLabel()
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+        self._dismiss_timer = QTimer(self)
+        self._dismiss_timer.setSingleShot(True)
+        self._dismiss_timer.setInterval(TRACKING_INDICATOR_TIMEOUT_MS)
+        self._dismiss_timer.timeout.connect(self.hide)
+        self._tracking: bool | None = None
+        self.set_tracking(False)
+
+    def set_tracking(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if enabled == self._tracking and self.label.text():
+            return
+        self._tracking = enabled
+        if enabled:
+            self.label.setText("● TRACKING ON")
+            self.setStyleSheet(
+                "QWidget { background: rgba(16, 92, 64, 232); border: 1px solid #49e0a5; border-radius: 8px; }"
+                "QLabel { color: white; border: 0; font-weight: 800; font-size: 11px; }"
+            )
+        else:
+            self.label.setText("● TRACKING OFF")
+            self.setStyleSheet(
+                "QWidget { background: rgba(45, 50, 59, 220); border: 1px solid #9ca3af; border-radius: 8px; }"
+                "QLabel { color: white; border: 0; font-weight: 800; font-size: 11px; }"
+            )
+        self.reposition()
+        self.show()
+        self._dismiss_timer.start()
+
+    def reposition(self) -> None:
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        self.move(
+            available.right() - self.width() - 16,
+            available.top() + 12,
+        )
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +118,8 @@ class MainWindow(QMainWindow):
         self.navigate_menu = None
         self.tools_menu = None
         self.help_menu = None
+        self.tray_tracking_action = None
+        self.tray_click_action = None
         self.full_sidebar_action = None
         self.nav_collapsed = False
         self.page_names: list[str] = []
@@ -91,6 +155,7 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget()
 
+        self.camera_control_page = camera_control_page.build_page(context)
         pages = [
             ("Overview", overview_page.build_page(context)),
             ("Endpoints", endpoints_page.build_page(context)),
@@ -98,7 +163,7 @@ class MainWindow(QMainWindow):
             ("Automations", automations_page.build_page(context)),
             ("Integrations", integrations_page.build_page(context)),
             ("MIDI", midi_page.build_page(context)),
-            ("Camera Control", camera_control_page.build_page(context)),
+            ("Camera Control", self.camera_control_page),
             ("Scoreboard", scoreboard_page.build_page(context)),
             ("Remote Pages", remote_pages_page.build_page(context)),
             ("Settings", settings_page.build_page(context)),
@@ -122,6 +187,12 @@ class MainWindow(QMainWindow):
         self.remove_spinbox_arrows()
         self.set_nav_collapsed(False)
         self.setup_tray_icon()
+        self.tracking_indicator = TrackingStatusIndicator()
+        self.camera_state_timer = QTimer(self)
+        self.camera_state_timer.setInterval(250)
+        self.camera_state_timer.timeout.connect(self.sync_camera_global_controls)
+        self.camera_state_timer.start()
+        self.sync_camera_global_controls()
 
     def set_nav_collapsed(self, collapsed: bool) -> None:
         self.nav_collapsed = collapsed
@@ -176,14 +247,70 @@ class MainWindow(QMainWindow):
         menu = QMenu()
         show_action = QAction("Show Production Hub", self)
         show_action.triggered.connect(self.show_from_tray)
+        self.tray_tracking_action = QAction("Subject Tracking", self)
+        self.tray_tracking_action.setCheckable(True)
+        self.tray_tracking_action.triggered.connect(
+            self.toggle_subject_tracking_from_global_control
+        )
+        self.tray_click_action = QAction("Show Click-to-Frame Window", self)
+        self.tray_click_action.setCheckable(True)
+        self.tray_click_action.triggered.connect(
+            self.toggle_click_to_frame_from_global_control
+        )
+        calibrate_action = QAction("Calibrate Camera Sync…", self)
+        calibrate_action.triggered.connect(
+            self.camera_control_page.request_camera_calibration
+        )
         quit_action = QAction("Quit Production Hub", self)
         quit_action.triggered.connect(self.quit_from_tray)
         menu.addAction(show_action)
         menu.addSeparator()
+        menu.addAction(self.tray_tracking_action)
+        menu.addAction(self.tray_click_action)
+        menu.addAction(calibrate_action)
+        menu.addSeparator()
         menu.addAction(quit_action)
         self.tray_icon.setContextMenu(menu)
-        self.tray_icon.activated.connect(lambda reason: self.show_from_tray() if reason == QSystemTrayIcon.ActivationReason.Trigger else None)
         self.tray_icon.show()
+
+    def toggle_subject_tracking_from_global_control(self, enabled: bool) -> None:
+        self.camera_control_page.set_subject_tracking_enabled(
+            bool(enabled),
+            show_errors=self.isVisible(),
+        )
+        self.sync_camera_global_controls()
+
+    def toggle_click_to_frame_from_global_control(self, visible: bool) -> None:
+        self.camera_control_page.toggle_click_to_frame_window(bool(visible))
+        self.sync_camera_global_controls()
+
+    def sync_camera_global_controls(self) -> None:
+        # The app-level timer remains active when the main window is hidden,
+        # so menu-bar tracking can finish its bounded camera-analysis startup.
+        self.camera_control_page.continue_pending_subject_arm()
+        tracking = self.camera_control_page.subject_tracking_enabled()
+        if (
+            not tracking
+            and not self.camera_control_page.subject_tracking_requested()
+            and self.context.config.integrations.camera_tracking.automation.mode == "subject"
+        ):
+            self.camera_control_page.set_subject_tracking_enabled(
+                False,
+                show_errors=False,
+            )
+        self.tracking_indicator.set_tracking(tracking)
+        if self.tray_tracking_action is not None:
+            self.tray_tracking_action.blockSignals(True)
+            self.tray_tracking_action.setChecked(
+                self.camera_control_page.subject_tracking_requested()
+            )
+            self.tray_tracking_action.blockSignals(False)
+        if self.tray_click_action is not None:
+            self.tray_click_action.blockSignals(True)
+            self.tray_click_action.setChecked(
+                self.camera_control_page.click_to_frame_window.isVisible()
+            )
+            self.tray_click_action.blockSignals(False)
 
     def show_from_tray(self) -> None:
         self.show()
@@ -246,6 +373,20 @@ class MainWindow(QMainWindow):
         self.tools_menu = self.menuBar().addMenu("Tools")
         self.add_menu_action(self.tools_menu, "Pause All Automations", "Ctrl+Shift+P", self.pause_all_automations)
         self.add_menu_action(self.tools_menu, "Resume Automations", "Ctrl+Shift+G", self.resume_automations)
+        self.add_menu_action(
+            self.tools_menu,
+            "STOP / Disarm Automatic PTZ",
+            "Ctrl+Shift+X",
+            self.emergency_stop_ptz,
+        )
+        self.add_menu_action(
+            self.tools_menu,
+            "Toggle Subject Tracking",
+            "Ctrl+Alt+T",
+            lambda: self.toggle_subject_tracking_from_global_control(
+                not self.camera_control_page.subject_tracking_requested()
+            ),
+        )
         self.tools_menu.addSeparator()
         self.add_menu_action(self.tools_menu, "Open Endpoint Builder", "", lambda: self.show_page_by_name("Endpoints"))
         self.add_menu_action(self.tools_menu, "Open Input Lists", "", lambda: self.show_page_by_name("Input Lists"))
@@ -253,6 +394,13 @@ class MainWindow(QMainWindow):
         self.add_menu_action(self.tools_menu, "Open Remote Pages", "", lambda: self.show_page_by_name("Remote Pages"))
         self.add_menu_action(self.tools_menu, "Open Integration Diagnostics", "", lambda: self.show_page_by_name("Integrations"))
         self.add_menu_action(self.tools_menu, "Open Settings", "", lambda: self.show_page_by_name("Settings"))
+        self.tools_menu.addSeparator()
+        self.add_menu_action(
+            self.tools_menu,
+            "Calibrate Camera Sync…",
+            "",
+            self.open_camera_calibration,
+        )
 
     def setup_help_menu(self) -> None:
         self.help_menu = self.menuBar().addMenu("Help")
@@ -318,11 +466,20 @@ class MainWindow(QMainWindow):
 
     def pause_all_automations(self) -> None:
         self.context.automation_engine.pause_all()
+        self.context.ptz_automation.disarm("All automations were paused")
         self.show_status_message("All automations paused.")
 
     def resume_automations(self) -> None:
         self.context.automation_engine.resume_all()
         self.show_status_message("Automations resumed.")
+
+    def emergency_stop_ptz(self) -> None:
+        self.context.ptz_automation.disarm("Operator used the global STOP action")
+        self.show_status_message("Automatic PTZ movement stopped and disarmed.")
+
+    def open_camera_calibration(self) -> None:
+        self.show_page_by_name("Camera Control")
+        self.camera_control_page.request_camera_calibration()
 
     def quit_from_menu(self) -> None:
         self._quitting = True
@@ -342,6 +499,8 @@ class MainWindow(QMainWindow):
             return
         if self.tray_icon:
             self.tray_icon.hide()
+        self.tracking_indicator.hide()
+        self.camera_control_page.hide_click_to_frame_window()
         if self.api_handle:
             self.api_handle.stop()
         event.accept()
@@ -451,12 +610,10 @@ STYLE = """
 QMainWindow {
   background: #f6f7f8;
   color: #1c2430;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI";
   font-size: 13px;
 }
 QWidget {
   color: #1c2430;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI";
   font-size: 13px;
 }
 QMenuBar {

@@ -56,6 +56,8 @@ def configure_logging(log_dir: Path, level: int = logging.INFO) -> logging.Logge
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("production_hub")
     logger.setLevel(level)
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers.clear()
 
     log_path = log_dir / f"production-hub-{datetime.now(UTC).strftime('%Y-%m-%d')}.log"
@@ -67,4 +69,3 @@ def configure_logging(log_dir: Path, level: int = logging.INFO) -> logging.Logge
     stream_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     logger.addHandler(stream_handler)
     return logger
-

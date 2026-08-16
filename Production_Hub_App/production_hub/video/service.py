@@ -2,26 +2,42 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
-from production_hub.core.config.models import VideoConfig
+from production_hub.calibration.relocalization import AudienceRelocalizationService
+from production_hub.core.config.models import CameraTrackingConfig, VideoConfig
+from production_hub.tracking.service import PersonTrackingService
 from production_hub.video.frame_broker import LatestFrameBroker
-from production_hub.video.local_camera_source import LocalCameraDevice, LocalPTZCameraSource
-from production_hub.video.models import VideoFramePacket, VideoSourceKey, VideoSourceSnapshot
-from production_hub.video.ndi_source import AudienceNDISource, NDISourceSettings
+from production_hub.video.local_camera_source import LocalCameraDevice, LocalCameraVideoSource
+from production_hub.video.models import (
+    VideoFramePacket,
+    VideoSourceKey,
+    VideoSourceSnapshot,
+    VideoSourceState,
+)
+from production_hub.video.ndi_native import NativeNDI
+from production_hub.video.ndi_source import NDISourceSettings, NDIVideoSource
 from production_hub.video.recording import DiagnosticRecorder, ReplayVideoSource
 
 
-class VideoService:
-    """Owns Phase 1 video resources and keeps every queue bounded to one frame."""
+VideoPipeline = NDIVideoSource | LocalCameraVideoSource
 
-    def __init__(self, config: VideoConfig, data_root: Path, logger: Any | None = None) -> None:
+
+class VideoService:
+    """Own both configurable video slots and keep every queue bounded."""
+
+    def __init__(
+        self,
+        config: VideoConfig,
+        data_root: Path,
+        logger: Any | None = None,
+        tracking_config: CameraTrackingConfig | None = None,
+    ) -> None:
         self.config = config
         self.data_root = data_root
         self.logger = logger
         self.broker = LatestFrameBroker()
-        self.audience = self._make_audience_source(config)
-        self.local_ptz: LocalPTZCameraSource | None = None
         self.recorder = DiagnosticRecorder(
             self.broker,
             data_root / "recordings",
@@ -29,9 +45,32 @@ class VideoService:
             config.recording_max_width,
         )
         self.replay = ReplayVideoSource(self.broker)
+        self.tracking = PersonTrackingService(
+            self.broker,
+            tracking_config or CameraTrackingConfig(),
+            logger,
+            initially_active=False,
+        )
+        self.relocalization = AudienceRelocalizationService(
+            self.broker,
+            data_root,
+            tracking_config or CameraTrackingConfig(),
+            logger,
+            initially_active=False,
+        )
+        self.tracking.set_region_provider(
+            lambda: self.relocalization.stabilized_regions(self.tracking.config.scene_regions)
+        )
+        self._sources: dict[VideoSourceKey, VideoPipeline] = {}
+        self._discovered_ndi_sources: list[str] = []
+        self._ndi_runtime_version = "not loaded"
+        self._discovery_lock = threading.RLock()
         self._qt_initialized = False
         self._preview_active = False
+        self._tracking_activity_owners: set[str] = set()
+        self._calibration_activity_owners: set[str] = set()
         self._shutdown_lock = threading.Lock()
+        self._shutdown_callbacks: list[Callable[[], None]] = []
         self._stopped = False
         self.recorder.state_changed_callback = self._update_output_activity
 
@@ -43,127 +82,204 @@ class VideoService:
     def recordings_root(self) -> Path:
         return self.data_root / "recordings"
 
+    @property
+    def audience(self) -> VideoPipeline | None:
+        return self._sources.get(VideoSourceKey.AUDIENCE)
+
+    @property
+    def local_ptz(self) -> LocalCameraVideoSource | None:
+        source = self._sources.get(VideoSourceKey.PTZ)
+        return source if isinstance(source, LocalCameraVideoSource) else None
+
+    @property
+    def discovered_ndi_sources(self) -> list[str]:
+        with self._discovery_lock:
+            names = list(self._discovered_ndi_sources)
+        for source in self._sources.values():
+            if isinstance(source, NDIVideoSource):
+                names.extend(source.discovered_sources)
+        return sorted(set(names), key=str.casefold)
+
+    @property
+    def ndi_runtime_version(self) -> str:
+        versions = [
+            source.runtime_version
+            for source in self._sources.values()
+            if isinstance(source, NDIVideoSource) and source.runtime_version != "not loaded"
+        ]
+        return versions[0] if versions else self._ndi_runtime_version
+
     def initialize_qt(self) -> None:
         if self._qt_initialized:
             return
         self._qt_initialized = True
         self.recorder.initialize_qt()
         self.replay.initialize_qt()
-        self.local_ptz = LocalPTZCameraSource(
-            self.broker,
-            publish_fps=self.config.preview_fps,
-            preferred_width=self.config.preferred_width,
-            preferred_height=self.config.preferred_height,
-            preferred_fps=self.config.preferred_fps,
-            stale_after_seconds=self.config.stale_after_seconds,
-        )
-        if self.config.enabled and self.config.audience_enabled and self.config.audience_auto_connect:
-            self.audience.start()
-        if (
-            self.config.enabled
-            and self.config.ptz_enabled
-            and self.config.ptz_auto_connect
-            and self.config.ptz_device_id
-        ):
-            self.local_ptz.start(self.config.ptz_device_id)
+        for source_key in (VideoSourceKey.AUDIENCE, VideoSourceKey.PTZ):
+            self._sources[source_key] = self._make_source(source_key, self.config)
+            if self._source_enabled(source_key, self.config) and self._source_auto_connect(
+                source_key,
+                self.config,
+            ):
+                self.start_source(source_key)
+        self.tracking.start()
+        self.relocalization.start()
         self._update_output_activity()
 
     def set_preview_active(self, active: bool) -> None:
         self._preview_active = bool(active)
         self._update_output_activity()
 
+    def set_tracking_activity(self, active: bool, *, owner: str = "ui") -> None:
+        """Grant runtime analysis activity without granting any PTZ motion authority."""
+
+        selected_owner = str(owner or "ui")
+        if active:
+            self._tracking_activity_owners.add(selected_owner)
+        else:
+            self._tracking_activity_owners.discard(selected_owner)
+        tracking_active = bool(self._tracking_activity_owners)
+        self.tracking.set_active(tracking_active)
+        # Live tracking needs current scene-plane coordinates when available.
+        self.relocalization.set_active(
+            bool(self._calibration_activity_owners) or tracking_active
+        )
+        self._update_output_activity()
+
+    def set_calibration_activity(self, active: bool, *, owner: str = "ui") -> None:
+        selected_owner = str(owner or "ui")
+        if active:
+            self._calibration_activity_owners.add(selected_owner)
+        else:
+            self._calibration_activity_owners.discard(selected_owner)
+        self.relocalization.set_active(
+            bool(self._calibration_activity_owners)
+            or bool(self._tracking_activity_owners)
+        )
+        self._update_output_activity()
+
+    def source_type(self, source: VideoSourceKey, config: VideoConfig | None = None) -> str:
+        selected = config or self.config
+        return (
+            selected.audience_source_type
+            if source == VideoSourceKey.AUDIENCE
+            else selected.ptz_source_type
+        )
+
+    def source_identifier(self, source: VideoSourceKey, config: VideoConfig | None = None) -> str:
+        selected = config or self.config
+        if source == VideoSourceKey.AUDIENCE:
+            return (
+                selected.audience_ndi_source_name
+                if selected.audience_source_type == "ndi"
+                else selected.audience_device_id
+            )
+        return (
+            selected.ptz_ndi_source_name
+            if selected.ptz_source_type == "ndi"
+            else selected.ptz_device_id
+        )
+
+    def source_pipeline(self, source: VideoSourceKey) -> VideoPipeline | None:
+        return self._sources.get(source)
+
     def reconfigure(self, config: VideoConfig) -> None:
         old_config = self.config
-        audience_was_running = self.audience.running
-        ptz_was_running = bool(self.local_ptz and self.local_ptz.running)
-        audience_was_enabled = old_config.enabled and old_config.audience_enabled
-        audience_is_enabled = config.enabled and config.audience_enabled
-        audience_became_enabled = not audience_was_enabled and audience_is_enabled
-        audience_auto_turned_on = (
-            not old_config.audience_auto_connect and config.audience_auto_connect
-        )
-        ptz_was_enabled = old_config.enabled and old_config.ptz_enabled
-        ptz_is_enabled = config.enabled and config.ptz_enabled
-        ptz_became_enabled = not ptz_was_enabled and ptz_is_enabled
-        ptz_auto_turned_on = not old_config.ptz_auto_connect and config.ptz_auto_connect
-        audience_changed = (
-            old_config.audience_ndi_source_name != config.audience_ndi_source_name
-            or old_config.audience_highest_bandwidth != config.audience_highest_bandwidth
-            or old_config.preview_fps != config.preview_fps
-            or old_config.stale_after_seconds != config.stale_after_seconds
-        )
-        local_pipeline_changed = (
-            old_config.preview_fps != config.preview_fps
-            or old_config.preferred_width != config.preferred_width
-            or old_config.preferred_height != config.preferred_height
-            or old_config.preferred_fps != config.preferred_fps
-            or old_config.stale_after_seconds != config.stale_after_seconds
-        )
-        local_device_changed = old_config.ptz_device_id != config.ptz_device_id
         self.config = config
         self.recorder.frame_rate = config.recording_fps
         self.recorder.max_width = config.recording_max_width
+        if not self._qt_initialized:
+            return
 
-        if audience_changed:
-            self.audience.stop()
-            self.audience = self._make_audience_source(config)
-        if not audience_is_enabled:
-            self.audience.stop()
-        elif audience_changed and (audience_was_running or config.audience_auto_connect):
-            self.audience.start()
-        elif (audience_became_enabled or audience_auto_turned_on) and config.audience_auto_connect:
-            self.audience.start()
+        for source_key in (VideoSourceKey.AUDIENCE, VideoSourceKey.PTZ):
+            existing = self._sources[source_key]
+            was_running = existing.running
+            signature_changed = self._source_signature(source_key, old_config) != self._source_signature(
+                source_key,
+                config,
+            )
+            was_enabled = self._source_enabled(source_key, old_config)
+            is_enabled = self._source_enabled(source_key, config)
+            auto_turned_on = (
+                not self._source_auto_connect(source_key, old_config)
+                and self._source_auto_connect(source_key, config)
+            )
 
-        if self.local_ptz and (local_pipeline_changed or local_device_changed):
-            self.local_ptz.stop()
-        if self._qt_initialized and (self.local_ptz is None or local_pipeline_changed):
-            self.local_ptz = LocalPTZCameraSource(
-                self.broker,
-                publish_fps=config.preview_fps,
-                preferred_width=config.preferred_width,
-                preferred_height=config.preferred_height,
-                preferred_fps=config.preferred_fps,
-                stale_after_seconds=config.stale_after_seconds,
-            )
-        if self.local_ptz and not ptz_is_enabled:
-            self.local_ptz.stop()
-        if (
-            self.local_ptz
-            and ptz_is_enabled
-            and config.ptz_device_id
-            and (
-                (
-                    (local_pipeline_changed or local_device_changed)
-                    and (ptz_was_running or config.ptz_auto_connect)
-                )
-                or (
-                    (ptz_became_enabled or ptz_auto_turned_on)
-                    and config.ptz_auto_connect
-                )
-            )
-        ):
-            self.local_ptz.start(config.ptz_device_id)
+            if signature_changed:
+                existing.stop()
+                self.broker.clear_frame(source_key)
+                existing = self._make_source(source_key, config)
+                self._sources[source_key] = existing
+                if is_enabled and (was_running or self._source_auto_connect(source_key, config)):
+                    self.start_source(source_key)
+            elif not is_enabled:
+                existing.stop()
+            elif (
+                (not was_enabled or auto_turned_on)
+                and self._source_auto_connect(source_key, config)
+            ):
+                self.start_source(source_key)
+        self._update_output_activity()
+
+    def reconfigure_tracking(self, config: CameraTrackingConfig) -> None:
+        self.tracking.reconfigure(config)
+        self.relocalization.reconfigure(config)
+        tracking_active = bool(self._tracking_activity_owners)
+        self.tracking.set_active(tracking_active and config.enabled)
+        self.relocalization.set_active(
+            (bool(self._calibration_activity_owners) or tracking_active)
+            and config.relocalization_enabled
+        )
         self._update_output_activity()
 
     def local_devices(self) -> list[LocalCameraDevice]:
-        return LocalPTZCameraSource.available_devices() if self._qt_initialized else []
+        return LocalCameraVideoSource.available_devices() if self._qt_initialized else []
+
+    def discover_ndi_sources(self, wait_ms: int = 800) -> list[str]:
+        runtime = NativeNDI.shared()
+        sources = runtime.discover_sources(wait_ms)
+        with self._discovery_lock:
+            self._discovered_ndi_sources = list(sources)
+            self._ndi_runtime_version = runtime.version
+        return sources
+
+    def start_source(self, source: VideoSourceKey) -> None:
+        if not self._qt_initialized:
+            raise RuntimeError("Qt video capture has not been initialized")
+        pipeline = self._sources[source]
+        if isinstance(pipeline, LocalCameraVideoSource):
+            device_id = self.source_identifier(source)
+            if not device_id:
+                self.broker.set_status(
+                    source,
+                    VideoSourceState.MISSING,
+                    "Select a local camera source first.",
+                )
+                return
+            pipeline.start(device_id)
+        else:
+            pipeline.start()
+        self._update_output_activity()
+
+    def stop_source(self, source: VideoSourceKey) -> None:
+        pipeline = self._sources.get(source)
+        if pipeline is not None:
+            pipeline.stop()
+        self.broker.clear_frame(source)
 
     def start_audience(self) -> None:
-        self.audience.start()
-        self._update_output_activity()
+        self.start_source(VideoSourceKey.AUDIENCE)
 
     def stop_audience(self) -> None:
-        self.audience.stop()
+        self.stop_source(VideoSourceKey.AUDIENCE)
 
     def start_ptz(self, device_id: str | None = None) -> None:
-        if not self._qt_initialized or self.local_ptz is None:
-            raise RuntimeError("Qt video capture has not been initialized")
-        self.local_ptz.start(device_id if device_id is not None else self.config.ptz_device_id)
-        self._update_output_activity()
+        if device_id is not None and self.source_type(VideoSourceKey.PTZ) == "local":
+            self.config.ptz_device_id = device_id
+        self.start_source(VideoSourceKey.PTZ)
 
     def stop_ptz(self) -> None:
-        if self.local_ptz:
-            self.local_ptz.stop()
+        self.stop_source(VideoSourceKey.PTZ)
 
     def frame(self, source: VideoSourceKey) -> VideoFramePacket | None:
         return self.broker.frame(source)
@@ -184,6 +300,9 @@ class VideoService:
     def start_replay(self, path: Path) -> None:
         self.replay.start(path)
 
+    def add_shutdown_callback(self, callback: Callable[[], None]) -> None:
+        self._shutdown_callbacks.append(callback)
+
     def stop_replay(self) -> None:
         self.replay.stop()
 
@@ -192,25 +311,94 @@ class VideoService:
             if self._stopped:
                 return
             self._stopped = True
+        for callback in reversed(self._shutdown_callbacks):
+            try:
+                callback()
+            except Exception as exc:
+                if self.logger is not None:
+                    self.logger.warning(
+                        "video_shutdown_callback_failed",
+                        "A video-dependent service did not stop cleanly",
+                        error=str(exc),
+                    )
         self.recorder.stop(wait=True)
         self.replay.stop()
-        self.audience.stop()
-        if self.local_ptz:
-            self.local_ptz.stop()
+        self.tracking.stop()
+        self.relocalization.stop()
+        for source in self._sources.values():
+            source.stop()
 
-    def _make_audience_source(self, config: VideoConfig) -> AudienceNDISource:
-        return AudienceNDISource(
+    def _make_source(self, source: VideoSourceKey, config: VideoConfig) -> VideoPipeline:
+        display_name = "Audience Cam" if source == VideoSourceKey.AUDIENCE else "PTZ Cam"
+        if self.source_type(source, config) == "ndi":
+            highest_bandwidth = (
+                config.audience_highest_bandwidth
+                if source == VideoSourceKey.AUDIENCE
+                else config.ptz_highest_bandwidth
+            )
+            return NDIVideoSource(
+                self.broker,
+                NDISourceSettings(
+                    source_name=self.source_identifier(source, config),
+                    source=source,
+                    display_name=display_name,
+                    highest_bandwidth=highest_bandwidth,
+                    publish_fps=config.preview_fps,
+                    stale_after_seconds=config.stale_after_seconds,
+                ),
+            )
+        return LocalCameraVideoSource(
             self.broker,
-            NDISourceSettings(
-                source_name=config.audience_ndi_source_name,
-                highest_bandwidth=config.audience_highest_bandwidth,
-                publish_fps=config.preview_fps,
-                stale_after_seconds=config.stale_after_seconds,
-            ),
+            source=source,
+            display_name=display_name,
+            publish_fps=config.preview_fps,
+            preferred_width=config.preferred_width,
+            preferred_height=config.preferred_height,
+            preferred_fps=config.preferred_fps,
+            stale_after_seconds=config.stale_after_seconds,
+        )
+
+    def _source_enabled(self, source: VideoSourceKey, config: VideoConfig) -> bool:
+        enabled = config.audience_enabled if source == VideoSourceKey.AUDIENCE else config.ptz_enabled
+        return config.enabled and enabled
+
+    @staticmethod
+    def _source_auto_connect(source: VideoSourceKey, config: VideoConfig) -> bool:
+        return (
+            config.audience_auto_connect
+            if source == VideoSourceKey.AUDIENCE
+            else config.ptz_auto_connect
+        )
+
+    def _source_signature(self, source: VideoSourceKey, config: VideoConfig) -> tuple[object, ...]:
+        highest_bandwidth = (
+            config.audience_highest_bandwidth
+            if source == VideoSourceKey.AUDIENCE
+            else config.ptz_highest_bandwidth
+        )
+        return (
+            self.source_type(source, config),
+            self.source_identifier(source, config),
+            highest_bandwidth,
+            config.preview_fps,
+            config.preferred_width,
+            config.preferred_height,
+            config.preferred_fps,
+            config.stale_after_seconds,
         )
 
     def _update_output_activity(self) -> None:
-        active = self._preview_active or self.recorder.recording
-        self.audience.set_output_active(active)
-        if self.local_ptz:
-            self.local_ptz.set_output_active(active)
+        shared_active = self._preview_active or self.recorder.recording
+        for source_key, source in self._sources.items():
+            tracking_config = self.tracking.config
+            tracking_active = bool(self._tracking_activity_owners) and tracking_config.enabled and (
+                tracking_config.analyze_audience
+                if source_key == VideoSourceKey.AUDIENCE
+                else tracking_config.analyze_ptz
+            )
+            calibration_active = (
+                (bool(self._calibration_activity_owners) or bool(self._tracking_activity_owners))
+                and self.relocalization.config.relocalization_enabled
+                and source_key == VideoSourceKey.AUDIENCE
+            )
+            source.set_output_active(shared_active or tracking_active or calibration_active)
