@@ -72,7 +72,7 @@ class PersonTrackingService:
             source: TrackingSnapshot(source=source) for source in self.SOURCES
         }
         self._associators = {
-            source: self._make_associator(config) for source in self.SOURCES
+            source: self._make_associator(config, source) for source in self.SOURCES
         }
         self._last_sequences = {source: 0 for source in self.SOURCES}
         self._last_analysis_times = {source: 0.0 for source in self.SOURCES}
@@ -175,7 +175,7 @@ class PersonTrackingService:
         with self._lock:
             self.config = config
             self._associators = {
-                source: self._make_associator(config) for source in self.SOURCES
+                source: self._make_associator(config, source) for source in self.SOURCES
             }
         if config.enabled:
             self.start()
@@ -315,7 +315,7 @@ class PersonTrackingService:
         *,
         available_regions: tuple[CameraSceneRegion, ...] | None = None,
     ) -> tuple[list[PersonCandidate], tuple[CameraSceneRegion, ...]]:
-        if source != VideoSourceKey.AUDIENCE or not self.config.audience_region_filter_enabled:
+        if source != VideoSourceKey.AUDIENCE or not self._audience_region_filter_active():
             return candidates, ()
         regions = available_regions
         if regions is None:
@@ -342,7 +342,7 @@ class PersonTrackingService:
         self,
         source: VideoSourceKey,
     ) -> tuple[CameraSceneRegion, ...] | None:
-        if source != VideoSourceKey.AUDIENCE or not self.config.audience_region_filter_enabled:
+        if source != VideoSourceKey.AUDIENCE or not self._audience_region_filter_active():
             return ()
         provider = self._region_provider
         # A standalone tracking service has no live calibration authority. Keep
@@ -364,6 +364,16 @@ class PersonTrackingService:
             and region.kind in allowed_kinds
         )
 
+    def _audience_region_filter_active(self) -> bool:
+        # Subject mode is seeded exclusively from the current PTZ frame, then
+        # a persistent cross-camera identity lock rejects newcomers. Analyze
+        # the complete wide image so that the same person can be reacquired
+        # after walking off the stage or outside a hand-drawn stage polygon.
+        return bool(
+            self.config.audience_region_filter_enabled
+            and self.config.automation.mode != "subject"
+        )
+
     def _detect_candidates(
         self,
         source: VideoSourceKey,
@@ -371,6 +381,36 @@ class PersonTrackingService:
         detector: PersonDetector,
         regions: tuple[CameraSceneRegion, ...] | None,
     ) -> list[PersonCandidate]:
+        if (
+            source == VideoSourceKey.AUDIENCE
+            and self.config.automation.mode == "subject"
+            and bool(getattr(detector, "supports_region_cropping", False))
+        ):
+            # A person on the distant stage occupies too few pixels in the
+            # church-wide image for Vision's whole-frame request to be
+            # dependable. Keep that whole-frame pass for someone walking down
+            # an aisle, then add three bounded stage/entrance crops. Cropping
+            # changes the detector's scale without enlarging or copying frames
+            # into a second video pipeline, and only runs while Subject
+            # Tracking is actively using the wide-camera safety net.
+            candidates = list(detector.detect(image))
+            for window in _subject_handoff_detection_windows():
+                crop = _crop_normalized(image, window)
+                if crop.isNull():
+                    continue
+                for candidate in detector.detect(crop):
+                    candidates.append(
+                        PersonCandidate(
+                            NormalizedRect(
+                                window.x + candidate.bounds.x * window.width,
+                                window.y + candidate.bounds.y * window.height,
+                                candidate.bounds.width * window.width,
+                                candidate.bounds.height * window.height,
+                            ).clamped(),
+                            candidate.confidence,
+                        )
+                    )
+            return _deduplicate_candidates(candidates)
         if (
             source != VideoSourceKey.AUDIENCE
             or not regions
@@ -432,11 +472,19 @@ class PersonTrackingService:
     def _refresh_subject_selection(self, source: VideoSourceKey) -> None:
         self._snapshots[source].subjects = self._associators[source].visible_subjects()
 
-    def _make_associator(self, config: CameraTrackingConfig) -> SubjectAssociator:
+    def _make_associator(
+        self,
+        config: CameraTrackingConfig,
+        source: VideoSourceKey,
+    ) -> SubjectAssociator:
         return SubjectAssociator(
             minimum_iou=config.minimum_match_iou,
             maximum_center_distance=config.maximum_center_distance,
             maximum_missed_frames=config.maximum_missed_frames,
+            # A stale PTZ rectangle is invalid as soon as the camera moves.
+            # Keep it only during a complete detector dropout, never beside a
+            # fresh observation where it would look like a second person.
+            retain_missed_with_active=source != VideoSourceKey.PTZ,
         )
 
     @staticmethod
@@ -538,6 +586,22 @@ def _region_detection_windows(
     return tuple(
         NormalizedRect(start, top, selected_width, height).clamped()
         for start in starts
+    )
+
+
+def _subject_handoff_detection_windows() -> tuple[NormalizedRect, ...]:
+    """High-resolution wide-camera windows covering stage and side entrances.
+
+    The complete Audience frame remains a fourth request, so a verified person
+    can still be reacquired after moving toward the camera or into an aisle.
+    These three overlapping crops deliberately cover only the distant half of
+    the room, where whole-frame human detection is least reliable.
+    """
+
+    return (
+        NormalizedRect(0.00, 0.00, 0.40, 0.52),
+        NormalizedRect(0.30, 0.00, 0.40, 0.52),
+        NormalizedRect(0.60, 0.00, 0.40, 0.52),
     )
 
 

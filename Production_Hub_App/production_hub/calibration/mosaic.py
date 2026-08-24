@@ -14,12 +14,12 @@ import numpy as np
 from production_hub.calibration.review import CalibrationReviewData
 
 
-MOSAIC_SCHEMA_VERSION = 4
+MOSAIC_SCHEMA_VERSION = 7
 
 
 @dataclass(frozen=True, slots=True)
 class AudienceWarpMesh:
-    """Piecewise mapping from the saved Audience frame into PTZ panorama space."""
+    """Smooth mapping from the saved Audience frame into PTZ panorama space."""
 
     source_size: tuple[int, int]
     target_size: tuple[int, int]
@@ -27,6 +27,11 @@ class AudienceWarpMesh:
     target_points: tuple[tuple[float, float], ...]
     triangles: tuple[tuple[int, int, int], ...]
     control_points: int = 0
+    grid_shape: tuple[int, int] = (0, 0)
+    interpolation: str = "piecewise_affine"
+    inverse_grid_shape: tuple[int, int] = (0, 0)
+    inverse_source_points: tuple[tuple[float, float], ...] = ()
+    inverse_validity: tuple[float, ...] = ()
 
     def reference_maps(
         self,
@@ -38,6 +43,197 @@ class AudienceWarpMesh:
         live frame then only needs the small relocalization homography and one
         OpenCV remap, rather than repainting hundreds of image fragments.
         """
+
+        if (
+            self.interpolation == "multi_pose_inverse_bicubic"
+            and self.inverse_grid_shape[0] >= 4
+            and self.inverse_grid_shape[1] >= 4
+            and self.inverse_grid_shape[0] * self.inverse_grid_shape[1]
+            == len(self.inverse_source_points)
+            == len(self.inverse_validity)
+        ):
+            return self._multi_pose_reference_maps(mosaic)
+        if (
+            self.interpolation == "thin_plate_bicubic"
+            and self.grid_shape[0] >= 4
+            and self.grid_shape[1] >= 4
+            and self.grid_shape[0] * self.grid_shape[1] == len(self.source_points)
+        ):
+            return self._smooth_reference_maps(mosaic)
+        return self._piecewise_reference_maps(mosaic)
+
+    def _multi_pose_reference_maps(
+        self,
+        mosaic: CalibrationMosaic,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Expand the calibrated per-PTZ-view inverse field smoothly.
+
+        A panorama is not one flat camera plane: each patch came from a
+        different pan/tilt/zoom pose. Camera Sync already measures a direct
+        Audience-to-PTZ transform for every accepted pose, so the saved grid
+        blends those exact inverse transforms with the same feathering used by
+        the panorama. Bicubic evaluation keeps the result curved and seamless
+        without doing any feature work while the operator is using the app.
+        """
+
+        columns, rows = self.inverse_grid_shape
+        source = np.asarray(
+            self.inverse_source_points,
+            dtype=np.float32,
+        ).reshape(rows, columns, 2)
+        support = np.asarray(
+            self.inverse_validity,
+            dtype=np.float32,
+        ).reshape(rows, columns)
+        canvas_y, canvas_x = np.indices(
+            (mosaic.height, mosaic.width),
+            dtype=np.float32,
+        )
+        grid_x = (
+            canvas_x / max(1.0, float(mosaic.width - 1)) * (columns - 1)
+        ).astype(np.float32)
+        grid_y = (
+            canvas_y / max(1.0, float(mosaic.height - 1)) * (rows - 1)
+        ).astype(np.float32)
+        source_x = cv2.remap(
+            source[..., 0],
+            grid_x,
+            grid_y,
+            cv2.INTER_CUBIC,
+            borderMode=cv2.BORDER_REPLICATE,
+        )
+        source_y = cv2.remap(
+            source[..., 1],
+            grid_x,
+            grid_y,
+            cv2.INTER_CUBIC,
+            borderMode=cv2.BORDER_REPLICATE,
+        )
+        interpolated_support = cv2.remap(
+            support,
+            grid_x,
+            grid_y,
+            cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+        )
+        valid = (
+            (interpolated_support > 0.08)
+            & np.isfinite(source_x)
+            & np.isfinite(source_y)
+            & (source_x >= 0.0)
+            & (source_y >= 0.0)
+            & (source_x < self.source_size[0] - 1)
+            & (source_y < self.source_size[1] - 1)
+        )
+        return (
+            np.where(valid, source_x, -1.0).astype(np.float32),
+            np.where(valid, source_y, -1.0).astype(np.float32),
+            valid.astype(np.uint8) * 255,
+        )
+
+    def _smooth_reference_maps(
+        self,
+        mosaic: CalibrationMosaic,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Invert a curved source-to-panorama field into OpenCV remap arrays.
+
+        The calibration stores a regular grid whose offsets were fitted with
+        a thin-plate spline. Runtime inversion starts from the global camera
+        homography, samples that displacement grid bicubically, and refines
+        the inverse three times. This keeps walls, arches, and pew lines
+        smoothly curved instead of introducing straight triangle facets.
+        """
+
+        columns, rows = self.grid_shape
+        source = np.asarray(self.source_points, dtype=np.float64).reshape(
+            rows,
+            columns,
+            2,
+        )
+        targets = np.asarray(self.target_points, dtype=np.float64).reshape(
+            rows,
+            columns,
+            2,
+        )
+        homography = np.asarray(
+            mosaic.audience_to_reference_ptz,
+            dtype=np.float64,
+        )
+        projected = _project_arrays(
+            homography,
+            source[..., 0],
+            source[..., 1],
+        )
+        residual_x = (targets[..., 0] - projected[0]).astype(np.float32)
+        residual_y = (targets[..., 1] - projected[1]).astype(np.float32)
+
+        canvas_y, canvas_x = np.indices(
+            (mosaic.height, mosaic.width),
+            dtype=np.float32,
+        )
+        target_x = (
+            mosaic.left
+            + canvas_x / max(1.0, float(mosaic.width)) * mosaic.reference_width
+        ) * mosaic.reference_ptz_size[0]
+        target_y = (
+            mosaic.top
+            + canvas_y / max(1.0, float(mosaic.height)) * mosaic.reference_height
+        ) * mosaic.reference_ptz_size[1]
+        inverse = np.linalg.inv(homography)
+        source_x, source_y = _project_arrays(inverse, target_x, target_y)
+        source_width = max(1.0, float(self.source_size[0] - 1))
+        source_height = max(1.0, float(self.source_size[1] - 1))
+
+        for _iteration in range(3):
+            grid_x = np.clip(
+                source_x / source_width * (columns - 1),
+                0.0,
+                float(columns - 1),
+            ).astype(np.float32)
+            grid_y = np.clip(
+                source_y / source_height * (rows - 1),
+                0.0,
+                float(rows - 1),
+            ).astype(np.float32)
+            correction_x = cv2.remap(
+                residual_x,
+                grid_x,
+                grid_y,
+                cv2.INTER_CUBIC,
+                borderMode=cv2.BORDER_REPLICATE,
+            )
+            correction_y = cv2.remap(
+                residual_y,
+                grid_x,
+                grid_y,
+                cv2.INTER_CUBIC,
+                borderMode=cv2.BORDER_REPLICATE,
+            )
+            source_x, source_y = _project_arrays(
+                inverse,
+                target_x - correction_x,
+                target_y - correction_y,
+            )
+
+        valid = (
+            np.isfinite(source_x)
+            & np.isfinite(source_y)
+            & (source_x >= 0.0)
+            & (source_y >= 0.0)
+            & (source_x < self.source_size[0] - 1)
+            & (source_y < self.source_size[1] - 1)
+        )
+        return (
+            np.where(valid, source_x, -1.0).astype(np.float32),
+            np.where(valid, source_y, -1.0).astype(np.float32),
+            valid.astype(np.uint8) * 255,
+        )
+
+    def _piecewise_reference_maps(
+        self,
+        mosaic: CalibrationMosaic,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Load legacy triangle meshes without invalidating old diagnostics."""
 
         map_x = np.full((mosaic.height, mosaic.width), -1.0, dtype=np.float32)
         map_y = np.full((mosaic.height, mosaic.width), -1.0, dtype=np.float32)
@@ -281,6 +477,21 @@ def load_calibration_mosaic(
                 for item in mesh_payload["triangles"]
             ),
             control_points=int(mesh_payload.get("control_points", 0)),
+            grid_shape=_size(mesh_payload.get("grid_shape", (0, 0))),
+            interpolation=str(
+                mesh_payload.get("interpolation", "piecewise_affine")
+            ),
+            inverse_grid_shape=_optional_grid_shape(
+                mesh_payload.get("inverse_grid_shape", (0, 0))
+            ),
+            inverse_source_points=tuple(
+                _point(item)
+                for item in mesh_payload.get("inverse_source_points", ())
+            ),
+            inverse_validity=tuple(
+                float(item)
+                for item in mesh_payload.get("inverse_validity", ())
+            ),
         )
         mosaic = CalibrationMosaic(
             image_path=image_path,
@@ -326,6 +537,9 @@ def _build_calibration_mosaic(
     audience_to_reference_ptz = _matrix(alignment["audience_to_ptz"])
     pose_by_index = {pose.index: pose for pose in review.poses}
     sources: list[tuple[np.ndarray, np.ndarray]] = []
+    warp_sources: list[
+        tuple[np.ndarray, np.ndarray, tuple[int, int]]
+    ] = []
     coverage = [
         (0.0, 0.0),
         (float(reference_ptz_size[0]), float(reference_ptz_size[1])),
@@ -355,6 +569,19 @@ def _build_calibration_mosaic(
         )
         if (image.shape[1], image.shape[0]) != declared_size:
             image = cv2.resize(image, declared_size, interpolation=cv2.INTER_AREA)
+        try:
+            direct_audience_to_pose = pose_payload.get("audience_to_ptz")
+            if direct_audience_to_pose is not None:
+                audience_to_pose = _matrix(direct_audience_to_pose)
+            else:
+                audience_to_pose = (
+                    np.linalg.inv(pose_to_reference)
+                    @ audience_to_reference_ptz
+                )
+        except (TypeError, ValueError, np.linalg.LinAlgError):
+            continue
+        if not np.isfinite(audience_to_pose).all():
+            continue
         corners = _project_points(
             pose_to_reference,
             (
@@ -366,6 +593,9 @@ def _build_calibration_mosaic(
         )
         coverage.extend(corners)
         sources.append((image, pose_to_reference))
+        warp_sources.append(
+            (pose_to_reference, audience_to_pose, declared_size)
+        )
 
     if not sources:
         raise ValueError("The active calibration has no stitchable PTZ pose images.")
@@ -433,6 +663,9 @@ def _build_calibration_mosaic(
         audience_size=audience_size,
         reference_ptz_size=reference_ptz_size,
         audience_to_reference_ptz=audience_to_reference_ptz,
+        canvas_transform=canvas_transform,
+        canvas_size=(output_width, output_height),
+        warp_sources=warp_sources,
     )
     image_path, metadata_path = _cache_paths(review)
     image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -459,6 +692,13 @@ def _build_calibration_mosaic(
             "target_points": [list(item) for item in mesh.target_points],
             "triangles": [list(item) for item in mesh.triangles],
             "control_points": mesh.control_points,
+            "grid_shape": list(mesh.grid_shape),
+            "interpolation": mesh.interpolation,
+            "inverse_grid_shape": list(mesh.inverse_grid_shape),
+            "inverse_source_points": [
+                list(item) for item in mesh.inverse_source_points
+            ],
+            "inverse_validity": list(mesh.inverse_validity),
         },
     }
     _atomic_json(metadata_path, metadata)
@@ -475,6 +715,11 @@ def _build_audience_warp_mesh(
     audience_size: tuple[int, int],
     reference_ptz_size: tuple[int, int],
     audience_to_reference_ptz: np.ndarray,
+    canvas_transform: np.ndarray,
+    canvas_size: tuple[int, int],
+    warp_sources: Sequence[
+        tuple[np.ndarray, np.ndarray, tuple[int, int]]
+    ],
 ) -> AudienceWarpMesh:
     excluded_ids = {item.marker_id for item in review.excluded_markers}
     observations: dict[int, list[tuple[float, float, float, float]]] = {}
@@ -558,29 +803,46 @@ def _build_audience_warp_mesh(
     # and leaving holes in the live interaction surface.
     source_points: list[tuple[float, float]] = []
     target_points: list[tuple[float, float]] = []
-    grid_x = np.linspace(0.0, 1.0, 9)
-    grid_y = (0.0, 0.16, 0.32, 0.48, 0.62, 0.78, 0.90, 1.0)
-    for normalized_y in grid_y:
-        for normalized_x in grid_x:
-            source = (
-                normalized_x * (audience_size[0] - 1),
-                normalized_y * (audience_size[1] - 1),
-            )
-            global_target = _project(audience_to_reference_ptz, *source)
-            correction = _local_residual(
-                normalized_x,
-                normalized_y,
-                control_sources,
-                control_residuals,
-            )
-            source_points.append(source)
-            target_points.append(
-                (global_target[0] + correction[0], global_target[1] + correction[1])
-            )
+    # A dense regular lattice lets OpenCV evaluate the fitted curved field
+    # bicubically. Structural observations remain the only calibration input;
+    # these samples are presentation controls, not additional guessed points.
+    grid_x = np.linspace(0.0, 1.0, 17)
+    grid_y = np.linspace(0.0, 1.0, 13)
+    queries = np.asarray(
+        [(x, y) for y in grid_y for x in grid_x],
+        dtype=np.float64,
+    )
+    corrections = _thin_plate_residuals(
+        control_sources,
+        control_residuals,
+        queries,
+    )
+    for (normalized_x, normalized_y), correction in zip(
+        queries,
+        corrections,
+    ):
+        source = (
+            normalized_x * (audience_size[0] - 1),
+            normalized_y * (audience_size[1] - 1),
+        )
+        global_target = _project(audience_to_reference_ptz, *source)
+        source_points.append(source)
+        target_points.append(
+            (global_target[0] + correction[0], global_target[1] + correction[1])
+        )
 
     triangles = _delaunay_triangles(source_points, target_points, audience_size)
     if not triangles:
         raise ValueError("Camera Sync could not construct a safe Audience warp mesh.")
+    inverse_grid_shape, inverse_source_points, inverse_validity = (
+        _build_multi_pose_inverse_grid(
+            audience_size=audience_size,
+            audience_to_reference_ptz=audience_to_reference_ptz,
+            canvas_transform=canvas_transform,
+            canvas_size=canvas_size,
+            warp_sources=warp_sources,
+        )
+    )
     return AudienceWarpMesh(
         source_size=audience_size,
         target_size=reference_ptz_size,
@@ -588,30 +850,292 @@ def _build_audience_warp_mesh(
         target_points=tuple(target_points),
         triangles=triangles,
         control_points=len(controls),
+        grid_shape=(len(grid_x), len(grid_y)),
+        interpolation=(
+            "multi_pose_inverse_bicubic"
+            if inverse_source_points
+            else "thin_plate_bicubic"
+        ),
+        inverse_grid_shape=inverse_grid_shape,
+        inverse_source_points=inverse_source_points,
+        inverse_validity=inverse_validity,
     )
 
 
-def _local_residual(
-    x: float,
-    y: float,
+def _build_multi_pose_inverse_grid(
+    *,
+    audience_size: tuple[int, int],
+    audience_to_reference_ptz: np.ndarray,
+    canvas_transform: np.ndarray,
+    canvas_size: tuple[int, int],
+    warp_sources: Sequence[
+        tuple[np.ndarray, np.ndarray, tuple[int, int]]
+    ],
+    columns: int = 81,
+    weight_power: float = 2.5,
+) -> tuple[
+    tuple[int, int],
+    tuple[tuple[float, float], ...],
+    tuple[float, ...],
+]:
+    """Build a compact panorama-to-Audience field from every scanned pose.
+
+    The height is derived from the panorama aspect ratio so the sampling
+    density is roughly square. Invalid boundary cells retain the global
+    calibration projection; their zero support keeps them invisible while
+    preventing interpolation from pulling sentinel values into valid pixels.
+    """
+
+    canvas_width, canvas_height = _size(canvas_size)
+    selected_columns = max(17, int(columns))
+    selected_rows = max(
+        13,
+        round(selected_columns * canvas_height / canvas_width),
+    )
+    grid_x, grid_y = np.meshgrid(
+        np.linspace(0.0, canvas_width - 1.0, selected_columns),
+        np.linspace(0.0, canvas_height - 1.0, selected_rows),
+    )
+    try:
+        canvas_to_global_audience = np.linalg.inv(
+            canvas_transform @ audience_to_reference_ptz
+        )
+    except np.linalg.LinAlgError:
+        return (0, 0), (), ()
+    fallback_x, fallback_y = _project_arrays(
+        canvas_to_global_audience,
+        grid_x,
+        grid_y,
+    )
+    accumulation_x = np.zeros_like(grid_x, dtype=np.float64)
+    accumulation_y = np.zeros_like(grid_y, dtype=np.float64)
+    accumulated_weight = np.zeros_like(grid_x, dtype=np.float64)
+
+    for pose_to_reference, audience_to_pose, ptz_size in warp_sources:
+        try:
+            projected = canvas_transform @ pose_to_reference
+            canvas_to_pose = np.linalg.inv(projected)
+            canvas_to_audience = np.linalg.inv(projected @ audience_to_pose)
+        except np.linalg.LinAlgError:
+            continue
+        pose_x, pose_y = _project_arrays(canvas_to_pose, grid_x, grid_y)
+        source_x, source_y = _project_arrays(
+            canvas_to_audience,
+            grid_x,
+            grid_y,
+        )
+        pose_width, pose_height = ptz_size
+        inside = (
+            np.isfinite(pose_x)
+            & np.isfinite(pose_y)
+            & np.isfinite(source_x)
+            & np.isfinite(source_y)
+            & (pose_x >= 0.0)
+            & (pose_y >= 0.0)
+            & (pose_x < pose_width - 1)
+            & (pose_y < pose_height - 1)
+            & (source_x >= 0.0)
+            & (source_y >= 0.0)
+            & (source_x < audience_size[0] - 1)
+            & (source_y < audience_size[1] - 1)
+        )
+        edge_distance = np.minimum.reduce(
+            (
+                pose_x + 1.0,
+                pose_width - pose_x,
+                pose_y + 1.0,
+                pose_height - pose_y,
+            )
+        )
+        feather = max(24.0, min(pose_width, pose_height) * 0.08)
+        weight = np.clip(edge_distance / feather, 0.03, 1.0)
+        weight = np.where(inside, np.power(weight, weight_power), 0.0)
+        accumulation_x += np.nan_to_num(source_x) * weight
+        accumulation_y += np.nan_to_num(source_y) * weight
+        accumulated_weight += weight
+
+    supported = accumulated_weight > 1e-5
+    if np.count_nonzero(supported) < 12:
+        return (0, 0), (), ()
+    selected_x = np.divide(
+        accumulation_x,
+        accumulated_weight,
+        out=np.asarray(fallback_x, dtype=np.float64).copy(),
+        where=supported,
+    )
+    selected_y = np.divide(
+        accumulation_y,
+        accumulated_weight,
+        out=np.asarray(fallback_y, dtype=np.float64).copy(),
+        where=supported,
+    )
+    selected_x, selected_y = _smooth_multi_pose_inverse_field(
+        grid_x=grid_x,
+        grid_y=grid_y,
+        source_x=selected_x,
+        source_y=selected_y,
+        fallback_x=fallback_x,
+        fallback_y=fallback_y,
+        supported=supported,
+    )
+    points = tuple(
+        (float(x), float(y))
+        for x, y in np.column_stack(
+            (selected_x.ravel(), selected_y.ravel())
+        )
+    )
+    validity = tuple(float(value) for value in supported.astype(np.float32).ravel())
+    return (selected_columns, selected_rows), points, validity
+
+
+def _smooth_multi_pose_inverse_field(
+    *,
+    grid_x: np.ndarray,
+    grid_y: np.ndarray,
+    source_x: np.ndarray,
+    source_y: np.ndarray,
+    fallback_x: np.ndarray,
+    fallback_y: np.ndarray,
+    supported: np.ndarray,
+    degree: int = 3,
+    ridge: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Regularize pose corrections into one lens-like curved field.
+
+    Adjacent PTZ scans can disagree locally because the sanctuary is
+    three-dimensional and the two cameras have different heights. Directly
+    reproducing every disagreement creates ripples in straight walls and pews.
+    A robust cubic surface retains the broad measured lens/parallax correction
+    (including the upper corners) while rejecting those high-frequency seams.
+    """
+
+    if np.count_nonzero(supported) < 12:
+        return source_x, source_y
+    width = max(1.0, float(np.nanmax(grid_x) - np.nanmin(grid_x)))
+    height = max(1.0, float(np.nanmax(grid_y) - np.nanmin(grid_y)))
+    normalized_x = (grid_x - np.nanmin(grid_x)) / width * 2.0 - 1.0
+    normalized_y = (grid_y - np.nanmin(grid_y)) / height * 2.0 - 1.0
+    selected_matrix = _polynomial_features(
+        normalized_x[supported],
+        normalized_y[supported],
+        degree,
+    )
+    full_matrix = _polynomial_features(
+        normalized_x.ravel(),
+        normalized_y.ravel(),
+        degree,
+    )
+    coefficient_x = _robust_polynomial_fit(
+        selected_matrix,
+        (source_x - fallback_x)[supported],
+        ridge=ridge,
+    )
+    coefficient_y = _robust_polynomial_fit(
+        selected_matrix,
+        (source_y - fallback_y)[supported],
+        ridge=ridge,
+    )
+    correction_x = (full_matrix @ coefficient_x).reshape(grid_x.shape)
+    correction_y = (full_matrix @ coefficient_y).reshape(grid_y.shape)
+    return fallback_x + correction_x, fallback_y + correction_y
+
+
+def _polynomial_features(
+    x: np.ndarray,
+    y: np.ndarray,
+    degree: int,
+) -> np.ndarray:
+    columns: list[np.ndarray] = []
+    for total_degree in range(max(0, int(degree)) + 1):
+        for x_power in range(total_degree + 1):
+            y_power = total_degree - x_power
+            columns.append(np.power(x, x_power) * np.power(y, y_power))
+    return np.column_stack(columns)
+
+
+def _robust_polynomial_fit(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    *,
+    ridge: float,
+) -> np.ndarray:
+    weights = np.ones(len(values), dtype=np.float64)
+    coefficients = np.zeros(matrix.shape[1], dtype=np.float64)
+    penalty = np.eye(matrix.shape[1], dtype=np.float64) * max(1e-6, ridge)
+    penalty[0, 0] *= 0.01
+    for _iteration in range(8):
+        root = np.sqrt(weights)
+        selected_matrix = matrix * root[:, None]
+        selected_values = values * root
+        coefficients = np.linalg.solve(
+            selected_matrix.T @ selected_matrix + penalty,
+            selected_matrix.T @ selected_values,
+        )
+        error = values - matrix @ coefficients
+        scale = max(3.0, float(np.median(np.abs(error))) * 1.4826)
+        normalized = np.abs(error) / (2.3 * scale)
+        weights = np.where(normalized <= 1.0, 1.0, 1.0 / normalized)
+    return coefficients
+
+
+def _thin_plate_residuals(
     control_sources: np.ndarray,
     control_residuals: np.ndarray,
-) -> tuple[float, float]:
-    if not len(control_sources):
-        return 0.0, 0.0
-    distances = np.linalg.norm(control_sources - np.asarray((x, y)), axis=1)
-    nearest = np.argsort(distances)[: min(7, len(distances))]
-    local_distances = distances[nearest]
-    if float(local_distances[0]) > 0.42:
-        return 0.0, 0.0
-    weights = 1.0 / np.maximum(0.025, local_distances) ** 2
-    correction = np.average(control_residuals[nearest], axis=0, weights=weights)
-    locality = max(0.0, min(1.0, 1.0 - float(local_distances[0]) / 0.42))
-    # The measured bottom of the Audience view already aligns very well. Fade
-    # local parallax correction there and concentrate it on the stage/back wall.
-    vertical = max(0.0, min(1.0, (0.78 - y) / 0.22))
-    selected = correction * locality * vertical
-    return float(selected[0]), float(selected[1])
+    queries: np.ndarray,
+) -> np.ndarray:
+    """Fit a regularized thin-plate spline over structural residuals.
+
+    Thin-plate splines are the standard smooth analogue of a control-point
+    warp: they reproduce broad lens/parallax curvature without corners or
+    triangle seams. A small regularizer prevents one noisy landmark from
+    pulling a sharp bump into the live view.
+    """
+
+    query_points = np.asarray(queries, dtype=np.float64).reshape(-1, 2)
+    if len(control_sources) < 3:
+        return np.zeros((len(query_points), 2), dtype=np.float64)
+    sources = np.asarray(control_sources, dtype=np.float64).reshape(-1, 2)
+    residuals = np.asarray(control_residuals, dtype=np.float64).reshape(-1, 2)
+    pairwise = sources[:, None, :] - sources[None, :, :]
+    kernel = _thin_plate_kernel(np.linalg.norm(pairwise, axis=2))
+    affine = np.column_stack((np.ones(len(sources)), sources))
+    system = np.block(
+        [
+            [kernel + np.eye(len(sources)) * 0.002, affine],
+            [affine.T, np.zeros((3, 3), dtype=np.float64)],
+        ]
+    )
+    values = np.vstack((residuals, np.zeros((3, 2), dtype=np.float64)))
+    coefficients, *_unused = np.linalg.lstsq(system, values, rcond=1e-9)
+    query_distances = np.linalg.norm(
+        query_points[:, None, :] - sources[None, :, :],
+        axis=2,
+    )
+    query_kernel = _thin_plate_kernel(query_distances)
+    query_affine = np.column_stack((np.ones(len(query_points)), query_points))
+    selected = (
+        query_kernel @ coefficients[: len(sources)]
+        + query_affine @ coefficients[len(sources) :]
+    )
+
+    nearest = np.min(query_distances, axis=1)
+    locality = np.clip((0.48 - nearest) / 0.18, 0.0, 1.0)
+    locality = locality * locality * (3.0 - 2.0 * locality)
+    # The lower pews already align well in this installation. Blend the curved
+    # correction smoothly to zero below them instead of bending the aisle.
+    vertical = np.clip((0.80 - query_points[:, 1]) / 0.20, 0.0, 1.0)
+    vertical = vertical * vertical * (3.0 - 2.0 * vertical)
+    selected *= (locality * vertical)[:, None]
+    magnitude = np.linalg.norm(selected, axis=1)
+    excessive = magnitude > 180.0
+    if np.any(excessive):
+        selected[excessive] *= (180.0 / magnitude[excessive])[:, None]
+    return selected
+
+
+def _thin_plate_kernel(distance: np.ndarray) -> np.ndarray:
+    squared = np.asarray(distance, dtype=np.float64) ** 2
+    return squared * np.log(np.maximum(squared, 1e-12))
 
 
 def _delaunay_triangles(
@@ -716,6 +1240,14 @@ def _size(value: Any) -> tuple[int, int]:
     return selected
 
 
+def _optional_grid_shape(value: Any) -> tuple[int, int]:
+    width, height = value
+    selected = round(float(width)), round(float(height))
+    if min(selected) < 0 or not all(math.isfinite(item) for item in selected):
+        raise ValueError("Calibration grid dimensions cannot be negative.")
+    return selected
+
+
 def _project(matrix: Any, x: float, y: float) -> tuple[float, float]:
     selected = np.asarray(matrix, dtype=np.float64)
     denominator = selected[2, 0] * x + selected[2, 1] * y + selected[2, 2]
@@ -724,6 +1256,28 @@ def _project(matrix: Any, x: float, y: float) -> tuple[float, float]:
     return (
         float((selected[0, 0] * x + selected[0, 1] * y + selected[0, 2]) / denominator),
         float((selected[1, 0] * x + selected[1, 1] * y + selected[1, 2]) / denominator),
+    )
+
+
+def _project_arrays(
+    matrix: Any,
+    x: np.ndarray,
+    y: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    selected = np.asarray(matrix, dtype=np.float64)
+    denominator = selected[2, 0] * x + selected[2, 1] * y + selected[2, 2]
+    safe = np.abs(denominator) > 1e-10
+    inverse = np.divide(
+        1.0,
+        denominator,
+        out=np.full_like(denominator, np.nan, dtype=np.float64),
+        where=safe,
+    )
+    return (
+        (selected[0, 0] * x + selected[0, 1] * y + selected[0, 2])
+        * inverse,
+        (selected[1, 0] * x + selected[1, 1] * y + selected[1, 2])
+        * inverse,
     )
 
 

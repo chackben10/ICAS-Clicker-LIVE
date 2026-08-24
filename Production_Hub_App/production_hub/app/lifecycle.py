@@ -165,7 +165,8 @@ async def start_visca_listener(context: ApplicationContext) -> ViscaUdpListener 
     async def handle(command: PanasonicCommand) -> None:
         if await tracking_toggle.consume(command):
             return
-        context.ptz_automation.manual_override("VISCA bridge command")
+        await tracking_toggle.cancel_pending("Manual VISCA camera control")
+        await context.ptz_automation.manual_override_async("VISCA bridge command")
         await context.panasonic.send_command(command.command, command.endpoint)
 
     listener = ViscaUdpListener(context.config.integrations.visca, handle)

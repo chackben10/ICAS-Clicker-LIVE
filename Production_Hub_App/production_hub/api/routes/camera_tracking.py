@@ -155,7 +155,9 @@ def router(context) -> APIRouter:
     @api.post("/automation/disarm")
     async def disarm_automation(request: Request) -> dict:
         _require_privileged(request, context)
-        context.ptz_automation.disarm("Operator disarmed PTZ automation through the API")
+        await context.ptz_automation.disarm_async(
+            "Operator disarmed PTZ automation through the API"
+        )
         return _automation_payload(context.ptz_automation.snapshot())
 
     @api.get("/tracking/{source_name}")
@@ -196,6 +198,7 @@ def _automation_payload(snapshot) -> dict:
         "lastDecisionMonotonic": snapshot.last_decision_monotonic,
         "lastCommandMonotonic": snapshot.last_command_monotonic,
         "lastError": snapshot.last_error,
+        "trackingSource": snapshot.tracking_source,
         "actualPose": _pose_payload(snapshot.actual_pose),
         "commandedPose": _pose_payload(snapshot.commanded_pose),
         "decision": None

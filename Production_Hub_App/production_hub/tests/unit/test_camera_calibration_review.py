@@ -11,17 +11,28 @@ import cv2
 import numpy as np
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtGui import QColor, QImage
-from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap, QPolygonF
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QVBoxLayout, QWidget
 
 from production_hub.app.bootstrap import build_context
 from production_hub.calibration.light_level import assess_camera_light
 from production_hub.calibration.mosaic import (
+    _build_multi_pose_inverse_grid,
+    _thin_plate_residuals,
     ensure_calibration_mosaic,
     load_calibration_mosaic,
 )
 from production_hub.calibration.review import load_latest_calibration_review
-from production_hub.ui.pages.camera_control_page import CameraControlPage, VideoPreview
+from production_hub.ui.pages.camera_control_page import (
+    CLICK_TO_FRAME_DEFAULT_HEIGHT,
+    CLICK_TO_FRAME_DEFAULT_WIDTH,
+    CLICK_TO_FRAME_VIEWPORT,
+    CameraControlPage,
+    VideoPreview,
+    click_viewport_to_canvas_rect,
+    crop_click_to_frame_image,
+)
 from production_hub.ui.main_window import (
     TRACKING_INDICATOR_TIMEOUT_MS,
     MainWindow,
@@ -221,12 +232,96 @@ class CameraCalibrationReviewTests(unittest.TestCase):
             )
             self.assertEqual("reference_ptz", mosaic.coordinate_space)
             self.assertGreaterEqual(len(mosaic.warp_mesh.triangles), 100)
+            self.assertEqual(
+                "multi_pose_inverse_bicubic",
+                mosaic.warp_mesh.interpolation,
+            )
+            self.assertEqual((17, 13), mosaic.warp_mesh.grid_shape)
+            self.assertEqual(81, mosaic.warp_mesh.inverse_grid_shape[0])
+            self.assertGreaterEqual(mosaic.warp_mesh.inverse_grid_shape[1], 13)
+            self.assertEqual(
+                mosaic.warp_mesh.inverse_grid_shape[0]
+                * mosaic.warp_mesh.inverse_grid_shape[1],
+                len(mosaic.warp_mesh.inverse_source_points),
+            )
             map_x, map_y, valid = mosaic.warp_mesh.reference_maps(mosaic)
             self.assertEqual((mosaic.height, mosaic.width), map_x.shape)
             self.assertEqual(map_x.shape, map_y.shape)
             components, _labels = cv2.connectedComponents(valid)
             self.assertEqual(2, components)
             self.assertGreater(np.count_nonzero(valid), valid.size * 0.25)
+
+    def test_click_to_frame_crop_matches_requested_wide_sanctuary_view(self) -> None:
+        image = QImage(1000, 500, QImage.Format.Format_RGB32)
+        image.fill(QColor("#182436"))
+
+        cropped = crop_click_to_frame_image(image)
+        mapped = click_viewport_to_canvas_rect(0.0, 0.0, 1.0, 1.0)
+
+        self.assertEqual((890, 320), (cropped.width(), cropped.height()))
+        self.assertEqual(CLICK_TO_FRAME_VIEWPORT, mapped)
+        self.assertAlmostEqual(0.50, click_viewport_to_canvas_rect(0.5, 0.5, 0, 0)[0])
+        self.assertAlmostEqual(0.32, click_viewport_to_canvas_rect(0.5, 0.5, 0, 0)[1])
+
+    def test_curved_audience_warp_is_smooth_between_structural_controls(self) -> None:
+        controls = np.asarray(
+            [
+                (0.10, 0.10),
+                (0.50, 0.08),
+                (0.90, 0.10),
+                (0.12, 0.55),
+                (0.50, 0.50),
+                (0.88, 0.55),
+            ],
+            dtype=np.float64,
+        )
+        residuals = np.asarray(
+            [
+                (-22.0, -8.0),
+                (0.0, 14.0),
+                (22.0, -8.0),
+                (-10.0, 5.0),
+                (0.0, 18.0),
+                (10.0, 5.0),
+            ],
+            dtype=np.float64,
+        )
+        queries = np.column_stack(
+            (np.linspace(0.10, 0.90, 161), np.full(161, 0.30))
+        )
+
+        curve = _thin_plate_residuals(controls, residuals, queries)
+
+        self.assertTrue(np.all(np.isfinite(curve)))
+        self.assertGreater(float(np.ptp(curve[:, 0])), 15.0)
+        # A curved camera warp must not contain the abrupt derivative changes
+        # produced by piecewise-affine triangle boundaries.
+        second_difference = np.diff(curve, n=2, axis=0)
+        self.assertLess(float(np.max(np.linalg.norm(second_difference, axis=1))), 0.05)
+
+    def test_multi_pose_warp_uses_each_pose_direct_audience_alignment(self) -> None:
+        identity = np.eye(3, dtype=np.float64)
+        audience_to_pose = np.asarray(
+            ((1.0, 0.0, 20.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            dtype=np.float64,
+        )
+
+        shape, points, validity = _build_multi_pose_inverse_grid(
+            audience_size=(100, 50),
+            audience_to_reference_ptz=identity,
+            canvas_transform=identity,
+            canvas_size=(100, 50),
+            warp_sources=((identity, audience_to_pose, (100, 50)),),
+            columns=21,
+        )
+
+        columns, rows = shape
+        center_index = (rows // 2) * columns + columns // 2
+        # The canvas center is x=49.5 and this pose sees the Audience 20px to
+        # the right, so its direct inverse must sample the Audience at x=29.5.
+        self.assertAlmostEqual(29.5, points[center_index][0], places=2)
+        self.assertAlmostEqual(24.5, points[center_index][1], places=2)
+        self.assertEqual(1.0, validity[center_index])
 
     def test_standard_video_preview_reserves_a_sixteen_by_nine_area(self) -> None:
         host = QWidget()
@@ -344,6 +439,12 @@ class CameraCalibrationReviewTests(unittest.TestCase):
             page = CameraControlPage(context)
             window = page.click_to_frame_window
             self.assertFalse(hasattr(window, "status"))
+            self.assertTrue(
+                bool(window.windowFlags() & Qt.WindowType.WindowDoesNotAcceptFocus)
+            )
+            self.assertTrue(
+                window.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+            )
             window.tracking_state_provider = lambda: (True, True)
             window.refresh_tracking_button()
             self.assertEqual("Disable Subject Tracking", window.tracking_button.text())
@@ -354,6 +455,94 @@ class CameraCalibrationReviewTests(unittest.TestCase):
             page.floating_click_button.click()
             APP.processEvents()
             self.assertTrue(window.isVisible())
+            page.hide_click_to_frame_window()
+            page.close()
+            context.video.shutdown()
+
+    def test_click_target_and_current_ptz_overlay_use_clean_blue_treatment(self) -> None:
+        target = QPixmap(200, 100)
+        target.fill(QColor("#182436"))
+        preview = VideoPreview("empty")
+        preview._frame_target_point = (0.5, 0.5)
+        painter = QPainter(target)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        preview._paint_frame_target(painter, target)
+        painter.end()
+        target_image = target.toImage()
+        ring = target_image.pixelColor(109, 50)
+        center = target_image.pixelColor(100, 50)
+        self.assertGreater(ring.blue(), ring.red() + 80)
+        self.assertGreater(center.red(), 220)
+        preview.close()
+
+        footprint = QImage(200, 100, QImage.Format.Format_RGB32)
+        original = QColor(120, 130, 140)
+        footprint.fill(original)
+        polygon = QPolygonF(
+            [
+                QPointF(50, 20),
+                QPointF(150, 20),
+                QPointF(150, 80),
+                QPointF(50, 80),
+            ]
+        )
+        painter = QPainter(footprint)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        CameraControlPage._paint_ptz_footprint_polygon(
+            painter,
+            polygon,
+            QSize(200, 100),
+        )
+        painter.end()
+        inside = footprint.pixelColor(100, 50)
+        outside = footprint.pixelColor(10, 10)
+        outline = footprint.pixelColor(50, 50)
+        self.assertEqual(original, inside)
+        self.assertLess(outside.red(), original.red() - 30)
+        self.assertLess(outside.green(), original.green() - 30)
+        self.assertGreater(outline.blue(), outline.red() + 70)
+
+    def test_click_to_frame_window_geometry_is_persisted_and_reset_to_center(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            context.config.ui.click_to_frame_window_geometry = [80, 90, 610, 330]
+            page = CameraControlPage(context)
+            window = page.click_to_frame_window
+
+            self.assertEqual((610, 330), (window.width(), window.height()))
+            window.show()
+            window.move(120, 130)
+            window.resize(640, 350)
+            APP.processEvents()
+            window.persist_geometry()
+            persisted = context.config.ui.click_to_frame_window_geometry
+            self.assertAlmostEqual(120, persisted[0], delta=3)
+            self.assertAlmostEqual(130, persisted[1], delta=3)
+            self.assertEqual([640, 350], persisted[2:])
+
+            page.reset_click_to_frame_window()
+            APP.processEvents()
+            available = window.screen().availableGeometry()
+            self.assertEqual(
+                (CLICK_TO_FRAME_DEFAULT_WIDTH, CLICK_TO_FRAME_DEFAULT_HEIGHT),
+                (window.width(), window.height()),
+            )
+            self.assertAlmostEqual(
+                available.center().x(),
+                window.geometry().center().x(),
+                delta=1,
+            )
+            self.assertAlmostEqual(
+                available.center().y(),
+                window.geometry().center().y(),
+                delta=1,
+            )
+            self.assertEqual(
+                [window.width(), window.height()],
+                context.config.ui.click_to_frame_window_geometry[2:],
+            )
             page.hide_click_to_frame_window()
             page.close()
             context.video.shutdown()
@@ -382,6 +571,41 @@ class CameraCalibrationReviewTests(unittest.TestCase):
                 "Camera Control",
                 window.page_names[window.stack.currentIndex()],
             )
+            window._quitting = True
+            window.close()
+            context.video.shutdown()
+
+    def test_menu_bar_reset_action_centers_floating_window(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            context.config.ui.keep_running_after_window_close = False
+            context.config.ui.click_to_frame_window_geometry = [80, 90, 610, 330]
+            with (
+                patch.object(
+                    QSystemTrayIcon,
+                    "isSystemTrayAvailable",
+                    return_value=True,
+                ),
+                patch.object(QSystemTrayIcon, "show"),
+            ):
+                window = MainWindow(context)
+
+            self.assertIsNotNone(window.tray_reset_click_action)
+            self.assertEqual(
+                "Reset Click-to-Frame Placement",
+                window.tray_reset_click_action.text(),
+            )
+            window.tray_reset_click_action.trigger()
+            APP.processEvents()
+            floating = window.camera_control_page.click_to_frame_window
+            self.assertTrue(floating.isVisible())
+            self.assertEqual(
+                (CLICK_TO_FRAME_DEFAULT_WIDTH, CLICK_TO_FRAME_DEFAULT_HEIGHT),
+                (floating.width(), floating.height()),
+            )
+
             window._quitting = True
             window.close()
             context.video.shutdown()

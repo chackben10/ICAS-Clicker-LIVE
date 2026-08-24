@@ -39,6 +39,17 @@ class _Automation:
         self.armed = False
         self.disarmed: list[str] = []
         self.configs = []
+        self.arm_request_owners: set[str] = set()
+
+    @property
+    def arm_requested(self) -> bool:
+        return self.armed or bool(self.arm_request_owners)
+
+    def set_arm_requested(self, active: bool, *, owner: str) -> None:
+        if active:
+            self.arm_request_owners.add(owner)
+        else:
+            self.arm_request_owners.discard(owner)
 
     def arm(self) -> tuple[bool, str]:
         self.armed = True
@@ -141,6 +152,36 @@ class ViscaTests(unittest.TestCase):
                 config.integrations.camera_tracking.automation.mode,
             )
             self.assertEqual(2, repository.saved)
+            toggle.shutdown()
+
+        asyncio.run(exercise())
+
+    def test_tenveo_manual_focus_form_is_the_same_physical_toggle(self) -> None:
+        async def exercise() -> None:
+            config = AppConfig()
+            automation = _Automation()
+            context = SimpleNamespace(
+                config=config,
+                video=_Video(),
+                ptz_automation=automation,
+                config_repository=_Repository(),
+                logger=_Logger(),
+            )
+            toggle = ViscaAutofocusTrackingToggle(context, clock=lambda: 20.0)
+            command = PanasonicCommand(
+                "#D10",
+                "aw_ptz",
+                "TENVEO",
+                "Manual focus",
+            )
+
+            self.assertTrue(await toggle.consume(command))
+            await asyncio.sleep(0)
+            self.assertTrue(automation.armed)
+            self.assertEqual(
+                "subject",
+                config.integrations.camera_tracking.automation.mode,
+            )
             toggle.shutdown()
 
         asyncio.run(exercise())

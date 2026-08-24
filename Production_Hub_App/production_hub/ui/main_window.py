@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
         self.help_menu = None
         self.tray_tracking_action = None
         self.tray_click_action = None
+        self.tray_reset_click_action = None
         self.full_sidebar_action = None
         self.nav_collapsed = False
         self.page_names: list[str] = []
@@ -257,6 +258,13 @@ class MainWindow(QMainWindow):
         self.tray_click_action.triggered.connect(
             self.toggle_click_to_frame_from_global_control
         )
+        self.tray_reset_click_action = QAction(
+            "Reset Click-to-Frame Placement",
+            self,
+        )
+        self.tray_reset_click_action.triggered.connect(
+            self.camera_control_page.reset_click_to_frame_window
+        )
         calibrate_action = QAction("Calibrate Camera Sync…", self)
         calibrate_action.triggered.connect(
             self.camera_control_page.request_camera_calibration
@@ -267,6 +275,7 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction(self.tray_tracking_action)
         menu.addAction(self.tray_click_action)
+        menu.addAction(self.tray_reset_click_action)
         menu.addAction(calibrate_action)
         menu.addSeparator()
         menu.addAction(quit_action)

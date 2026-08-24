@@ -361,6 +361,24 @@ class PtzGeometryModel:
             zoom=max(self.minimum_zoom, min(self.maximum_zoom, round(zoom))),
         )
 
+    def zoom_for_relative_footprint(
+        self,
+        current_zoom: int,
+        relative_footprint: float,
+    ) -> int:
+        """Adjust zoom from the live PTZ composition, independent of map scale.
+
+        Pan and tilt need the Audience-to-PTZ map, but the amount of zoom needed
+        to make a live subject larger or smaller is an image-space ratio. Using
+        that ratio directly avoids calibration-scale error at operator-selected
+        zooms beyond the sweep samples and makes an already-good zoom an exact
+        hold point.
+        """
+
+        ratio = max(0.25, min(4.0, float(relative_footprint)))
+        zoom = float(current_zoom) + math.log(ratio) / self._zoom_slope
+        return max(self.minimum_zoom, min(self.maximum_zoom, round(zoom)))
+
     def ptz_rect_to_reference(
         self,
         bounds: NormalizedRect,

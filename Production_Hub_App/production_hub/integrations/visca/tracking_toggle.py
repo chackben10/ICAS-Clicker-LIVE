@@ -33,7 +33,11 @@ class ViscaAutofocusTrackingToggle:
         visca = self.context.config.integrations.visca
         if (
             not visca.autofocus_toggles_subject_tracking
-            or command.command != "#D11"
+            # The Tenveo key alternates VISCA Auto Focus and Manual Focus
+            # packets as its internal state changes. Both packets come from
+            # the same physical button and are intentionally consumed as the
+            # tracking toggle; neither should alter camera focus mode.
+            or command.command not in {"#D11", "#D10"}
         ):
             return False
 
@@ -62,12 +66,20 @@ class ViscaAutofocusTrackingToggle:
                 )
             else:
                 try:
+                    self.context.ptz_automation.set_arm_requested(
+                        True,
+                        owner=TRACKING_ACTIVITY_OWNER,
+                    )
                     self.context.video.set_tracking_activity(
                         True,
                         owner=TRACKING_ACTIVITY_OWNER,
                     )
                     self._persist_mode(True)
                 except Exception as exc:
+                    self.context.ptz_automation.set_arm_requested(
+                        False,
+                        owner=TRACKING_ACTIVITY_OWNER,
+                    )
                     self.context.video.set_tracking_activity(
                         False,
                         owner=TRACKING_ACTIVITY_OWNER,
@@ -89,8 +101,21 @@ class ViscaAutofocusTrackingToggle:
                 )
         return True
 
+    async def cancel_pending(self, reason: str) -> None:
+        """Cancel a delayed hardware arm when the operator moves the camera."""
+
+        async with self._lock:
+            if not self.context.ptz_automation.arm_requested:
+                return
+            self._cancel_pending_arm()
+            self._set_requested(False, reason)
+
     def shutdown(self) -> None:
         self._cancel_pending_arm()
+        self.context.ptz_automation.set_arm_requested(
+            False,
+            owner=TRACKING_ACTIVITY_OWNER,
+        )
         self.context.video.set_tracking_activity(
             False,
             owner=TRACKING_ACTIVITY_OWNER,
@@ -105,6 +130,10 @@ class ViscaAutofocusTrackingToggle:
             ):
                 ok, message = self.context.ptz_automation.arm()
                 if ok:
+                    self.context.ptz_automation.set_arm_requested(
+                        False,
+                        owner=TRACKING_ACTIVITY_OWNER,
+                    )
                     # The automation service now owns analysis activity.
                     self.context.video.set_tracking_activity(
                         False,
@@ -140,11 +169,23 @@ class ViscaAutofocusTrackingToggle:
                     )
                     return
                 await asyncio.sleep(ARM_RETRY_INTERVAL_SECONDS)
+            self.context.ptz_automation.set_arm_requested(
+                False,
+                owner=TRACKING_ACTIVITY_OWNER,
+            )
+            self.context.video.set_tracking_activity(
+                False,
+                owner=TRACKING_ACTIVITY_OWNER,
+            )
         except asyncio.CancelledError:
             return
 
     def _set_requested(self, enabled: bool, reason: str) -> None:
         if not enabled:
+            self.context.ptz_automation.set_arm_requested(
+                False,
+                owner=TRACKING_ACTIVITY_OWNER,
+            )
             self.context.ptz_automation.disarm(reason)
             self.context.video.set_tracking_activity(
                 False,
@@ -192,5 +233,6 @@ def _start_retryable(message: str) -> bool:
             "fresh analysis",
             "fresh frame",
             "Waiting for",
+            "calibration is not locked",
         )
     )

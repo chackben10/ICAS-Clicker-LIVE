@@ -15,11 +15,20 @@ from production_hub.tracking.framing import (
     FramingEngine,
     FramingState,
 )
-from production_hub.tracking.models import NormalizedRect
+from production_hub.tracking.models import (
+    NormalizedRect,
+    SubjectReferenceTarget,
+    TrackingSnapshot,
+)
 from production_hub.tracking.ptz_geometry import (
     PtzGeometryModel,
     PtzMotorPose,
     transform_live_rect_to_reference,
+)
+from production_hub.tracking.target_lock import SubjectTargetLock
+from production_hub.tracking.velocity_controller import (
+    PtzVelocityCommand,
+    SmoothPtzVelocityController,
 )
 from production_hub.video.models import VideoSourceKey
 
@@ -48,13 +57,14 @@ class PtzAutomationSnapshot:
     last_command_monotonic: float = 0.0
     commands_sent: int = 0
     last_error: str = ""
+    tracking_source: str = ""
 
     def copy(self) -> PtzAutomationSnapshot:
         return replace(self)
 
 
 class PtzAutomationService:
-    """Safety supervisor and bounded absolute-position PTZ controller.
+    """Safety supervisor for absolute framing and smooth subject tracking.
 
     Arming is intentionally runtime-only and is never restored at startup. The
     worker computes shadow decisions while the Camera page is open, but it only
@@ -87,14 +97,32 @@ class PtzAutomationService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._armed = False
+        self._authority_generation = 0
         self._shadow_owners: set[str] = set()
+        self._arm_request_owners: set[str] = set()
         self._geometry: PtzGeometryModel | None = None
         self._click_target_reference: tuple[float, float] | None = None
         self._target_key: tuple[str, ...] = ()
+        self._last_target_bounds: NormalizedRect | None = None
         self._target_since = 0.0
         self._last_target_seen = 0.0
         self._last_command = 0.0
         self._last_recommended: PtzMotorPose | None = None
+        self._subject_lock = SubjectTargetLock(
+            maximum_match_distance=config.automation.subject_lock_maximum_match_distance
+        )
+        self._velocity = SmoothPtzVelocityController()
+        self._last_velocity_command = PtzVelocityCommand()
+        self._last_velocity_sent = 0.0
+        self._consecutive_cycle_errors = 0
+        self._last_tracking_source = ""
+        self._handoff_motor_pose: PtzMotorPose | None = None
+        self._handoff_mapped_pose: PtzMotorPose | None = None
+        self._handoff_origin_pose: PtzMotorPose | None = None
+        self._handoff_started_at = 0.0
+        self._handoff_pan_direction = 0
+        self._handoff_tilt_direction = 0
+        self._pending_stop_tasks: set[asyncio.Task[None]] = set()
         self._snapshot = PtzAutomationSnapshot(mode=config.automation.mode)
 
     @property
@@ -105,6 +133,13 @@ class PtzAutomationService:
     def armed(self) -> bool:
         with self._lock:
             return self._armed
+
+    @property
+    def arm_requested(self) -> bool:
+        """Whether a control surface is waiting for prerequisites before arming."""
+
+        with self._lock:
+            return self._armed or bool(self._arm_request_owners)
 
     def start(self) -> None:
         if self.running:
@@ -140,9 +175,17 @@ class PtzAutomationService:
             previous_mode = self.config.automation.mode
             self.config = config
             self._snapshot.mode = config.automation.mode
+            self._subject_lock.maximum_match_distance = (
+                config.automation.subject_lock_maximum_match_distance
+            )
             if previous_mode != config.automation.mode:
                 self._target_key = ()
                 self._target_since = 0.0
+                self._subject_lock.reset()
+                self._velocity.reset()
+                self._handoff_motor_pose = None
+                self._handoff_mapped_pose = None
+                self._reset_handoff_guard()
             if config.automation.mode != "click":
                 self._click_target_reference = None
         if self.armed and not config.enabled:
@@ -165,6 +208,17 @@ class PtzAutomationService:
                 )
         self._wake.set()
 
+    def set_arm_requested(self, active: bool, *, owner: str) -> None:
+        """Coordinate asynchronous arm requests across UI and hardware controls."""
+
+        normalized_owner = str(owner or "external")
+        with self._lock:
+            if active:
+                self._arm_request_owners.add(normalized_owner)
+            else:
+                self._arm_request_owners.discard(normalized_owner)
+        self._wake.set()
+
     def set_click_target_live(self, x: float, y: float) -> tuple[float, float]:
         lock = self.video.relocalization.snapshot()
         if not lock.motion_safe:
@@ -180,6 +234,7 @@ class PtzAutomationService:
         with self._lock:
             self._click_target_reference = target
             self._target_key = ()
+            self._last_target_bounds = None
             self._target_since = 0.0
         self._wake.set()
         return target
@@ -377,11 +432,21 @@ class PtzAutomationService:
         with self._lock:
             self._geometry = geometry
             self._armed = True
+            self._authority_generation += 1
             now = time.monotonic()
             self._last_target_seen = now
             self._last_command = 0.0
             self._last_recommended = None
+            self._subject_lock.reset()
+            self._velocity.reset()
+            self._last_velocity_command = PtzVelocityCommand()
+            self._last_velocity_sent = 0.0
+            self._last_tracking_source = ""
+            self._handoff_motor_pose = None
+            self._handoff_mapped_pose = None
+            self._reset_handoff_guard()
             self._target_key = ()
+            self._last_target_bounds = None
             self._target_since = 0.0
             self._snapshot = PtzAutomationSnapshot(
                 state=AutomationState.ARMED_WAITING,
@@ -401,9 +466,15 @@ class PtzAutomationService:
         with self._lock:
             was_armed = self._armed
             self._armed = False
+            self._authority_generation += 1
             self._target_key = ()
+            self._last_target_bounds = None
             self._target_since = 0.0
             self._last_recommended = None
+            self._subject_lock.reset()
+            self._handoff_motor_pose = None
+            self._handoff_mapped_pose = None
+            self._reset_handoff_guard()
             self._snapshot.armed = False
             self._snapshot.motion_authority = False
             self._snapshot.state = (
@@ -412,6 +483,8 @@ class PtzAutomationService:
                 else AutomationState.DISARMED
             )
             self._snapshot.message = str(reason)
+        if was_armed:
+            self._stop_continuous_motion()
         self.video.set_tracking_activity(False, owner=self.ACTIVITY_OWNER)
         self.video.set_calibration_activity(False, owner=self.ACTIVITY_OWNER)
         if was_armed:
@@ -421,6 +494,38 @@ class PtzAutomationService:
     def manual_override(self, reason: str = "Manual camera control") -> None:
         if self.armed:
             self.disarm(f"Disarmed by manual override: {reason}")
+
+    async def disarm_async(
+        self,
+        reason: str = "Operator disarmed PTZ automation",
+    ) -> None:
+        """Disarm and await any neutral command on the caller's event loop."""
+
+        self.disarm(reason)
+        await self._wait_for_pending_stops()
+
+    async def manual_override_async(
+        self,
+        reason: str = "Manual camera control",
+    ) -> None:
+        """Revoke automation and confirm neutral speed before manual motion."""
+
+        if self.armed:
+            self.disarm(f"Disarmed by manual override: {reason}")
+        await self._wait_for_pending_stops()
+
+    async def _wait_for_pending_stops(self) -> None:
+        loop = asyncio.get_running_loop()
+        while True:
+            with self._lock:
+                pending = tuple(
+                    task
+                    for task in self._pending_stop_tasks
+                    if task.get_loop() is loop
+                )
+            if not pending:
+                return
+            await asyncio.gather(*pending, return_exceptions=True)
 
     def _arm_blocker(self) -> str:
         if not self.config.enabled:
@@ -464,6 +569,25 @@ class PtzAutomationService:
             return "Click a calibrated Audience location before arming click-to-frame."
         return ""
 
+    def _runtime_blocker(self) -> str:
+        """Return only hard blockers once motion authority was granted.
+
+        Frame, detector, and NDI freshness are transient health signals. The
+        subject loop stops and waits when an observation is missing; it must
+        not silently turn the operator's toggle off. Initial arming still uses
+        the stricter `_arm_blocker` validation.
+        """
+
+        if not self.config.enabled:
+            return "Person detection was disabled"
+        if not getattr(self.panasonic.config, "enabled", False):
+            return "The Panasonic AWP integration was disabled"
+        if self.config.automation.mode == "off":
+            return "Framing mode was turned off"
+        if self.config.automation.mode != "subject":
+            return self._arm_blocker()
+        return ""
+
     def _run(self) -> None:
         while not self._stop.is_set():
             with self._lock:
@@ -476,14 +600,19 @@ class PtzAutomationService:
             started = time.monotonic()
             try:
                 self._cycle(started)
+                self._consecutive_cycle_errors = 0
             except Exception as exc:
-                self._fault(exc)
+                self._consecutive_cycle_errors += 1
+                if self._consecutive_cycle_errors >= 3:
+                    self._fault(exc)
+                else:
+                    self._recoverable_cycle_error(exc)
             elapsed = time.monotonic() - started
             self._wake.wait(timeout=max(0.02, 1.0 / rate - elapsed))
             self._wake.clear()
 
     def _cycle(self, now: float) -> None:
-        blocker = self._arm_blocker() if self.armed else ""
+        blocker = self._runtime_blocker() if self.armed else ""
         if blocker:
             self.disarm(blocker)
             with self._lock:
@@ -492,6 +621,7 @@ class PtzAutomationService:
         with self._lock:
             geometry = self._geometry
             armed = self._armed
+            authority_generation = self._authority_generation
             config = self.config
             click_target = self._click_target_reference
         if geometry is None:
@@ -510,22 +640,165 @@ class PtzAutomationService:
         if armed and actual is not None and self._manual_motion_detected(actual, now):
             self.disarm("External or manual PTZ movement was detected")
             return
+        audience_snapshot = self.video.tracking.snapshot(VideoSourceKey.AUDIENCE)
+        ptz_snapshot = self.video.tracking.snapshot(VideoSourceKey.PTZ)
+        relocalization = self.video.relocalization.snapshot()
+        subject_targets_locked = False
+        all_locked_targets_in_ptz = False
+        locked_reference_targets = None
+        locked_subject_count = 0
+        locked_ptz_matches = 0
+        locked_audience_matches = 0
+        locked_audience_coasts = 0
+        if armed and config.automation.mode == "subject" and actual is not None:
+            with self._lock:
+                if (
+                    not self._armed
+                    or authority_generation != self._authority_generation
+                ):
+                    return
+                locked = self._subject_lock.update(
+                    ptz_snapshot,
+                    audience_snapshot,
+                    relocalization,
+                    geometry,
+                    actual,
+                    minimum_age_frames=config.automation.minimum_subject_age_frames,
+                    now=now,
+                )
+            audience_snapshot = locked.audience
+            ptz_snapshot = locked.ptz
+            subject_targets_locked = locked.initialized
+            locked_reference_targets = locked.reference_targets
+            locked_subject_count = locked.lock_count
+            locked_ptz_matches = locked.ptz_matches
+            locked_audience_matches = locked.audience_matches
+            locked_audience_coasts = locked.audience_coasts
+            all_locked_targets_in_ptz = bool(
+                locked.initialized and locked.ptz_matches == locked.lock_count
+            )
         decision = self.framing.decide(
             config.automation,
-            self.video.tracking.snapshot(VideoSourceKey.AUDIENCE),
-            self.video.tracking.snapshot(VideoSourceKey.PTZ),
-            self.video.relocalization.snapshot(),
+            audience_snapshot,
+            ptz_snapshot,
+            relocalization,
             config.scene_regions,
             geometry,
             current_pose=actual,
             click_target=click_target,
+            subject_targets_locked=subject_targets_locked,
+            locked_reference_targets=locked_reference_targets,
         )
+        handoff_guard_reason = ""
+        handoff_bounds = _reference_target_union(locked_reference_targets)
+        if (
+            armed
+            and config.automation.mode == "subject"
+            and actual is not None
+            and handoff_bounds is not None
+        ):
+            try:
+                mapped_handoff = geometry.pose_for_target(
+                    handoff_bounds,
+                    desired_frame_height=0.70,
+                )
+            except ValueError:
+                mapped_handoff = None
+            if all_locked_targets_in_ptz:
+                self._prepare_handoff_guard(actual)
+            if all_locked_targets_in_ptz and mapped_handoff is not None:
+                # Refresh the local wide-camera origin whenever the PTZ has a
+                # trusted live observation. Relative motor deltas cancel the
+                # fixed inverse-map bias that otherwise reverses direction at
+                # the exact moment a subject crosses the PTZ image edge.
+                self._handoff_motor_pose = actual
+                self._handoff_mapped_pose = mapped_handoff
+            elif (
+                (locked_audience_matches > 0 or locked_audience_coasts > 0)
+                and mapped_handoff is not None
+                and self._handoff_motor_pose is not None
+                and self._handoff_mapped_pose is not None
+                and decision.desired_pose is not None
+            ):
+                relative_pose = _relative_handoff_pose(
+                    motor_anchor=self._handoff_motor_pose,
+                    mapped_anchor=self._handoff_mapped_pose,
+                    mapped_target=mapped_handoff,
+                    current_zoom=actual.zoom,
+                )
+                guarded_pose, handoff_guard_reason = self._guard_audience_handoff(
+                    relative_pose,
+                    actual=actual,
+                    now=now,
+                )
+                decision = replace(
+                    decision,
+                    state=(
+                        FramingState.WAITING
+                        if guarded_pose is None
+                        else decision.state
+                    ),
+                    reason=handoff_guard_reason or decision.reason,
+                    desired_pose=guarded_pose,
+                )
+        if (
+            armed
+            and config.automation.mode == "subject"
+            and actual is not None
+            and decision.desired_pose is not None
+            and not all_locked_targets_in_ptz
+        ):
+            # The wide camera is an aiming backup, not an optical composition
+            # source. Hold the operator's zoom until the locked person is back
+            # in the PTZ image, where scale can be measured directly.
+            decision = replace(
+                decision,
+                desired_pose=replace(decision.desired_pose, zoom=actual.zoom),
+            )
+        if armed and config.automation.mode == "subject":
+            handoff_searching = bool(
+                handoff_guard_reason and decision.desired_pose is not None
+            )
+            tracking_source = (
+                "holding_handoff_guard"
+                if handoff_guard_reason and not handoff_searching
+                else "audience_search"
+                if handoff_searching
+                else "ptz"
+                if all_locked_targets_in_ptz
+                else "audience_handoff"
+                if locked_audience_matches > 0
+                else "audience_coast"
+                if locked_audience_coasts > 0
+                else "holding"
+                if subject_targets_locked
+                else "waiting_for_initial_subject"
+            )
+            self._record_tracking_source(
+                tracking_source,
+                actual=actual,
+                desired=decision.desired_pose,
+                lock_count=locked_subject_count,
+                ptz_matches=locked_ptz_matches,
+                audience_matches=locked_audience_matches,
+                audience_coasts=locked_audience_coasts,
+            )
         with self._lock:
+            # A UI, VISCA, preset, or API action may revoke motion authority
+            # while detector inference is in flight. Never let that stale
+            # decision rewrite the Off state or send a post-disarm command.
+            if armed and (
+                not self._armed
+                or authority_generation != self._authority_generation
+            ):
+                return
             self._snapshot.decision = decision
             self._snapshot.last_decision_monotonic = now
             self._snapshot.actual_pose = actual
             self._snapshot.mode = config.automation.mode
             self._snapshot.last_error = ""
+            if armed and config.automation.mode == "subject":
+                self._snapshot.tracking_source = tracking_source
             if not armed:
                 self._snapshot.state = (
                     AutomationState.SHADOW
@@ -539,28 +812,204 @@ class PtzAutomationService:
             self._handle_target_loss(now, decision.reason)
             return
         self._last_target_seen = now
-        if decision.target_ids != self._target_key:
+        same_target = _target_is_continuous(
+            self._last_target_bounds,
+            decision.target_bounds,
+            len(self._target_key),
+            len(decision.target_ids),
+        )
+        if decision.target_ids != self._target_key and not same_target:
             self._target_key = decision.target_ids
             self._target_since = now
+        elif decision.target_ids != self._target_key:
+            self._target_key = decision.target_ids
+        self._last_target_bounds = decision.target_bounds
         if now - self._target_since < config.automation.target_dwell_seconds:
+            self._stop_continuous_motion()
             with self._lock:
                 self._snapshot.state = AutomationState.ARMED_WAITING
                 self._snapshot.message = "Waiting for the target selection to stabilize"
             return
-        smoothed = self._smoothed_pose(decision.desired_pose)
         with self._lock:
-            self._snapshot.commanded_pose = smoothed
+            if not self._armed or authority_generation != self._authority_generation:
+                return
             self._snapshot.state = AutomationState.ARMED_TRACKING
             self._snapshot.message = (
                 f"Tracking {len(decision.target_ids)} target(s)"
                 + (" with podium framing" if decision.podium_framing else "")
             )
         if actual is not None:
-            self._send_bounded_command(actual, smoothed, now)
+            if config.automation.mode == "subject":
+                self._send_continuous_command(
+                    actual,
+                    decision.desired_pose,
+                    now,
+                    live_bounds=(
+                        _subject_union(ptz_snapshot)
+                        if all_locked_targets_in_ptz
+                        else None
+                    ),
+                    authority_generation=authority_generation,
+                )
+            else:
+                self._send_bounded_command(
+                    actual,
+                    self._smoothed_pose(decision.desired_pose, actual),
+                    now,
+                    authority_generation=authority_generation,
+                )
+
+    def _prepare_handoff_guard(self, actual: PtzMotorPose) -> None:
+        """Remember the last PTZ-authoritative motion before an edge loss."""
+
+        self._handoff_origin_pose = actual
+        self._handoff_started_at = 0.0
+        # Panasonic continuous pan speed and the absolute-position coordinate
+        # use opposite signs. Convert the last image-space/AW command into
+        # absolute motor-coordinate direction before guarding the handoff.
+        self._handoff_pan_direction = -_direction(
+            self._last_velocity_command.pan - 50,
+        )
+        # Panasonic tilt speed has the inverse sign of motor-position error.
+        self._handoff_tilt_direction = -_direction(
+            self._last_velocity_command.tilt - 50,
+        )
+
+    def _reset_handoff_guard(self) -> None:
+        self._handoff_origin_pose = None
+        self._handoff_started_at = 0.0
+        self._handoff_pan_direction = 0
+        self._handoff_tilt_direction = 0
+
+    def _guard_audience_handoff(
+        self,
+        desired: PtzMotorPose,
+        *,
+        actual: PtzMotorPose,
+        now: float,
+    ) -> tuple[PtzMotorPose | None, str]:
+        """Bound wide-camera recovery and reject unverified reversals.
+
+        The Audience image remains the active recovery sensor, but it is less
+        precise than the PTZ image and can briefly return a shifted rectangle
+        at a crop boundary. A handoff may continue the last PTZ-verified
+        direction; it may not reverse the camera or traverse the sanctuary
+        without seeing the locked person in the PTZ again.
+        """
+
+        limits = self.config.automation
+        origin = self._handoff_origin_pose
+        if origin is None:
+            origin = actual
+            self._handoff_origin_pose = origin
+        if self._handoff_started_at <= 0.0:
+            self._handoff_started_at = now
+        if now - self._handoff_started_at > limits.audience_handoff_max_seconds:
+            return None, "Holding camera; Audience handoff reached its safe time limit"
+
+        reversal_deadband = limits.audience_handoff_reversal_deadband_units
+        pan_error = desired.pan - actual.pan
+        tilt_error = desired.tilt - actual.tilt
+        requested_pan_direction = _direction(pan_error, reversal_deadband)
+        requested_tilt_direction = _direction(tilt_error, reversal_deadband)
+        if self._handoff_pan_direction == 0 and requested_pan_direction != 0:
+            self._handoff_pan_direction = requested_pan_direction
+        if self._handoff_tilt_direction == 0 and requested_tilt_direction != 0:
+            self._handoff_tilt_direction = requested_tilt_direction
+        if (
+            requested_pan_direction != 0
+            and self._handoff_pan_direction != 0
+            and requested_pan_direction != self._handoff_pan_direction
+        ):
+            search = self._verified_edge_search_pose(actual, origin)
+            if search is None:
+                return None, "Holding camera; Audience recovery reached its safe pan limit"
+            return (
+                search,
+                "Audience estimate reversed; continuing the last PTZ-verified edge direction",
+            )
+        tilt_contradicted = (
+            requested_tilt_direction != 0
+            and self._handoff_tilt_direction != 0
+            and requested_tilt_direction != self._handoff_tilt_direction
+        )
+
+        maximum_pan = limits.audience_handoff_max_pan_units
+        maximum_tilt = limits.audience_handoff_max_tilt_units
+        if (
+            abs(actual.pan - origin.pan) > maximum_pan + reversal_deadband
+            or abs(actual.tilt - origin.tilt) > maximum_tilt + reversal_deadband
+        ):
+            return None, "Holding camera; Audience handoff reached its safe travel limit"
+
+        pan_low, pan_high = origin.pan - maximum_pan, origin.pan + maximum_pan
+        if self._handoff_pan_direction > 0:
+            pan_low = origin.pan
+        elif self._handoff_pan_direction < 0:
+            pan_high = origin.pan
+        tilt_low, tilt_high = origin.tilt - maximum_tilt, origin.tilt + maximum_tilt
+        if self._handoff_tilt_direction > 0:
+            tilt_low = origin.tilt
+        elif self._handoff_tilt_direction < 0:
+            tilt_high = origin.tilt
+        selected = PtzMotorPose(
+            max(pan_low, min(pan_high, desired.pan)),
+            (
+                actual.tilt
+                if tilt_contradicted
+                else max(tilt_low, min(tilt_high, desired.tilt))
+            ),
+            actual.zoom,
+        )
+        return (
+            selected,
+            (
+                "Audience tilt estimate reversed; continuing pan recovery with tilt held"
+                if tilt_contradicted
+                else ""
+            ),
+        )
+
+    def _verified_edge_search_pose(
+        self,
+        actual: PtzMotorPose,
+        origin: PtzMotorPose,
+    ) -> PtzMotorPose | None:
+        direction = self._handoff_pan_direction
+        if direction == 0:
+            return None
+        maximum = self.config.automation.audience_handoff_max_pan_units
+        boundary = origin.pan + direction * maximum
+        remaining = (boundary - actual.pan) * direction
+        if remaining <= self.config.automation.pan_deadband_units:
+            return None
+        # Aim at the bounded recovery edge rather than advancing a fixed tiny
+        # step. The continuous controller turns the larger error into a fast
+        # initial pursuit and automatically tapers speed near the boundary.
+        # No absolute-position jump is sent; this remains a closed-loop speed
+        # command with the same acceleration and hard travel limits.
+        return PtzMotorPose(
+            boundary,
+            actual.tilt,
+            actual.zoom,
+        )
 
     def _handle_target_loss(self, now: float, reason: str) -> None:
         elapsed = now - self._last_target_seen
         limits = self.config.automation
+        self._stop_continuous_motion()
+        # A locked subject remains the operator's target through a detector
+        # dropout. Never disarm and never adopt a different person simply
+        # because the subject crossed the PTZ edge or left the stage polygon.
+        if self.config.automation.mode == "subject":
+            with self._lock:
+                self._snapshot.state = AutomationState.ARMED_WAITING
+                self._snapshot.message = (
+                    f"Holding camera; reacquiring locked subject ({reason})"
+                    if self._subject_lock.initialized
+                    else f"Tracking remains on; waiting to lock the initial PTZ subject ({reason})"
+                )
+            return
         if elapsed >= limits.target_loss_disarm_seconds:
             self.disarm(f"Target lost: {reason}")
             return
@@ -603,7 +1052,11 @@ class PtzAutomationService:
             or abs(actual.zoom - commanded.zoom) > limits.manual_override_zoom_units
         )
 
-    def _smoothed_pose(self, desired: PtzMotorPose) -> PtzMotorPose:
+    def _smoothed_pose(
+        self,
+        desired: PtzMotorPose,
+        actual: PtzMotorPose | None = None,
+    ) -> PtzMotorPose:
         previous = self._last_recommended
         if previous is None:
             self._last_recommended = desired
@@ -614,15 +1067,201 @@ class PtzAutomationService:
             round(previous.tilt + (desired.tilt - previous.tilt) * alpha),
             round(previous.zoom + (desired.zoom - previous.zoom) * alpha),
         )
+        if actual is not None:
+            limits = self.config.automation
+            selected = PtzMotorPose(
+                actual.pan
+                if abs(desired.pan - actual.pan) <= limits.pan_deadband_units
+                else selected.pan,
+                actual.tilt
+                if abs(desired.tilt - actual.tilt) <= limits.tilt_deadband_units
+                else selected.tilt,
+                actual.zoom
+                if abs(desired.zoom - actual.zoom) <= limits.zoom_deadband_units
+                else selected.zoom,
+            )
         self._last_recommended = selected
         return selected
+
+    def _send_continuous_command(
+        self,
+        actual: PtzMotorPose,
+        desired: PtzMotorPose,
+        now: float,
+        *,
+        live_bounds: NormalizedRect | None,
+        authority_generation: int,
+    ) -> None:
+        with self._lock:
+            if (
+                not self._armed
+                or authority_generation != self._authority_generation
+            ):
+                return
+            command = self._velocity.update(
+                actual=actual,
+                desired=desired,
+                config=self.config.automation,
+                now=now,
+                live_bounds=live_bounds,
+            )
+            previous = self._last_velocity_command
+            refresh = self.config.automation.continuous_command_refresh_seconds
+            refresh_due = command.moving and now - self._last_velocity_sent >= refresh
+            should_send = command != previous or refresh_due
+        if not should_send:
+            return
+
+        async def send() -> None:
+            if (command.pan, command.tilt) != (previous.pan, previous.tilt):
+                if not await self.panasonic.pan_tilt(command.pan, command.tilt):
+                    raise RuntimeError("Panasonic rejected the tracking pan/tilt speed.")
+            elif refresh_due and (command.pan, command.tilt) != (
+                50,
+                50,
+            ):
+                if not await self.panasonic.pan_tilt(command.pan, command.tilt):
+                    raise RuntimeError("Panasonic rejected the tracking pan/tilt refresh.")
+            if command.zoom != previous.zoom:
+                if not await self.panasonic.zoom(command.zoom):
+                    raise RuntimeError("Panasonic rejected the tracking zoom speed.")
+            elif refresh_due and command.zoom != 50:
+                if not await self.panasonic.zoom(command.zoom):
+                    raise RuntimeError("Panasonic rejected the tracking zoom refresh.")
+
+        asyncio.run(send())
+        revoked = False
+        with self._lock:
+            revoked = (
+                not self._armed
+                or authority_generation != self._authority_generation
+            )
+            # Record an in-flight command even after revocation so the stop
+            # path knows exactly which axes must be neutralized.
+            self._last_velocity_command = command
+            if not revoked:
+                self._last_velocity_sent = now
+                self._last_command = now
+                self._snapshot.commanded_pose = None
+                self._snapshot.last_command_monotonic = now
+                self._snapshot.commands_sent += 1
+        if revoked:
+            # A manual command may have revoked authority while the network
+            # request was in flight. Stop our velocity before returning.
+            self._stop_continuous_motion()
+            return
+        self._log(
+            "info",
+            "ptz_automation_velocity",
+            "Continuous PTZ tracking speed updated",
+            pan_speed=command.pan,
+            tilt_speed=command.tilt,
+            zoom_speed=command.zoom,
+        )
+
+    def _stop_continuous_motion(self) -> None:
+        with self._lock:
+            previous = self._last_velocity_command
+            self._velocity.halt()
+            self._last_velocity_command = PtzVelocityCommand()
+            self._last_velocity_sent = 0.0
+        if not previous.moving:
+            return
+
+        async def stop() -> None:
+            if (previous.pan, previous.tilt) != (50, 50):
+                await self.panasonic.stop_pan_tilt()
+            if previous.zoom != 50:
+                await self.panasonic.stop_zoom()
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(stop())
+            except Exception as exc:
+                self._log_stop_failure(exc)
+            return
+
+        # VISCA and API callbacks already execute inside an asyncio loop. A
+        # nested asyncio.run() raises before sending the neutral command and
+        # leaves Panasonic's last velocity latched. Schedule the stop on that
+        # live loop and retain the task until it has completed.
+        task = loop.create_task(stop())
+        with self._lock:
+            self._pending_stop_tasks.add(task)
+        task.add_done_callback(self._stop_task_finished)
+
+    def _stop_task_finished(self, task: asyncio.Task[None]) -> None:
+        with self._lock:
+            self._pending_stop_tasks.discard(task)
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            self._log_stop_failure(RuntimeError("PTZ stop task was cancelled"))
+        except Exception as exc:
+            self._log_stop_failure(exc)
+
+    def _log_stop_failure(self, exc: Exception) -> None:
+        # Revoking motion authority must still complete even if the camera is
+        # temporarily unreachable; surface the failed stop in logs.
+        self._log(
+            "warning",
+            "ptz_automation_stop_failed",
+            "Could not confirm the PTZ tracking stop command",
+            error=str(exc),
+        )
+
+    def _record_tracking_source(
+        self,
+        source: str,
+        *,
+        actual: PtzMotorPose | None,
+        desired: PtzMotorPose | None,
+        lock_count: int,
+        ptz_matches: int,
+        audience_matches: int,
+        audience_coasts: int,
+    ) -> None:
+        if source == self._last_tracking_source:
+            return
+        self._last_tracking_source = source
+        self._log(
+            "info",
+            "ptz_tracking_source_changed",
+            f"Subject Tracking source changed to {source}",
+            source=source,
+            lock_count=lock_count,
+            ptz_matches=ptz_matches,
+            audience_matches=audience_matches,
+            audience_coasts=audience_coasts,
+            actual=(
+                {"pan": actual.pan, "tilt": actual.tilt, "zoom": actual.zoom}
+                if actual is not None
+                else None
+            ),
+            desired=(
+                {"pan": desired.pan, "tilt": desired.tilt, "zoom": desired.zoom}
+                if desired is not None
+                else None
+            ),
+        )
 
     def _send_bounded_command(
         self,
         actual: PtzMotorPose,
         desired: PtzMotorPose,
         now: float,
+        *,
+        authority_generation: int | None = None,
     ) -> None:
+        if authority_generation is not None:
+            with self._lock:
+                if (
+                    not self._armed
+                    or authority_generation != self._authority_generation
+                ):
+                    return
         limits = self.config.automation
         if now - self._last_command < limits.minimum_command_interval_seconds:
             return
@@ -670,6 +1309,11 @@ class PtzAutomationService:
         asyncio.run(send())
         commanded = PtzMotorPose(pan, tilt, zoom)
         with self._lock:
+            if authority_generation is not None and (
+                not self._armed
+                or authority_generation != self._authority_generation
+            ):
+                return
             self._last_command = now
             self._snapshot.commanded_pose = commanded
             self._snapshot.last_command_monotonic = now
@@ -681,6 +1325,24 @@ class PtzAutomationService:
             pan=pan,
             tilt=tilt,
             zoom=zoom,
+        )
+
+    def _recoverable_cycle_error(self, exc: Exception) -> None:
+        self._stop_continuous_motion()
+        with self._lock:
+            if self._armed:
+                self._snapshot.state = AutomationState.ARMED_WAITING
+                self._snapshot.message = (
+                    "Holding camera after a temporary PTZ communication error "
+                    f"({self._consecutive_cycle_errors}/3)"
+                )
+                self._snapshot.last_error = str(exc)
+        self._log(
+            "warning",
+            "ptz_automation_cycle_retry",
+            "PTZ tracking cycle failed; holding before retry",
+            attempt=self._consecutive_cycle_errors,
+            error=str(exc),
         )
 
     def _fault(self, exc: Exception) -> None:
@@ -715,3 +1377,74 @@ def _pose_is_settled(actual: PtzMotorPose, commanded: PtzMotorPose, limits) -> b
         and abs(actual.tilt - commanded.tilt) <= limits.tilt_deadband_units
         and abs(actual.zoom - commanded.zoom) <= limits.zoom_deadband_units
     )
+
+
+def _target_is_continuous(
+    previous: NormalizedRect | None,
+    current: NormalizedRect | None,
+    previous_count: int,
+    current_count: int,
+) -> bool:
+    if previous is None or current is None or previous_count != current_count:
+        return False
+    return (
+        previous.intersection_over_union(current) >= 0.08
+        or previous.center_distance(current) <= 0.12
+    )
+
+
+def _subject_union(snapshot: TrackingSnapshot) -> NormalizedRect | None:
+    subjects = tuple(snapshot.subjects)
+    if not subjects:
+        return None
+    left = min(item.bounds.x for item in subjects)
+    top = min(item.bounds.y for item in subjects)
+    right = max(item.bounds.x + item.bounds.width for item in subjects)
+    bottom = max(item.bounds.y + item.bounds.height for item in subjects)
+    return NormalizedRect(left, top, right - left, bottom - top).clamped()
+
+
+def _reference_target_union(
+    targets: tuple[SubjectReferenceTarget, ...] | None,
+) -> NormalizedRect | None:
+    if not targets:
+        return None
+    left = min(item.bounds.x for item in targets)
+    top = min(item.bounds.y for item in targets)
+    right = max(item.bounds.x + item.bounds.width for item in targets)
+    bottom = max(item.bounds.y + item.bounds.height for item in targets)
+    return NormalizedRect(left, top, right - left, bottom - top)
+
+
+def _relative_handoff_pose(
+    *,
+    motor_anchor: PtzMotorPose,
+    mapped_anchor: PtzMotorPose,
+    mapped_target: PtzMotorPose,
+    current_zoom: int,
+) -> PtzMotorPose:
+    """Translate calibrated target motion from the last trusted motor pose."""
+
+    return PtzMotorPose(
+        pan=max(
+            0,
+            min(
+                0xFFFF,
+                motor_anchor.pan + mapped_target.pan - mapped_anchor.pan,
+            ),
+        ),
+        tilt=max(
+            0,
+            min(
+                0xFFFF,
+                motor_anchor.tilt + mapped_target.tilt - mapped_anchor.tilt,
+            ),
+        ),
+        zoom=int(current_zoom),
+    )
+
+
+def _direction(value: int | float, deadband: int | float = 0) -> int:
+    if abs(value) <= abs(deadband):
+        return 0
+    return 1 if value > 0 else -1

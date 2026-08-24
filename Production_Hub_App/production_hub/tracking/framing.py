@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Iterable, Sequence
 
@@ -9,7 +9,12 @@ from production_hub.core.config.models import (
     CameraSceneRegion,
     PtzAutomationConfig,
 )
-from production_hub.tracking.models import NormalizedRect, TrackedSubject, TrackingSnapshot
+from production_hub.tracking.models import (
+    NormalizedRect,
+    SubjectReferenceTarget,
+    TrackedSubject,
+    TrackingSnapshot,
+)
 from production_hub.tracking.ptz_geometry import (
     PtzGeometryModel,
     PtzMotorPose,
@@ -50,11 +55,13 @@ class FramingEngine:
         *,
         current_pose: PtzMotorPose | None = None,
         click_target: tuple[float, float] | None = None,
+        subject_targets_locked: bool = False,
+        locked_reference_targets: Sequence[SubjectReferenceTarget] | None = None,
     ) -> FramingDecision:
         mode = config.mode
         if mode == "off":
             return FramingDecision(FramingState.OFF, mode, "Choose a framing mode.")
-        if not relocalization.motion_safe:
+        if not relocalization.motion_safe and mode != "subject":
             return FramingDecision(
                 FramingState.BLOCKED,
                 mode,
@@ -94,10 +101,34 @@ class FramingEngine:
                     geometry,
                     current_pose,
                 )
-            # The fixed Audience view is backup/reacquisition only. Restrict it
-            # to operational stage areas so congregants in the pews cannot pull
-            # the PTZ away from the speaker.
-            if not selected:
+            # Once the automation supervisor has locked the subjects present
+            # at arm time, its Audience snapshot contains only cross-camera
+            # matches for those logical people. It is then safe—and necessary
+            # for following someone off stage—to use matches anywhere in the
+            # wide view. Without that lock, retain the conservative stage-only
+            # behavior used by shadow previews and standalone policy tests.
+            if subject_targets_locked:
+                ptz_lock_ids = {_logical_subject_id(item[0]) for item in selected}
+                if locked_reference_targets is None:
+                    # Compatibility for policy-only callers that do not run
+                    # the automation supervisor's cross-camera identity lock.
+                    selected.extend(
+                        item
+                        for item in subjects
+                        if _logical_subject_id(item[0]) not in ptz_lock_ids
+                    )
+                else:
+                    selected.extend(
+                        (
+                            f"locked:{item.lock_id}",
+                            item.bounds,
+                            item.confidence,
+                        )
+                        for item in locked_reference_targets
+                        if str(item.lock_id) not in ptz_lock_ids
+                        and item.source == "audience"
+                    )
+            elif not selected:
                 allowed = {"stage", "front_stage", "altar", "podium"}
                 selected = [
                     item
@@ -184,7 +215,11 @@ class FramingEngine:
             and len(selected) == 1
             and any(
                 region.kind == "podium"
-                and _region_contains(region, *_subject_floor(selected[0][1]))
+                and _podium_region_contains(
+                    region,
+                    *_subject_floor(selected[0][1]),
+                    horizontal_inset_ratio=config.podium_region_horizontal_inset_ratio,
+                )
                 for region in usable_regions
             )
         )
@@ -192,6 +227,7 @@ class FramingEngine:
             mode == "subject"
             and config.adaptive_subject_framing_enabled
             and ptz_selected
+            and len(ptz_selected) == len(selected)
             and current_pose is not None
         ):
             target, desired_height = _adaptive_ptz_composition(
@@ -213,7 +249,7 @@ class FramingEngine:
                     target_confidence=min(item[2] for item in ptz_selected),
                     podium_framing=podium,
                 )
-            return self._pose_decision(
+            decision = self._pose_decision(
                 config,
                 geometry,
                 reference_target,
@@ -221,6 +257,68 @@ class FramingEngine:
                 min(item[2] for item in ptz_selected),
                 podium=podium,
                 desired_frame_height=desired_height,
+            )
+            if decision.desired_pose is None:
+                return decision
+            live_subject_bounds = [item[1] for item in ptz_selected]
+            if len(live_subject_bounds) == 1 and not podium:
+                # The old upper-body expansion had an unintended equilibrium:
+                # once an off-lectern person reached roughly 55% image height,
+                # expansion made the shot appear "full" and zoom stopped. Use
+                # the actual pose envelope for optical occupancy so the body
+                # reaches the reference-shot scale instead.
+                optical_target = _pad(
+                    live_subject_bounds[0],
+                    config.subject_safety_padding_x,
+                    config.subject_safety_padding_y,
+                )
+                optical_height = config.off_podium_subject_frame_height
+                relative_footprint = max(
+                    optical_target.height / max(0.10, optical_height),
+                    optical_target.width
+                    / max(0.10, optical_height * 16.0 / 9.0),
+                )
+            else:
+                relative_footprint = max(
+                    target.height / max(0.10, desired_height),
+                    target.width / max(0.10, desired_height * 16.0 / 9.0),
+                )
+            touches_edge = any(
+                _touches_ptz_edge(bounds) for bounds in live_subject_bounds
+            )
+            if touches_edge:
+                # A detector rectangle touching any image edge is incomplete.
+                # Never zoom into that partial observation; widen gently while
+                # pan/tilt brings the locked person back into safe composition.
+                relative_footprint = max(relative_footprint, 1.08)
+            elif (
+                not podium
+                and abs(_union(live_subject_bounds).center[0] - 0.5)
+                > config.subject_zoom_center_gate_x
+            ):
+                # First center a walking subject, then tighten the shot. This
+                # avoids reducing the field of view while the pan controller is
+                # still catching up near an image edge.
+                relative_footprint = max(relative_footprint, 1.0)
+            relative_zoom = geometry.zoom_for_relative_footprint(
+                current_pose.zoom,
+                relative_footprint,
+            )
+            target_center_x, target_center_y = target.center
+            # The composition helper deliberately snaps an acceptable live
+            # subject to image center. Make that hold decision authoritative:
+            # projecting a centered rectangle through a slightly imperfect
+            # calibration map must not reintroduce pan/tilt jitter.
+            hold_pan = abs(target_center_x - 0.5) <= 1e-6
+            hold_tilt = abs(target_center_y - 0.5) <= 1e-6
+            return replace(
+                decision,
+                desired_pose=replace(
+                    decision.desired_pose,
+                    pan=(current_pose.pan if hold_pan else decision.desired_pose.pan),
+                    tilt=(current_pose.tilt if hold_tilt else decision.desired_pose.tilt),
+                    zoom=relative_zoom,
+                ),
             )
         prepared = [
             bounds if podium else _expand_upper_body_to_stage_frame(bounds)
@@ -355,6 +453,19 @@ def _subject_floor(bounds: NormalizedRect) -> tuple[float, float]:
     return bounds.x + bounds.width / 2.0, min(1.0, bounds.y + bounds.height)
 
 
+def _logical_subject_id(identifier: str) -> str:
+    return str(identifier).split(":", 1)[-1].replace(":selected", "")
+
+
+def _touches_ptz_edge(bounds: NormalizedRect, margin: float = 0.015) -> bool:
+    return bool(
+        bounds.x <= margin
+        or bounds.y <= margin
+        or bounds.x + bounds.width >= 1.0 - margin
+        or bounds.y + bounds.height >= 1.0 - margin
+    )
+
+
 def _expand_upper_body_to_stage_frame(bounds: NormalizedRect) -> NormalizedRect:
     """Give an off-stand speaker enough room for a near full-body composition."""
 
@@ -367,7 +478,12 @@ def _expand_upper_body_to_stage_frame(bounds: NormalizedRect) -> NormalizedRect:
     center_x, _center_y = bounds.center
     width = min(1.0, bounds.width * 1.35)
     top = max(0.0, bounds.y - bounds.height * 0.12)
-    bottom = min(1.0, bounds.y + bounds.height * 1.85)
+    # VNDetectHumanRectangles in upper-body mode generally reaches the hips,
+    # while the pose envelope often reaches farther. A 1.85x extension made
+    # the inferred body grow as the camera zoomed out, creating a runaway
+    # feedback loop toward a stage-wide shot. This modest extension supplies
+    # leg room without treating a clear half-height person as a tiny subject.
+    bottom = min(1.0, bounds.y + bounds.height * 1.25)
     return NormalizedRect(center_x - width / 2.0, top, width, bottom - top).clamped()
 
 
@@ -480,3 +596,26 @@ def _region_contains(region: CameraSceneRegion, x: float, y: float) -> bool:
             inside = not inside
         previous = current
     return inside
+
+
+def _podium_region_contains(
+    region: CameraSceneRegion,
+    x: float,
+    y: float,
+    *,
+    horizontal_inset_ratio: float,
+) -> bool:
+    """Use the reliable center of a podium region for intimate framing.
+
+    Subject mode may be operating at a zoom far tighter than the calibration
+    sweep. A small horizontal guard band prevents nearby drums or music stands
+    from being classified as the central lectern when projection drifts by a
+    few pixels.
+    """
+
+    if not _region_contains(region, x, y):
+        return False
+    left = min(point.x for point in region.points)
+    right = max(point.x for point in region.points)
+    inset = max(0.0, min(0.40, horizontal_inset_ratio)) * (right - left)
+    return left + inset <= x <= right - inset

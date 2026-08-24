@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from ctypes import c_void_p
 from pathlib import Path
 import re
 import sys
@@ -9,12 +10,13 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QPointF, QProcess, QRectF, QSize, QTimer, Qt, QUrl, Signal
+from PySide6.QtCore import QPointF, QProcess, QRect, QRectF, QSize, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QImage,
     QPainter,
+    QPainterPath,
     QPen,
     QPixmap,
     QPolygonF,
@@ -23,6 +25,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -75,6 +78,45 @@ from production_hub.tracking.framing import FramingState
 from production_hub.tracking.ptz_geometry import PtzGeometryModel, PtzMotorPose
 from production_hub.tracking.scene_regions import suggested_church_scene_regions
 from production_hub.video.models import VideoSourceKey, VideoSourceSnapshot
+
+
+CLICK_TO_FRAME_DEFAULT_WIDTH = 520
+CLICK_TO_FRAME_DEFAULT_HEIGHT = 340
+# Crop the generated sanctuary panorama to the useful stage/pew interaction
+# area shown by the operator: remove 5.5% from each side and the lower 36%.
+CLICK_TO_FRAME_VIEWPORT = (0.055, 0.0, 0.89, 0.64)
+
+
+def click_viewport_to_canvas_rect(
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+) -> tuple[float, float, float, float]:
+    crop_x, crop_y, crop_width, crop_height = CLICK_TO_FRAME_VIEWPORT
+    return (
+        crop_x + float(x) * crop_width,
+        crop_y + float(y) * crop_height,
+        float(width) * crop_width,
+        float(height) * crop_height,
+    )
+
+
+def crop_click_to_frame_image(image: QImage) -> QImage:
+    if image.isNull():
+        return QImage(image)
+    crop_x, crop_y, crop_width, crop_height = CLICK_TO_FRAME_VIEWPORT
+    left = max(0, min(image.width() - 1, round(image.width() * crop_x)))
+    top = max(0, min(image.height() - 1, round(image.height() * crop_y)))
+    right = max(
+        left + 1,
+        min(image.width(), round(image.width() * (crop_x + crop_width))),
+    )
+    bottom = max(
+        top + 1,
+        min(image.height(), round(image.height() * (crop_y + crop_height))),
+    )
+    return image.copy(left, top, right - left, bottom - top)
 
 
 class VideoPreview(QFrame):
@@ -571,13 +613,21 @@ class VideoPreview(QFrame):
         if self._frame_target_point is not None:
             x, y = self._frame_target_point
             point = QPointF(x * pixmap.width(), y * pixmap.height())
-            outline = QColor(5, 8, 12)
-            outline.setAlpha(round(255 * self._frame_target_opacity))
-            painter.setPen(QPen(outline, 6))
+            opacity = self._frame_target_opacity
+            halo = QColor(55, 157, 255, round(58 * opacity))
+            ring = QColor(55, 157, 255, round(255 * opacity))
+            center = QColor(242, 249, 255, round(255 * opacity))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(halo)
+            painter.drawEllipse(point, 13, 13)
+            painter.setBrush(QColor(7, 12, 20, round(178 * opacity)))
+            painter.drawEllipse(point, 8, 8)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(ring, 3))
             painter.drawEllipse(point, 9, 9)
-            painter.setPen(QPen(color, 3))
-            painter.drawLine(point + QPointF(-12, 0), point + QPointF(12, 0))
-            painter.drawLine(point + QPointF(0, -12), point + QPointF(0, 12))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(center)
+            painter.drawEllipse(point, 3, 3)
 
 
 class ClickToFrameWindow(QWidget):
@@ -587,13 +637,21 @@ class ClickToFrameWindow(QWidget):
     tracking_toggle_requested = Signal()
 
     def __init__(self, context) -> None:
-        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        super().__init__(
+            None,
+            Qt.WindowType.Tool
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus,
+        )
         self.context = context
         self.frame_provider = None
         self.tracking_state_provider = None
+        self._geometry_restored = False
+        self._persisted_geometry: tuple[int, int, int, int] | None = None
+        self._native_nonactivating_panel = False
         self.setWindowTitle("Production Hub · Click to Frame")
         self.setMinimumSize(360, 240)
-        self.resize(520, 340)
+        self.resize(CLICK_TO_FRAME_DEFAULT_WIDTH, CLICK_TO_FRAME_DEFAULT_HEIGHT)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         if hasattr(Qt.WidgetAttribute, "WA_MacAlwaysShowToolWindow"):
             self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow, True)
@@ -608,6 +666,140 @@ class ClickToFrameWindow(QWidget):
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(100)
         self.refresh_timer.timeout.connect(self.refresh_frame)
+        self.geometry_save_timer = QTimer(self)
+        self.geometry_save_timer.setSingleShot(True)
+        self.geometry_save_timer.setInterval(250)
+        self.geometry_save_timer.timeout.connect(self.persist_geometry)
+        self.restore_saved_geometry()
+        self._apply_macos_nonactivating_panel()
+
+    def has_saved_geometry(self) -> bool:
+        return len(self.context.config.ui.click_to_frame_window_geometry) == 4
+
+    def restore_saved_geometry(self) -> None:
+        saved = self.context.config.ui.click_to_frame_window_geometry
+        self._geometry_restored = False
+        if len(saved) == 4:
+            try:
+                selected = self._clamped_geometry(
+                    QRect(*(int(value) for value in saved))
+                )
+                self.setGeometry(selected)
+                self._persisted_geometry = (
+                    selected.x(),
+                    selected.y(),
+                    selected.width(),
+                    selected.height(),
+                )
+            except (TypeError, ValueError):
+                self.center_default_geometry(persist=False)
+        else:
+            self.center_default_geometry(persist=False)
+        self._geometry_restored = True
+
+    def center_default_geometry(self, *, persist: bool = True) -> None:
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            selected = QRect(
+                0,
+                0,
+                CLICK_TO_FRAME_DEFAULT_WIDTH,
+                CLICK_TO_FRAME_DEFAULT_HEIGHT,
+            )
+        else:
+            available = screen.availableGeometry()
+            selected = QRect(
+                available.x()
+                + (available.width() - CLICK_TO_FRAME_DEFAULT_WIDTH) // 2,
+                available.y()
+                + (available.height() - CLICK_TO_FRAME_DEFAULT_HEIGHT) // 2,
+                CLICK_TO_FRAME_DEFAULT_WIDTH,
+                CLICK_TO_FRAME_DEFAULT_HEIGHT,
+            )
+        self.setGeometry(self._clamped_geometry(selected))
+        if persist:
+            self.persist_geometry()
+
+    def _clamped_geometry(self, requested: QRect) -> QRect:
+        screens = QApplication.screens()
+        if not screens:
+            return requested
+        intersections = [
+            (
+                requested.intersected(screen.availableGeometry()).width()
+                * requested.intersected(screen.availableGeometry()).height(),
+                screen,
+            )
+            for screen in screens
+        ]
+        overlap, screen = max(intersections, key=lambda item: item[0])
+        if overlap <= 0:
+            screen = QApplication.primaryScreen() or screens[0]
+        available = screen.availableGeometry()
+        width = min(
+            available.width(),
+            max(self.minimumWidth(), requested.width()),
+        )
+        height = min(
+            available.height(),
+            max(self.minimumHeight(), requested.height()),
+        )
+        x = max(
+            available.x(),
+            min(requested.x(), available.x() + available.width() - width),
+        )
+        y = max(
+            available.y(),
+            min(requested.y(), available.y() + available.height() - height),
+        )
+        return QRect(x, y, width, height)
+
+    def persist_geometry(self) -> None:
+        if not self._geometry_restored:
+            return
+        geometry = self.geometry()
+        selected = (
+            geometry.x(),
+            geometry.y(),
+            geometry.width(),
+            geometry.height(),
+        )
+        if selected == self._persisted_geometry:
+            return
+        self.context.config.ui.click_to_frame_window_geometry = list(selected)
+        self.context.config_repository.save_app_config(self.context.config)
+        self._persisted_geometry = selected
+
+    def _apply_macos_nonactivating_panel(self) -> None:
+        """Make the Qt tool panel clickable without activating Production Hub."""
+
+        if sys.platform != "darwin" or QApplication.platformName() != "cocoa":
+            return
+        try:
+            import AppKit
+            import objc
+
+            native_view = objc.objc_object(c_void_p=int(self.winId()))
+            native_window = native_view.window()
+            if native_window is None:
+                return
+            nonactivating = int(AppKit.NSWindowStyleMaskNonactivatingPanel)
+            native_window.setStyleMask_(int(native_window.styleMask()) | nonactivating)
+            native_window.setHidesOnDeactivate_(False)
+            if hasattr(native_window, "setBecomesKeyOnlyIfNeeded_"):
+                native_window.setBecomesKeyOnlyIfNeeded_(True)
+            if hasattr(native_window, "setFloatingPanel_"):
+                native_window.setFloatingPanel_(True)
+            behavior = int(native_window.collectionBehavior())
+            behavior |= int(AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces)
+            behavior |= int(AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary)
+            native_window.setCollectionBehavior_(behavior)
+            self._native_nonactivating_panel = True
+        # PyObjC may surface native AppKit failures as objc.error or a runtime
+        # exception. This enhancement must remain best-effort: Qt's
+        # WindowDoesNotAcceptFocus hint is still the safe fallback.
+        except Exception:
+            self._native_nonactivating_panel = False
 
     def refresh_frame(self) -> None:
         if callable(self.frame_provider):
@@ -643,14 +835,30 @@ class ClickToFrameWindow(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        self._apply_macos_nonactivating_panel()
         self.refresh_frame()
         self.refresh_timer.start()
         self.visibility_changed.emit(True)
 
     def hideEvent(self, event) -> None:
+        self.persist_geometry()
         self.refresh_timer.stop()
         self.visibility_changed.emit(False)
         super().hideEvent(event)
+
+    def moveEvent(self, event) -> None:
+        super().moveEvent(event)
+        if self._geometry_restored:
+            self.geometry_save_timer.start()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._geometry_restored:
+            self.geometry_save_timer.start()
+
+    def closeEvent(self, event) -> None:
+        self.persist_geometry()
+        super().closeEvent(event)
 
 
 class CameraControlPage(QWidget):
@@ -1806,7 +2014,11 @@ class CameraControlPage(QWidget):
         )
 
     def subject_tracking_requested(self) -> bool:
-        return self.subject_tracking_enabled() or self._pending_subject_arm_until > 0.0
+        return bool(
+            self.subject_tracking_enabled()
+            or self._pending_subject_arm_until > 0.0
+            or self.context.ptz_automation.arm_requested
+        )
 
     def set_subject_tracking_enabled(
         self,
@@ -1899,6 +2111,7 @@ class CameraControlPage(QWidget):
             return
         active = self.subject_tracking_enabled()
         wants_tracking = requested or self._pending_subject_arm_until > 0.0 or active
+        wants_tracking = wants_tracking or self.context.ptz_automation.arm_requested
         self._syncing_automation_control = True
         self.automation_mode.setCurrentIndex(1 if wants_tracking else 0)
         self._syncing_automation_control = False
@@ -2084,21 +2297,20 @@ class CameraControlPage(QWidget):
                 self._click_visual_live_size = (0, 0)
                 self._click_visual_alignment_sequence = -1
                 self._click_geometry = None
-        ratio = (
-            self._click_mosaic.width / self._click_mosaic.height
-            if self._click_mosaic is not None
-            else 16.0 / 9.0
-        )
+        if self._click_mosaic is not None:
+            _crop_x, _crop_y, crop_width, crop_height = CLICK_TO_FRAME_VIEWPORT
+            ratio = (
+                self._click_mosaic.width * crop_width
+                / (self._click_mosaic.height * crop_height)
+            )
+        else:
+            ratio = 16.0 / 9.0
         for preview in (
             self.click_to_frame_preview,
             self.click_to_frame_window.preview,
         ):
             preview.set_aspect_ratio(ratio)
-        floating_width = max(420, self.click_to_frame_window.width())
-        floating_height = round(floating_width / ratio) + 58
         self.click_to_frame_window.setMinimumSize(360, round(360 / ratio) + 58)
-        if not self.click_to_frame_window.isVisible():
-            self.click_to_frame_window.resize(floating_width, floating_height)
         self._click_mosaic_version += 1
         self._click_composite_packet_sequence = -1
         self._click_composite_version = -1
@@ -2287,6 +2499,7 @@ class CameraControlPage(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         self._paint_current_ptz_footprint(painter, mosaic, composite.size())
         painter.end()
+        composite = crop_click_to_frame_image(composite)
         self._click_composite_packet_sequence = packet.sequence
         self._click_composite_version = self._click_mosaic_version
         self._click_composite_pose_sequence = self._click_pose_sequence
@@ -2421,26 +2634,47 @@ class CameraControlPage(QWidget):
                 for x, y in reference_polygon
             ]
         )
-        fill = QColor(255, 244, 180, 42)
-        outline = QColor(255, 248, 204, 235)
-        painter.setBrush(fill)
-        painter.setPen(QPen(outline, 3))
+        self._paint_ptz_footprint_polygon(painter, polygon, canvas_size)
+
+    @staticmethod
+    def _paint_ptz_footprint_polygon(
+        painter: QPainter,
+        polygon: QPolygonF,
+        canvas_size: QSize,
+    ) -> None:
+        """Emphasize the live PTZ view without altering pixels inside it."""
+
+        if polygon.isEmpty() or min(canvas_size.width(), canvas_size.height()) <= 0:
+            return
+        full_canvas = QPainterPath()
+        full_canvas.addRect(
+            QRectF(
+                0.0,
+                0.0,
+                float(canvas_size.width()),
+                float(canvas_size.height()),
+            )
+        )
+        current_view = QPainterPath()
+        current_view.addPolygon(polygon)
+        current_view.closeSubpath()
+        painter.save()
+        painter.fillPath(
+            full_canvas.subtracted(current_view),
+            QColor(0, 0, 0, 84),
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(
+            QPen(
+                QColor(55, 157, 255, 242),
+                3,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            )
+        )
         painter.drawPolygon(polygon)
-        label_rect = polygon.boundingRect()
-        if label_rect.width() >= 90 and label_rect.height() >= 32:
-            label = QRectF(
-                label_rect.left() + 8,
-                label_rect.top() + 8,
-                104,
-                24,
-            )
-            painter.fillRect(label, QColor(9, 11, 15, 190))
-            painter.setPen(outline)
-            painter.drawText(
-                label.adjusted(6, 0, -4, 0),
-                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-                "CURRENT PTZ",
-            )
+        painter.restore()
 
     def _schedule_click_pose_refresh(self) -> None:
         if not self.context.config.integrations.panasonic.enabled:
@@ -2531,8 +2765,14 @@ class CameraControlPage(QWidget):
             )
             uses_live_audience = True
         else:
+            canvas_rect = click_viewport_to_canvas_rect(
+                x,
+                y,
+                width,
+                height,
+            )
             reference_x, reference_y, reference_width, reference_height = (
-                mosaic.canvas_rect_to_reference(x, y, width, height)
+                mosaic.canvas_rect_to_reference(*canvas_rect)
             )
             uses_live_audience = False
 
@@ -2628,14 +2868,7 @@ class CameraControlPage(QWidget):
             self.hide_click_to_frame_window()
 
     def reset_click_to_frame_window(self) -> None:
-        self.click_to_frame_window.resize(520, 340)
-        screen = self.screen()
-        if screen is not None:
-            available = screen.availableGeometry()
-            self.click_to_frame_window.move(
-                available.right() - self.click_to_frame_window.width() - 24,
-                available.top() + 54,
-            )
+        self.click_to_frame_window.center_default_geometry()
         self.show_click_to_frame_window()
 
     def _update_preview_activity(self) -> None:
@@ -2951,6 +3184,7 @@ class CameraControlPage(QWidget):
         if (
             not automation.armed
             and self._pending_subject_arm_until <= 0.0
+            and not self.context.ptz_automation.arm_requested
             and self.context.config.integrations.camera_tracking.automation.mode == "subject"
         ):
             # External VISCA, manual controls, target loss, and safety blocks

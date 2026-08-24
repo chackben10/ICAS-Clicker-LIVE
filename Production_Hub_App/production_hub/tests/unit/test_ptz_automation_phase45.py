@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 import unittest
@@ -24,6 +25,7 @@ from production_hub.core.config.models import (
     SceneRegionPoint,
 )
 from production_hub.tracking.framing import (
+    FramingDecision,
     FramingEngine,
     FramingState,
     _adaptive_ptz_composition,
@@ -39,13 +41,19 @@ from production_hub.tracking.models import (
     TrackingSnapshot,
     TrackingState,
 )
-from production_hub.tracking.ptz_automation import PtzAutomationService
+from production_hub.tracking.ptz_automation import (
+    AutomationState,
+    PtzAutomationService,
+    _relative_handoff_pose,
+    _target_is_continuous,
+)
 from production_hub.tracking.ptz_geometry import (
     CalibrationPoseAnchor,
     PtzGeometryModel,
     PtzMotorPose,
 )
 from production_hub.tracking.service import PersonTrackingService
+from production_hub.tracking.velocity_controller import PtzVelocityCommand
 from production_hub.video.frame_broker import LatestFrameBroker
 from production_hub.video.models import (
     VideoSourceKey,
@@ -98,6 +106,7 @@ class _Geometry:
 
     def __init__(self) -> None:
         self.frame_heights: list[float] = []
+        self.relative_footprints: list[float] = []
 
     def pose_for_target(self, _target, *, desired_frame_height: float) -> PtzMotorPose:
         self.frame_heights.append(desired_frame_height)
@@ -105,6 +114,10 @@ class _Geometry:
 
     def ptz_rect_to_reference(self, bounds, _pose):
         return bounds
+
+    def zoom_for_relative_footprint(self, current_zoom, relative_footprint):
+        self.relative_footprints.append(relative_footprint)
+        return round(current_zoom + (1.0 - relative_footprint) * 1000)
 
 
 class _Tracking:
@@ -153,6 +166,8 @@ class _Panasonic:
         self.pose = PtzMotorPose(43700, 33900, 2000)
         self.pan_tilt_commands: list[tuple[int, int]] = []
         self.zoom_commands: list[int] = []
+        self.pan_tilt_speed_commands: list[tuple[int, int]] = []
+        self.zoom_speed_commands: list[int] = []
 
     async def query_pan_tilt_position(self):
         return self.pose.pan, self.pose.tilt
@@ -170,6 +185,22 @@ class _Panasonic:
         self.pose = PtzMotorPose(self.pose.pan, self.pose.tilt, zoom)
         return True
 
+    async def pan_tilt(self, pan: int, tilt: int) -> bool:
+        self.pan_tilt_speed_commands.append((pan, tilt))
+        return True
+
+    async def stop_pan_tilt(self) -> bool:
+        self.pan_tilt_speed_commands.append((50, 50))
+        return True
+
+    async def zoom(self, zoom: int) -> bool:
+        self.zoom_speed_commands.append(zoom)
+        return True
+
+    async def stop_zoom(self) -> bool:
+        self.zoom_speed_commands.append(50)
+        return True
+
 
 def _snapshot(source: VideoSourceKey, *subjects: TrackedSubject) -> TrackingSnapshot:
     return TrackingSnapshot(
@@ -181,6 +212,90 @@ def _snapshot(source: VideoSourceKey, *subjects: TrackedSubject) -> TrackingSnap
 
 
 class PtzAutomationPhase45Tests(unittest.TestCase):
+    def test_audience_handoff_cancels_absolute_map_bias(self) -> None:
+        # The calibration inverse is biased +900 pan / +500 tilt at both
+        # points. Relative motion must preserve only the small target delta.
+        handoff = _relative_handoff_pose(
+            motor_anchor=PtzMotorPose(43000, 34000, 3000),
+            mapped_anchor=PtzMotorPose(43900, 34500, 2500),
+            mapped_target=PtzMotorPose(43980, 34440, 2600),
+            current_zoom=3075,
+        )
+
+        self.assertEqual(PtzMotorPose(43080, 33940, 3075), handoff)
+
+    def test_audience_handoff_continues_verified_direction_on_recorded_oscillation(self) -> None:
+        config = CameraTrackingConfig(enabled=True)
+        config.automation.mode = "subject"
+        service = PtzAutomationService(
+            _Video(
+                _snapshot(VideoSourceKey.AUDIENCE),
+                _snapshot(VideoSourceKey.PTZ),
+            ),
+            _Panasonic(),
+            config,
+            Path("/tmp"),
+            geometry_loader=lambda _root: _Geometry(),
+        )
+        # The live failure left the PTZ frame with a verified left command,
+        # then the wide estimate flipped from 43662 to 44099.
+        service._last_velocity_command = PtzVelocityCommand(36, 50, 50)
+        service._prepare_handoff_guard(PtzMotorPose(43916, 33467, 3606))
+
+        searched, first_reason = service._guard_audience_handoff(
+            PtzMotorPose(43662, 33795, 3606),
+            actual=PtzMotorPose(43916, 33467, 3606),
+            now=100.0,
+        )
+        accepted, accepted_reason = service._guard_audience_handoff(
+            PtzMotorPose(44099, 33870, 3606),
+            actual=PtzMotorPose(43962, 33471, 3606),
+            now=100.85,
+        )
+
+        # AW speed 36 moved the live camera toward increasing absolute pan.
+        # Reject the first noisy lower-coordinate estimate and continue in
+        # that verified direction. The later higher-coordinate estimate is
+        # then consistent with the physical motion and may take over.
+        self.assertEqual(PtzMotorPose(46516, 33467, 3606), searched)
+        self.assertIn("continuing the last PTZ-verified edge direction", first_reason)
+        self.assertIsNotNone(accepted)
+        self.assertEqual(44099, accepted.pan)
+        self.assertEqual("", accepted_reason)
+
+    def test_audience_handoff_is_bounded_by_travel_and_time(self) -> None:
+        config = CameraTrackingConfig(enabled=True)
+        config.automation.mode = "subject"
+        service = PtzAutomationService(
+            _Video(
+                _snapshot(VideoSourceKey.AUDIENCE),
+                _snapshot(VideoSourceKey.PTZ),
+            ),
+            _Panasonic(),
+            config,
+            Path("/tmp"),
+            geometry_loader=lambda _root: _Geometry(),
+        )
+        service._last_velocity_command = PtzVelocityCommand(36, 50, 50)
+        origin = PtzMotorPose(43000, 34000, 3200)
+        service._prepare_handoff_guard(origin)
+
+        bounded, reason = service._guard_audience_handoff(
+            PtzMotorPose(47000, 34000, 3200),
+            actual=origin,
+            now=200.0,
+        )
+        expired, expired_reason = service._guard_audience_handoff(
+            PtzMotorPose(44000, 34000, 3200),
+            actual=PtzMotorPose(43800, 34000, 3200),
+            now=214.1,
+        )
+
+        self.assertEqual(45600, bounded.pan)
+        self.assertEqual("", reason)
+        self.assertIsNone(expired)
+        self.assertIn("safe time limit", expired_reason)
+
     def test_body_pose_envelope_expands_rectangle_for_raised_hand(self) -> None:
         candidates = [
             PersonCandidate(NormalizedRect(0.40, 0.25, 0.12, 0.30), 0.93)
@@ -255,6 +370,189 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
         self.assertAlmostEqual(0.47, target.center[1], places=3)
         self.assertGreater(footprint, 1.10)
         self.assertEqual(config.raised_gesture_maximum_occupancy, desired)
+
+    def test_live_ptz_zoom_uses_relative_composition_for_clipped_subject(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.15, 0.0, 0.30, 1.0),
+            0.90,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+        current = PtzMotorPose(43150, 33200, 3645)
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+            _locked(),
+            (_stage(),),
+            geometry,
+            current_pose=current,
+        )
+
+        self.assertEqual(FramingState.READY, decision.state)
+        self.assertGreater(geometry.relative_footprints[-1], 1.0)
+        self.assertLess(decision.desired_pose.zoom, current.zoom)
+
+    def test_side_clipped_subject_widens_instead_of_zooming_into_partial_body(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.0, 0.20, 0.08, 0.36),
+            0.90,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+        current = PtzMotorPose(43150, 33200, 3645)
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+            _locked(),
+            (_stage(),),
+            geometry,
+            current_pose=current,
+        )
+
+        self.assertEqual(FramingState.READY, decision.state)
+        self.assertGreaterEqual(geometry.relative_footprints[-1], 1.08)
+        self.assertLess(decision.desired_pose.zoom, current.zoom)
+
+    def test_centered_off_lectern_subject_tightens_to_reference_scale(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.43, 0.20, 0.14, 0.56),
+            0.92,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+        current = PtzMotorPose(43150, 33200, 2500)
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+            _locked(),
+            (),
+            geometry,
+            current_pose=current,
+        )
+
+        self.assertEqual(FramingState.READY, decision.state)
+        self.assertLess(geometry.relative_footprints[-1], 0.75)
+        self.assertGreater(decision.desired_pose.zoom, current.zoom)
+
+    def test_off_center_subject_is_centered_before_zooming_in(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.70, 0.20, 0.12, 0.56),
+            0.92,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+        current = PtzMotorPose(43150, 33200, 2500)
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+            _locked(),
+            (),
+            geometry,
+            current_pose=current,
+        )
+
+        self.assertEqual(FramingState.READY, decision.state)
+        self.assertEqual(1.0, geometry.relative_footprints[-1])
+        self.assertEqual(current.zoom, decision.desired_pose.zoom)
+
+    def test_clear_off_podium_subject_does_not_run_away_to_stage_wide(self) -> None:
+        target, desired = _adaptive_ptz_composition(
+            CameraTrackingConfig(enabled=True).automation,
+            [NormalizedRect(0.45, 0.12, 0.10, 0.36)],
+            podium=False,
+        )
+        relative_footprint = max(
+            target.height / desired,
+            target.width / (desired * 16.0 / 9.0),
+        )
+
+        self.assertLess(relative_footprint, 1.0)
+        self.assertGreater(target.height, 0.50)
+
+    def test_centered_live_subject_holds_current_pan(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.45, 0.08, 0.10, 0.58),
+            0.91,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+        current = PtzMotorPose(43700, 33900, 3200)
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+            _locked(),
+            (_stage(),),
+            geometry,
+            current_pose=current,
+        )
+
+        self.assertEqual(current.pan, decision.desired_pose.pan)
+
+    def test_podium_framing_uses_guarded_center_of_region(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.82, 0.10, 0.08, 0.18),
+            0.93,
+            False,
+            5,
+            time.monotonic(),
+        )
+        geometry = _Geometry()
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE, subject),
+            _snapshot(VideoSourceKey.PTZ),
+            _locked(),
+            (_stage(), _stage("podium", name="Podium")),
+            geometry,
+        )
+
+        self.assertFalse(decision.podium_framing)
+
+    def test_target_identity_handoff_preserves_dwell_for_same_location(self) -> None:
+        previous = NormalizedRect(0.40, 0.10, 0.15, 0.50)
+        nearby = NormalizedRect(0.46, 0.10, 0.15, 0.50)
+
+        self.assertTrue(_target_is_continuous(previous, nearby, 1, 1))
+        self.assertFalse(_target_is_continuous(previous, nearby, 1, 2))
 
     def test_audience_detector_suppresses_people_outside_live_stage_regions(self) -> None:
         broker = LatestFrameBroker()
@@ -378,6 +676,43 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
 
         self.assertEqual(FramingState.READY, decision.state)
         self.assertEqual(("ptz:12",), decision.target_ids)
+
+    def test_locked_group_combines_ptz_and_audience_reacquisition(self) -> None:
+        now = time.monotonic()
+        ptz_subject = TrackedSubject(
+            1,
+            NormalizedRect(0.20, 0.10, 0.14, 0.50),
+            0.92,
+            True,
+            6,
+            now,
+        )
+        audience_subject = TrackedSubject(
+            2,
+            NormalizedRect(0.70, 0.12, 0.12, 0.48),
+            0.90,
+            True,
+            6,
+            now,
+        )
+        config = CameraTrackingConfig(enabled=True).automation
+        config.mode = "subject"
+
+        decision = FramingEngine().decide(
+            config,
+            _snapshot(VideoSourceKey.AUDIENCE, audience_subject),
+            _snapshot(VideoSourceKey.PTZ, ptz_subject),
+            _locked(),
+            (),
+            _Geometry(),
+            current_pose=PtzMotorPose(43700, 33900, 2000),
+            subject_targets_locked=True,
+        )
+
+        self.assertEqual(FramingState.READY, decision.state)
+        self.assertEqual(2, len(decision.target_ids))
+        self.assertLess(decision.target_bounds.x, 0.25)
+        self.assertGreater(decision.target_bounds.x + decision.target_bounds.width, 0.75)
 
     def test_click_to_frame_point_preserves_zoom_and_box_changes_zoom(self) -> None:
         video = _Video(
@@ -570,6 +905,50 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
             )
         )
 
+    def test_subject_detector_loss_holds_without_turning_tracking_off(self) -> None:
+        video = _Video(
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ),
+        )
+        config = CameraTrackingConfig(enabled=True, scene_regions=[_stage()])
+        config.automation.mode = "subject"
+        config.automation.target_loss_disarm_seconds = 1.0
+        service = PtzAutomationService(video, _Panasonic(), config, Path("/tmp"))
+        service._armed = True
+        service._snapshot.armed = True
+        service._snapshot.motion_authority = True
+        service._last_target_seen = 10.0
+
+        service._handle_target_loss(30.0, "detector dropout")
+
+        self.assertTrue(service.snapshot().armed)
+        self.assertEqual(AutomationState.ARMED_WAITING, service.snapshot().state)
+        self.assertIn("Tracking remains on", service.snapshot().message)
+
+    def test_async_visca_override_neutralizes_latched_velocity(self) -> None:
+        async def exercise() -> None:
+            video = _Video(
+                _snapshot(VideoSourceKey.AUDIENCE),
+                _snapshot(VideoSourceKey.PTZ),
+            )
+            panasonic = _Panasonic()
+            config = CameraTrackingConfig(enabled=True, scene_regions=[_stage()])
+            config.automation.mode = "subject"
+            service = PtzAutomationService(video, panasonic, config, Path("/tmp"))
+            service._armed = True
+            service._snapshot.armed = True
+            service._snapshot.motion_authority = True
+            service._last_velocity_command = PtzVelocityCommand(24, 36, 42)
+
+            await service.manual_override_async("VISCA bridge command")
+
+            self.assertFalse(service.snapshot().armed)
+            self.assertEqual([(50, 50)], panasonic.pan_tilt_speed_commands)
+            self.assertEqual([50], panasonic.zoom_speed_commands)
+            self.assertEqual(set(), service._pending_stop_tasks)
+
+        asyncio.run(exercise())
+
     def test_next_absolute_step_waits_for_panasonic_to_settle(self) -> None:
         audience = _snapshot(VideoSourceKey.AUDIENCE)
         video = _Video(audience, _snapshot(VideoSourceKey.PTZ))
@@ -588,6 +967,86 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
 
         self.assertEqual([], panasonic.pan_tilt_commands)
         self.assertEqual([], panasonic.zoom_commands)
+
+    def test_subject_tracking_uses_velocity_without_claiming_absolute_pose(self) -> None:
+        subject = TrackedSubject(
+            1,
+            NormalizedRect(0.66, 0.08, 0.16, 0.40),
+            0.94,
+            False,
+            5,
+            time.monotonic(),
+        )
+        video = _Video(
+            _snapshot(VideoSourceKey.AUDIENCE),
+            _snapshot(VideoSourceKey.PTZ, subject),
+        )
+        panasonic = _Panasonic()
+        config = CameraTrackingConfig(enabled=True, scene_regions=[_stage()])
+        config.automation.mode = "subject"
+        config.automation.target_dwell_seconds = 0.0
+        geometry = _Geometry()
+        service = PtzAutomationService(
+            video,
+            panasonic,
+            config,
+            Path("/tmp"),
+            geometry_loader=lambda _root: geometry,
+        )
+        service._armed = True
+        service._geometry = geometry
+        service._snapshot.armed = True
+        service._snapshot.motion_authority = True
+        service._snapshot.commanded_pose = None
+        service._last_command = time.monotonic()
+
+        service._cycle(service._last_command + 0.7)
+
+        snapshot = service.snapshot()
+        self.assertIsNone(snapshot.commanded_pose)
+        self.assertIsNotNone(snapshot.decision.desired_pose)
+        self.assertEqual([], panasonic.pan_tilt_commands)
+        self.assertTrue(panasonic.pan_tilt_speed_commands)
+
+    def test_in_flight_decision_cannot_overwrite_disarmed_state(self) -> None:
+        audience = _snapshot(VideoSourceKey.AUDIENCE)
+        video = _Video(audience, _snapshot(VideoSourceKey.PTZ))
+        panasonic = _Panasonic()
+        config = CameraTrackingConfig(enabled=True, scene_regions=[_stage()])
+        config.automation.mode = "subject"
+        geometry = _Geometry()
+        service = PtzAutomationService(
+            video,
+            panasonic,
+            config,
+            Path("/tmp"),
+            geometry_loader=lambda _root: geometry,
+        )
+        service._armed = True
+        service._geometry = geometry
+        service._snapshot.armed = True
+        service._snapshot.motion_authority = True
+
+        class _DisarmingFraming:
+            def decide(self, *_args, **_kwargs):
+                service.disarm("Tenveo Auto Focus button turned tracking off")
+                return FramingDecision(
+                    FramingState.WAITING,
+                    "subject",
+                    "No stable subject is visible",
+                )
+
+        service.framing = _DisarmingFraming()
+        service._cycle(time.monotonic())
+
+        snapshot = service.snapshot()
+        self.assertFalse(snapshot.armed)
+        self.assertEqual("disarmed", snapshot.state)
+        self.assertEqual(
+            "Tenveo Auto Focus button turned tracking off",
+            snapshot.message,
+        )
+        self.assertEqual([], panasonic.pan_tilt_commands)
 
     def test_automation_api_is_readable_but_remote_controls_require_token(self) -> None:
         with TemporaryDirectory() as directory:

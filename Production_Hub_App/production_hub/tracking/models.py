@@ -76,6 +76,16 @@ class TrackedSubject:
     last_seen_monotonic: float
 
 
+@dataclass(frozen=True, slots=True)
+class SubjectReferenceTarget:
+    """A cross-camera subject expressed in calibrated reference coordinates."""
+
+    lock_id: int
+    bounds: NormalizedRect
+    confidence: float
+    source: str
+
+
 @dataclass(slots=True)
 class TrackingSnapshot:
     source: VideoSourceKey

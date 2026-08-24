@@ -441,10 +441,11 @@ class CameraSceneRegion(JsonModel):
 
 @dataclass
 class PtzAutomationConfig(JsonModel):
-    """Framing policy and bounded motion limits; arming is runtime-only."""
+    """Framing policy and guarded motion limits; arming is runtime-only."""
 
     mode: str = "off"
     podium_zoom_enabled: bool = True
+    podium_region_horizontal_inset_ratio: float = 0.18
     decision_fps: float = 4.0
     minimum_subject_age_frames: int = 2
     target_padding_x: float = 0.10
@@ -462,6 +463,8 @@ class PtzAutomationConfig(JsonModel):
     group_minimum_occupancy: float = 0.70
     group_maximum_occupancy: float = 0.86
     raised_gesture_maximum_occupancy: float = 0.84
+    off_podium_subject_frame_height: float = 0.88
+    subject_zoom_center_gate_x: float = 0.16
     click_target_width: float = 0.12
     click_target_height: float = 0.34
     target_dwell_seconds: float = 0.35
@@ -474,6 +477,21 @@ class PtzAutomationConfig(JsonModel):
     maximum_pan_step_units: int = 320
     maximum_tilt_step_units: int = 220
     maximum_zoom_step_units: int = 100
+    subject_lock_maximum_match_distance: float = 0.30
+    continuous_pan_max_speed: int = 26
+    continuous_tilt_max_speed: int = 14
+    continuous_zoom_max_speed: int = 8
+    continuous_speed_slew_per_second: float = 18.0
+    continuous_error_smoothing: float = 0.58
+    continuous_velocity_smoothing: float = 0.45
+    continuous_prediction_seconds: float = 0.55
+    continuous_zoom_dwell_seconds: float = 0.60
+    continuous_command_refresh_seconds: float = 0.50
+    audience_handoff_max_seconds: float = 14.0
+    audience_handoff_max_pan_units: int = 2600
+    audience_handoff_max_tilt_units: int = 900
+    audience_handoff_reversal_deadband_units: int = 120
+    continuous_control_revision: int = 1
     manual_override_pan_units: int = 420
     manual_override_tilt_units: int = 320
     manual_override_zoom_units: int = 140
@@ -494,6 +512,9 @@ class PtzAutomationConfig(JsonModel):
         )
         self.podium_subject_frame_height = max(
             0.40, min(0.98, float(self.podium_subject_frame_height))
+        )
+        self.podium_region_horizontal_inset_ratio = max(
+            0.0, min(0.40, float(self.podium_region_horizontal_inset_ratio))
         )
         self.group_frame_height = max(0.30, min(0.95, float(self.group_frame_height)))
         self.adaptive_subject_framing_enabled = bool(
@@ -531,6 +552,14 @@ class PtzAutomationConfig(JsonModel):
         self.raised_gesture_maximum_occupancy = max(
             0.50, min(0.95, float(self.raised_gesture_maximum_occupancy))
         )
+        self.off_podium_subject_frame_height = max(
+            0.65,
+            min(0.95, float(self.off_podium_subject_frame_height)),
+        )
+        self.subject_zoom_center_gate_x = max(
+            0.08,
+            min(0.30, float(self.subject_zoom_center_gate_x)),
+        )
         self.click_target_width = max(0.02, min(0.60, float(self.click_target_width)))
         self.click_target_height = max(0.05, min(0.80, float(self.click_target_height)))
         self.target_dwell_seconds = max(0.0, min(5.0, float(self.target_dwell_seconds)))
@@ -556,6 +585,73 @@ class PtzAutomationConfig(JsonModel):
             ("manual_override_zoom_units", 40, 1000),
         ):
             setattr(self, field_name, max(low, min(high, int(getattr(self, field_name)))))
+        self.subject_lock_maximum_match_distance = max(
+            0.08,
+            min(0.60, float(self.subject_lock_maximum_match_distance)),
+        )
+        self.continuous_control_revision = max(
+            1,
+            int(self.continuous_control_revision),
+        )
+        if self.continuous_control_revision < 2:
+            # Revision 1 produced beautifully smooth motion but capped motor
+            # speed too low to follow a walking subject. These controls are not
+            # user-facing, so migrate persisted revision-1 values atomically.
+            self.continuous_pan_max_speed = 26
+            self.continuous_tilt_max_speed = 14
+            self.continuous_zoom_max_speed = 8
+            self.continuous_speed_slew_per_second = 18.0
+            self.continuous_error_smoothing = 0.58
+            self.continuous_velocity_smoothing = 0.45
+            self.continuous_prediction_seconds = 0.55
+            self.continuous_zoom_dwell_seconds = 0.60
+            self.continuous_control_revision = 2
+        for field_name, low, high in (
+            ("continuous_pan_max_speed", 2, 30),
+            ("continuous_tilt_max_speed", 2, 30),
+            ("continuous_zoom_max_speed", 2, 15),
+        ):
+            setattr(self, field_name, max(low, min(high, int(getattr(self, field_name)))))
+        self.continuous_speed_slew_per_second = max(
+            2.0,
+            min(30.0, float(self.continuous_speed_slew_per_second)),
+        )
+        self.continuous_error_smoothing = max(
+            0.10,
+            min(1.0, float(self.continuous_error_smoothing)),
+        )
+        self.continuous_velocity_smoothing = max(
+            0.10,
+            min(1.0, float(self.continuous_velocity_smoothing)),
+        )
+        self.continuous_prediction_seconds = max(
+            0.0,
+            min(1.5, float(self.continuous_prediction_seconds)),
+        )
+        self.continuous_zoom_dwell_seconds = max(
+            0.0,
+            min(3.0, float(self.continuous_zoom_dwell_seconds)),
+        )
+        self.continuous_command_refresh_seconds = max(
+            0.20,
+            min(2.0, float(self.continuous_command_refresh_seconds)),
+        )
+        self.audience_handoff_max_seconds = max(
+            1.0,
+            min(20.0, float(self.audience_handoff_max_seconds)),
+        )
+        self.audience_handoff_max_pan_units = max(
+            200,
+            min(4000, int(self.audience_handoff_max_pan_units)),
+        )
+        self.audience_handoff_max_tilt_units = max(
+            120,
+            min(2400, int(self.audience_handoff_max_tilt_units)),
+        )
+        self.audience_handoff_reversal_deadband_units = max(
+            20,
+            min(600, int(self.audience_handoff_reversal_deadband_units)),
+        )
         self.manual_override_grace_seconds = max(
             1.0, min(10.0, float(self.manual_override_grace_seconds))
         )
@@ -808,6 +904,9 @@ class UiPreferences(JsonModel):
     keep_running_after_window_close: bool = True
     show_menu_bar_icon: bool = True
     launch_at_login: bool = False
+    # [x, y, width, height] in Qt logical screen coordinates. An empty value
+    # means the floating Click-to-Frame panel has not been placed yet.
+    click_to_frame_window_geometry: list[int] = field(default_factory=list)
 
 
 @dataclass

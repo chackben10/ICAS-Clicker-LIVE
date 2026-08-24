@@ -35,6 +35,7 @@ from production_hub.tracking.service import (
     PersonTrackingService,
     _deduplicate_candidates,
     _region_detection_windows,
+    _subject_handoff_detection_windows,
 )
 from production_hub.ui.pages.camera_control_page import CameraControlPage
 from production_hub.video.frame_broker import LatestFrameBroker
@@ -197,6 +198,27 @@ class CameraTrackingPhaseTwoTests(unittest.TestCase):
         self.assertTrue(tracking.analyze_ptz)
         self.assertLessEqual(tracking.analysis_fps, 4.0)
 
+    def test_camera_page_does_not_cancel_external_pending_arm(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            page = CameraControlPage(context)
+            tracking = context.config.integrations.camera_tracking
+            tracking.enabled = True
+            tracking.automation.mode = "subject"
+            context.ptz_automation.reconfigure(tracking)
+            context.ptz_automation.set_arm_requested(True, owner="test_visca")
+
+            page.refresh_video_status()
+
+            self.assertEqual("subject", tracking.automation.mode)
+            self.assertEqual("subject", page.automation_mode.currentData())
+            self.assertTrue(context.ptz_automation.arm_requested)
+            context.ptz_automation.set_arm_requested(False, owner="test_visca")
+            page.close()
+            context.video.shutdown()
+
     def test_association_keeps_identity_and_selection_across_small_motion(self) -> None:
         associator = SubjectAssociator()
         first = associator.update(
@@ -211,6 +233,53 @@ class CameraTrackingPhaseTwoTests(unittest.TestCase):
         )
         self.assertEqual(track_id, second[0].track_id)
         self.assertTrue(second[0].selected)
+
+    def test_association_smooths_detector_jitter_and_holds_short_dropouts(self) -> None:
+        associator = SubjectAssociator(maximum_missed_frames=2)
+        first = associator.update(
+            [PersonCandidate(NormalizedRect(0.40, 0.20, 0.20, 0.60), 0.90)]
+        )
+        track_id = first[0].track_id
+
+        jittered = associator.update(
+            [PersonCandidate(NormalizedRect(0.42, 0.19, 0.21, 0.59), 0.94)]
+        )
+        self.assertEqual(track_id, jittered[0].track_id)
+        self.assertGreater(jittered[0].bounds.x, 0.40)
+        self.assertLess(jittered[0].bounds.x, 0.42)
+
+        self.assertEqual(track_id, associator.update([])[0].track_id)
+        self.assertEqual(track_id, associator.update([])[0].track_id)
+        self.assertEqual((), associator.update([]))
+
+    def test_single_subject_association_survives_large_camera_motion(self) -> None:
+        associator = SubjectAssociator(maximum_center_distance=0.18)
+        first = associator.update(
+            [PersonCandidate(NormalizedRect(0.05, 0.20, 0.16, 0.60), 0.90)]
+        )
+
+        moved = associator.update(
+            [PersonCandidate(NormalizedRect(0.32, 0.20, 0.16, 0.60), 0.92)]
+        )
+
+        self.assertEqual(first[0].track_id, moved[0].track_id)
+
+    def test_moving_camera_does_not_show_stale_track_beside_fresh_track(self) -> None:
+        associator = SubjectAssociator(
+            maximum_center_distance=0.18,
+            maximum_missed_frames=4,
+            retain_missed_with_active=False,
+        )
+        first = associator.update(
+            [PersonCandidate(NormalizedRect(0.02, 0.20, 0.14, 0.60), 0.90)]
+        )
+
+        moved = associator.update(
+            [PersonCandidate(NormalizedRect(0.70, 0.20, 0.14, 0.60), 0.92)]
+        )
+
+        self.assertEqual(1, len(moved))
+        self.assertNotEqual(first[0].track_id, moved[0].track_id)
 
     def test_tracking_service_reports_and_selects_subjects(self) -> None:
         broker = LatestFrameBroker()
@@ -301,6 +370,43 @@ class CameraTrackingPhaseTwoTests(unittest.TestCase):
 
         self.assertEqual(1, len(selected))
         self.assertEqual(0.91, selected[0].confidence)
+
+    def test_subject_handoff_adds_bounded_stage_crops_to_whole_frame(self) -> None:
+        class CroppingDetector:
+            backend_name = "Crop test detector"
+            supports_region_cropping = True
+
+            def __init__(self) -> None:
+                self.sizes: list[tuple[int, int]] = []
+
+            def detect(self, image: QImage) -> list[PersonCandidate]:
+                self.sizes.append((image.width(), image.height()))
+                return []
+
+        config = CameraTrackingConfig(enabled=True)
+        config.automation.mode = "subject"
+        detector = CroppingDetector()
+        service = PersonTrackingService(
+            LatestFrameBroker(),
+            config,
+            detector_factory=lambda _config: detector,
+        )
+        image = QImage(1000, 600, QImage.Format.Format_RGB32)
+
+        candidates = service._detect_candidates(
+            VideoSourceKey.AUDIENCE,
+            image,
+            detector,
+            (),
+        )
+
+        self.assertEqual([], candidates)
+        windows = _subject_handoff_detection_windows()
+        self.assertEqual(3, len(windows))
+        self.assertEqual((1000, 600), detector.sizes[0])
+        self.assertEqual(4, len(detector.sizes))
+        self.assertTrue(all(height == 312 for _width, height in detector.sizes[1:]))
+        self.assertTrue(all(width == 400 for width, _height in detector.sizes[1:]))
 
     def _wait_for_sequence(
         self,
