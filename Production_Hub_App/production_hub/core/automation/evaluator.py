@@ -30,7 +30,7 @@ async def evaluate_condition(context: Any, condition: dict[str, Any], action_con
 
     if condition_type == "runtime.auto_show_enabled":
         expected = boolish(params.get("enabled", True))
-        actual = bool(context.runtime_state_repo.load().auto_show_enabled)
+        actual = context.runtime_state_repo.auto_show_enabled()
         return actual == expected, f"auto_show={actual}"
 
     if condition_type == "propresenter.current_look":

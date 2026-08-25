@@ -39,6 +39,12 @@ TRIGGER_SPECS: tuple[TriggerSpec, ...] = (
         "Run once for each new presentation UUID and slide index.",
         True,
     ),
+    TriggerSpec(
+        "propresenter.cue_changed",
+        "ProPresenter rendered cue changes",
+        "Run once for each newly rendered cue, including dynamic Bible verses.",
+        True,
+    ),
 )
 
 

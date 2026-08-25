@@ -82,6 +82,11 @@ from production_hub.video.models import VideoSourceKey, VideoSourceSnapshot
 
 CLICK_TO_FRAME_DEFAULT_WIDTH = 520
 CLICK_TO_FRAME_DEFAULT_HEIGHT = 340
+# The operator views this image at roughly 500-900 px wide.  Rendering the
+# calibrated panorama at its 1800 px source width wastes several million OpenCV
+# pixel operations per second without adding visible detail.
+CLICK_TO_FRAME_RENDER_MAX_WIDTH = 960
+CLICK_TO_FRAME_COMPOSITE_MIN_SECONDS = 0.25
 # Crop the generated sanctuary panorama to the useful stage/pew interaction
 # area shown by the operator: remove 5.5% from each side and the lower 36%.
 CLICK_TO_FRAME_VIEWPORT = (0.055, 0.0, 0.89, 0.64)
@@ -664,7 +669,7 @@ class ClickToFrameWindow(QWidget):
         self.tracking_button.clicked.connect(self.tracking_toggle_requested.emit)
         layout.addWidget(self.tracking_button)
         self.refresh_timer = QTimer(self)
-        self.refresh_timer.setInterval(100)
+        self.refresh_timer.setInterval(125)
         self.refresh_timer.timeout.connect(self.refresh_frame)
         self.geometry_save_timer = QTimer(self)
         self.geometry_save_timer.setSingleShot(True)
@@ -912,7 +917,6 @@ class CameraControlPage(QWidget):
         self._click_last_pose_poll_monotonic = 0.0
         self.status = QLabel("Ready")
         self.status.setObjectName("StatusText")
-        self.context.video.initialize_qt()
         self._last_recording_state = False
         self._local_devices = []
         self.build()
@@ -932,6 +936,7 @@ class CameraControlPage(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         if hasattr(self, "refresh_timer"):
+            self._ensure_video_initialized()
             self._update_preview_activity()
             tracking_requested = (
                 self.context.config.integrations.camera_tracking.automation.mode
@@ -948,6 +953,26 @@ class CameraControlPage(QWidget):
             self._update_calibration_activity(page_visible=True)
             self.refresh_timer.start()
             self.refresh_video_status()
+
+    def _ensure_video_initialized(self) -> None:
+        """Start camera services only after a camera feature is visible.
+
+        In particular, this keeps macOS's permission sheet from interrupting
+        construction of the main window.  A denied camera permission therefore
+        blocks only the local PTZ feed, not Production Hub itself.
+        """
+        if self.context.video.qt_initialized:
+            return
+        self.context.video.initialize_qt()
+        if hasattr(self, "source_type_boxes"):
+            self.refresh_source_options(discover_ndi=False)
+            # macOS may not publish the local-device list until its camera
+            # permission callback has completed. Refresh the selector after
+            # that asynchronous handoff without delaying the visible window.
+            QTimer.singleShot(
+                1_000,
+                lambda: self.refresh_source_options(discover_ndi=False),
+            )
 
     def hideEvent(self, event) -> None:
         if hasattr(self, "refresh_timer"):
@@ -1576,6 +1601,7 @@ class CameraControlPage(QWidget):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory)))
 
     def request_camera_calibration(self) -> None:
+        self._ensure_video_initialized()
         self.context.ptz_automation.disarm("Camera calibration was requested")
         if self._calibration_process is not None and self._calibration_process.state() != QProcess.ProcessState.NotRunning:
             self.calibration_process_status.setText("Camera calibration is already running.")
@@ -2027,6 +2053,8 @@ class CameraControlPage(QWidget):
         show_errors: bool = True,
     ) -> tuple[bool, str]:
         enabled = bool(enabled)
+        if enabled:
+            self._ensure_video_initialized()
         if not enabled:
             self._pending_subject_arm_until = 0.0
             self.context.ptz_automation.disarm("Subject Tracking was turned off")
@@ -2254,6 +2282,27 @@ class CameraControlPage(QWidget):
         else:
             try:
                 map_x, map_y, valid = mosaic.warp_mesh.reference_maps(mosaic)
+                if image.width() > CLICK_TO_FRAME_RENDER_MAX_WIDTH:
+                    render_height = max(
+                        1,
+                        round(
+                            image.height()
+                            * CLICK_TO_FRAME_RENDER_MAX_WIDTH
+                            / image.width()
+                        ),
+                    )
+                    render_size = (
+                        CLICK_TO_FRAME_RENDER_MAX_WIDTH,
+                        render_height,
+                    )
+                    image = image.scaled(
+                        *render_size,
+                        Qt.AspectRatioMode.IgnoreAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    map_x = cv2.resize(map_x, render_size, interpolation=cv2.INTER_LINEAR)
+                    map_y = cv2.resize(map_y, render_size, interpolation=cv2.INTER_LINEAR)
+                    valid = cv2.resize(valid, render_size, interpolation=cv2.INTER_NEAREST)
                 # Triangle rasterization can leave sub-pixel cracks. Close
                 # those before edge feathering so the live image reads as one
                 # clean surface rather than a collection of mesh panels.
@@ -2263,7 +2312,8 @@ class CameraControlPage(QWidget):
                     np.ones((7, 7), dtype=np.uint8),
                 )
                 distance = cv2.distanceTransform(closed, cv2.DIST_L2, 3)
-                alpha = np.clip(distance / 18.0, 0.0, 1.0).astype(np.float32)
+                feather_pixels = max(6.0, 18.0 * image.width() / mosaic.width)
+                alpha = np.clip(distance / feather_pixels, 0.0, 1.0).astype(np.float32)
                 self._click_mosaic = mosaic
                 self._click_mosaic_image = image
                 self._click_mosaic_bgr = qimage_to_bgr(image)
@@ -2354,7 +2404,11 @@ class CameraControlPage(QWidget):
         if self._click_composite_image is not None and not (
             pose_changed or lock_changed or version_changed or alignment_changed
         ):
-            if not source_changed or now - self._click_composite_last_render_monotonic < 0.20:
+            if (
+                not source_changed
+                or now - self._click_composite_last_render_monotonic
+                < CLICK_TO_FRAME_COMPOSITE_MIN_SECONDS
+            ):
                 return QImage(self._click_composite_image), self._click_render_sequence
 
         composite = QImage(base)
@@ -2847,6 +2901,7 @@ class CameraControlPage(QWidget):
         self.click_to_frame_window.tracking_button.setToolTip(message)
 
     def show_click_to_frame_window(self) -> None:
+        self._ensure_video_initialized()
         self.click_to_frame_window.show()
         self.floating_click_button.setText("Hide Floating Click-to-Frame Window")
         self._update_preview_activity()
@@ -3796,6 +3851,7 @@ class CameraControlPage(QWidget):
         selector.setCurrentText(current)
 
     def connect_video_source(self, source: VideoSourceKey) -> None:
+        self._ensure_video_initialized()
         source_type = str(self.source_type_boxes[source].currentData())
         selector = self.source_selectors[source]
         identifier = selector.currentText().strip() if source_type == "ndi" else selector.currentData()

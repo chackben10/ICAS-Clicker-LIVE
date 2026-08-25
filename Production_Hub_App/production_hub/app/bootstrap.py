@@ -10,6 +10,7 @@ from typing import Any
 from production_hub.core.automation.engine import AutomationEngine
 from production_hub.core.automation.catalog import normalize_trigger
 from production_hub.core.config.defaults import (
+    AUTO_SHOW_BIBLE_AUTOMATION_KEY,
     PRESENTATION_FOCUS_AUTOMATION_KEY,
     build_default_automations,
     build_default_endpoints,
@@ -336,10 +337,20 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
             repaired.append(automation)
             continue
         automation.trigger = normalize_trigger(automation.trigger)
-        if automation.key == "auto_show_slides" and automation.interval_seconds <= 0:
+        if automation.key == "auto_show_slides" and automation.interval_seconds < 0.25:
             automation.interval_seconds = default.interval_seconds
-        if automation.key == "bible_look_enforcement" and automation.trigger == "interval":
+        if automation.key == AUTO_SHOW_BIBLE_AUTOMATION_KEY and automation.interval_seconds < 0.25:
+            automation.interval_seconds = default.interval_seconds
+        if automation.key == PRESENTATION_FOCUS_AUTOMATION_KEY and automation.interval_seconds < 0.5:
+            automation.interval_seconds = default.interval_seconds
+        if automation.key == "slide_label_audio_sync" and automation.interval_seconds <= 0:
+            automation.interval_seconds = default.interval_seconds
+        if automation.key in {
+            "bible_look_enforcement",
+            AUTO_SHOW_BIBLE_AUTOMATION_KEY,
+        } and automation.trigger != default.trigger:
             automation.trigger = default.trigger
+        if automation.key == "bible_look_enforcement" and automation.trigger == default.trigger:
             automation.conditions = [dict(condition) for condition in default.conditions]
             automation.rules = dict(default.rules)
         if not automation.conditions and default.conditions:
@@ -353,7 +364,10 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
                 automation.actions = [ActionDefinition("propresenter.audio_from_slide_label")]
         repaired.append(automation)
     existing = {automation.key for automation in repaired}
-    for required_key in (PRESENTATION_FOCUS_AUTOMATION_KEY,):
+    for required_key in (
+        PRESENTATION_FOCUS_AUTOMATION_KEY,
+        AUTO_SHOW_BIBLE_AUTOMATION_KEY,
+    ):
         if required_key not in existing:
             repaired.append(defaults[required_key])
     return repaired

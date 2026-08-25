@@ -21,6 +21,7 @@ from production_hub.integrations.midi.models import MidiMapping
 
 
 PRESENTATION_FOCUS_AUTOMATION_KEY = "presentation_macro_after_presentation_look"
+AUTO_SHOW_BIBLE_AUTOMATION_KEY = "auto_show_bible_slides"
 
 
 PRESENTATIONS = [
@@ -346,7 +347,7 @@ def build_default_automations() -> list[AutomationDefinition]:
         AutomationDefinition(
             key="bible_look_enforcement",
             name="Bible Look Enforcement",
-            trigger="propresenter.presentation_changed",
+            trigger="propresenter.cue_changed",
             enabled=True,
             interval_seconds=0.75,
             cooldown_seconds=2.5,
@@ -379,6 +380,7 @@ def build_default_automations() -> list[AutomationDefinition]:
             name="Slide Label Audio Sync",
             trigger="propresenter.slide_changed",
             enabled=True,
+            interval_seconds=0.5,
             debounce_seconds=0.5,
             conditions=[{"condition_type": "always", "params": {}}],
             actions=[ActionDefinition("propresenter.audio_from_slide_label")],
@@ -389,7 +391,7 @@ def build_default_automations() -> list[AutomationDefinition]:
             name="Presentation Macro After Presentation Look",
             trigger="propresenter.slide_changed",
             enabled=True,
-            interval_seconds=0.2,
+            interval_seconds=0.5,
             debounce_seconds=10.0,
             rules={
                 "operator": "or",
@@ -416,7 +418,7 @@ def build_default_automations() -> list[AutomationDefinition]:
             name="Auto Show Slides",
             trigger="propresenter.slide_changed",
             enabled=True,
-            interval_seconds=0.2,
+            interval_seconds=0.25,
             debounce_seconds=0.1,
             conditions=[{"condition_type": "runtime.auto_show_enabled", "params": {"enabled": True}}],
             actions=[
@@ -424,5 +426,28 @@ def build_default_automations() -> list[AutomationDefinition]:
                 ActionDefinition("obs.set_scene", {"scene": "ProPresenter Input", "transition_policy": True}),
             ],
             description="Clear announcements and move OBS to the ProPresenter Input scene when Auto Show is enabled.",
+        ),
+        AutomationDefinition(
+            key=AUTO_SHOW_BIBLE_AUTOMATION_KEY,
+            name="Auto Show Bible Slides",
+            trigger="propresenter.cue_changed",
+            enabled=True,
+            interval_seconds=0.25,
+            debounce_seconds=0.1,
+            conditions=[
+                {"condition_type": "runtime.auto_show_enabled", "params": {"enabled": True}},
+                {
+                    "condition_type": "propresenter.active_presentation",
+                    "params": {"group_count": "1", "first_group_contains": ":"},
+                },
+            ],
+            actions=[
+                ActionDefinition("propresenter.clear_announcements"),
+                ActionDefinition("obs.set_scene", {"scene": "ProPresenter Input", "transition_policy": True}),
+            ],
+            description=(
+                "When Auto Show is enabled, detect each rendered Bible verse, verify the active "
+                "presentation structure, clear announcements, and move OBS to ProPresenter Input."
+            ),
         ),
     ]

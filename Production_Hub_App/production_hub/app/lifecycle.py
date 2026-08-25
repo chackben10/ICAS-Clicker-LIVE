@@ -35,6 +35,7 @@ class ApiServerHandle:
 
 
 LEGACY_API_PORTS = (17777, 5000)
+AUTO_SHOW_AUTOMATION_KEYS = frozenset({"auto_show_slides", "auto_show_bible_slides"})
 
 
 @dataclass
@@ -375,8 +376,20 @@ async def _run_due_automations(
     import time
 
     now = time.monotonic()
+    if context.automation_engine.paused:
+        trigger_monitor.reset()
+        return
+
     trigger_monitor.forget_missing(set(context.automation_engine.definitions))
+    auto_show_enabled = context.runtime_state_repo.auto_show_enabled()
+    pending_runs: list[tuple[str, dict[str, Any]]] = []
     for definition in list(context.automation_engine.definitions.values()):
+        if not definition.enabled:
+            trigger_monitor.forget(definition.key)
+            continue
+        if definition.key in AUTO_SHOW_AUTOMATION_KEYS and not auto_show_enabled:
+            trigger_monitor.forget(definition.key)
+            continue
         register_generic_automation_handler(context, definition)
         try:
             due, action_context = await trigger_monitor.due(definition, now)
@@ -386,7 +399,11 @@ async def _run_due_automations(
                 state.last_condition_result = f"trigger_unavailable:{exc}"
             continue
         if due:
-            await context.automation_engine.run_once(definition.key, action_context)
+            pending_runs.append((definition.key, action_context))
+
+    for key, action_context in pending_runs:
+        enriched_context = trigger_monitor.enrich_from_snapshot_cycle(action_context, now)
+        await context.automation_engine.run_once(key, enriched_context)
 
 
 async def _background_services_main(context: ApplicationContext, stop_event: threading.Event) -> None:
@@ -405,6 +422,14 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
         while not stop_event.is_set():
             await asyncio.sleep(0.25)
             await _run_due_automations(context, trigger_monitor)
+            try:
+                context.runtime_state_repo.flush_if_due()
+            except Exception as exc:
+                context.logger.warning(
+                    "runtime_state_flush_failed",
+                    "Runtime telemetry could not be persisted",
+                    error=str(exc),
+                )
             await poll_due_input_lists(
                 context,
                 next_list_due,
@@ -457,6 +482,14 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
             midi_receiver.stop()
         if listener:
             await listener.stop()
+        try:
+            context.runtime_state_repo.flush()
+        except Exception as exc:
+            context.logger.warning(
+                "runtime_state_flush_failed",
+                "Runtime telemetry could not be persisted during shutdown",
+                error=str(exc),
+            )
 
 
 def start_background_services(context: ApplicationContext) -> BackgroundServicesHandle:

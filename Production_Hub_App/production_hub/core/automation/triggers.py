@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,6 +26,18 @@ def _presentation_index(data: dict[str, Any]) -> tuple[int | None, str, str, int
     )
 
 
+def _slide_status(data: dict[str, Any]) -> tuple[str, str, str]:
+    current = data.get("current")
+    if not isinstance(current, dict):
+        return "", "", ""
+    identifier = current.get("id")
+    identifier = identifier if isinstance(identifier, dict) else {}
+    uuid = str(identifier.get("uuid") or current.get("uuid") or "").strip()
+    text = str(current.get("text") or "")
+    notes = str(current.get("notes") or "")
+    return uuid, text, notes
+
+
 async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[str, Any]]:
     trigger_type = normalize_trigger(trigger_type)
     if trigger_type == "propresenter.look_changed":
@@ -43,10 +56,11 @@ async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[s
             f"{group.get('uuid', '')}:{group.get('name', '')}" for group in groups if isinstance(group, dict)
         )
         uuid = str(identifier.get("uuid") or "")
-        return f"{uuid}|{group_signature}", {
+        name = str(identifier.get("name") or "")
+        return f"{uuid}:{name}|{group_signature}", {
             "trigger": trigger_type,
             "presentation_uuid": uuid,
-            "presentation_name": str(identifier.get("name") or ""),
+            "presentation_name": name,
             "group_count": len(groups),
             "first_group_name": str(groups[0].get("name") or "") if groups and isinstance(groups[0], dict) else "",
             "active_presentation": active,
@@ -70,6 +84,26 @@ async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[s
             "has_active_slide": bool(uuid and index is not None),
         }
 
+    if trigger_type == "propresenter.cue_changed":
+        data = await context.propresenter.slide_status()
+        uuid, text, notes = _slide_status(data if isinstance(data, dict) else {})
+        # Cue UUIDs are stable for normal slides and unique for every verse in
+        # ProPresenter's dynamic Bible tab.  Text is included as a defensive
+        # fallback for older ProPresenter builds that omit or reuse the UUID.
+        text_fingerprint = hashlib.blake2s(
+            f"{text}\0{notes}".encode("utf-8"),
+            digest_size=10,
+        ).hexdigest() if text or notes else ""
+        signature = f"{uuid}:{text_fingerprint}" if uuid or text_fingerprint else "no-active-cue"
+        return signature, {
+            "trigger": trigger_type,
+            "slide_uuid": uuid,
+            "slide_text": text,
+            "slide_notes": notes,
+            "slide_status": data,
+            "has_active_slide": bool(uuid or text),
+        }
+
     return "", {"trigger": trigger_type}
 
 
@@ -89,9 +123,48 @@ class AutomationTriggerMonitor:
     def __init__(self, context: Any) -> None:
         self.context = context
         self.states: dict[str, TriggerState] = {}
+        self._snapshot_cycle_at: float | None = None
+        self._snapshot_cache: dict[str, tuple[str, dict[str, Any]]] = {}
 
     def forget_missing(self, keys: set[str]) -> None:
         self.states = {key: value for key, value in self.states.items() if key in keys}
+
+    def forget(self, key: str) -> None:
+        self.states.pop(key, None)
+
+    def reset(self) -> None:
+        self.states.clear()
+        self._snapshot_cache.clear()
+        self._snapshot_cycle_at = None
+
+    def _start_snapshot_cycle(self, now: float) -> None:
+        if self._snapshot_cycle_at != now:
+            self._snapshot_cycle_at = now
+            self._snapshot_cache = {}
+
+    async def _snapshot(self, trigger_type: str, now: float) -> tuple[str, dict[str, Any]]:
+        self._start_snapshot_cycle(now)
+        cached = self._snapshot_cache.get(trigger_type)
+        if cached is None:
+            signature, event_context = await trigger_snapshot(self.context, trigger_type)
+            cached = (signature, dict(event_context))
+            self._snapshot_cache[trigger_type] = cached
+        signature, event_context = cached
+        return signature, dict(event_context)
+
+    def enrich_from_snapshot_cycle(
+        self,
+        action_context: dict[str, Any],
+        now: float,
+    ) -> dict[str, Any]:
+        """Reuse data already fetched during this scheduler cycle for conditions."""
+        self._start_snapshot_cycle(now)
+        enriched = dict(action_context)
+        for _signature, cached_context in self._snapshot_cache.values():
+            for key in ("current_look", "active_presentation"):
+                if key in cached_context:
+                    enriched.setdefault(key, cached_context[key])
+        return enriched
 
     async def due(
         self,
@@ -122,7 +195,7 @@ class AutomationTriggerMonitor:
         if now < state.next_poll_at:
             return False, {}
         state.next_poll_at = now + max(0.1, poll_interval)
-        signature, event_context = await trigger_snapshot(self.context, trigger_type)
+        signature, event_context = await self._snapshot(trigger_type, now)
         if state.observed_signature is None:
             state.observed_signature = signature
             return False, {}
@@ -138,6 +211,9 @@ class AutomationTriggerMonitor:
         context = dict(state.pending_context)
         state.pending_signature = None
         state.pending_context = {}
-        if trigger_type == "propresenter.slide_changed" and not context.get("has_active_slide"):
+        if trigger_type in {
+            "propresenter.slide_changed",
+            "propresenter.cue_changed",
+        } and not context.get("has_active_slide"):
             return False, {}
         return True, context

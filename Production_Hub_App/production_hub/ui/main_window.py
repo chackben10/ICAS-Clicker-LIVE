@@ -327,8 +327,7 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def quit_from_tray(self) -> None:
-        self._quitting = True
-        self.close()
+        self.quit_application()
 
     def setup_menu_bar(self) -> None:
         self.setup_file_menu()
@@ -491,8 +490,14 @@ class MainWindow(QMainWindow):
         self.camera_control_page.request_camera_calibration()
 
     def quit_from_menu(self) -> None:
+        self.quit_application()
+
+    def quit_application(self) -> None:
         self._quitting = True
         self.close()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
 
     def show_about_dialog(self) -> None:
         QMessageBox.about(

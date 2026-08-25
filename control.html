@@ -159,7 +159,7 @@ transform: translateY(1px) scale(0.995);
 
 .remote-controls {
 display: grid;
-grid-template-columns: repeat(3, minmax(0, 1fr));
+grid-template-columns: minmax(135px, 0.9fr) minmax(150px, 1fr) minmax(290px, 1.45fr);
 gap: calc(8px * var(--btn-scale));
 margin: calc(10px * var(--btn-scale)) 0 calc(4px * var(--btn-scale));
 }
@@ -184,15 +184,21 @@ user-select: none;
 
 .remote-focus-setting {
 cursor: default;
-flex-direction: column;
-align-items: stretch;
-gap: calc(6px * var(--btn-scale));
+flex-direction: row;
+align-items: center;
+gap: calc(10px * var(--btn-scale));
+transition: opacity 0.15s ease;
+}
+
+.remote-focus-setting > .remote-switch-label {
+white-space: nowrap;
 }
 
 .remote-focus-actions {
 display: flex;
+flex: 0 0 auto;
 align-items: center;
-justify-content: space-between;
+justify-content: flex-end;
 gap: calc(7px * var(--btn-scale));
 }
 
@@ -232,6 +238,10 @@ outline-offset: 1px;
 
 .focus-toggle:has(.switch-input:disabled),
 .focus-time-input:disabled {
+cursor: not-allowed;
+}
+
+.remote-focus-setting:has(.switch-input:disabled) {
 opacity: 0.55;
 cursor: not-allowed;
 }
@@ -981,7 +991,7 @@ transform: translateX(calc(12px * var(--btn-scale)));
 }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 660px) {
 .remote-controls {
 grid-template-columns: repeat(2, minmax(0, 1fr));
 }

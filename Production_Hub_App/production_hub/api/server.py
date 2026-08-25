@@ -200,7 +200,7 @@ def create_app(context):
                     request_id=request_id,
                     error=error,
                 )
-                context.runtime_state_repo.update(lambda state: state.add_request(record))
+                context.runtime_state_repo.record_request(record)
             except Exception:
                 pass
 

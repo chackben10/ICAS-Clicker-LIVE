@@ -17,8 +17,7 @@ def is_clicker_presentation_trigger(method: str, path: str) -> bool:
 
 
 def presentation_activation_enabled(context: Any) -> bool:
-    state = context.runtime_state_repo.load()
-    return bool(state.clicker_presentation_activation_enabled)
+    return context.runtime_state_repo.clicker_presentation_activation_enabled()
 
 
 def presentation_activation_disabled_detail() -> dict[str, object]:

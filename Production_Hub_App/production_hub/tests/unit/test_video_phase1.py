@@ -5,7 +5,7 @@ import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -75,6 +75,40 @@ class VideoPhaseOneTests(unittest.TestCase):
         finally:
             source._camera_permission_status = original
 
+    def test_local_camera_capture_suspends_when_no_feature_needs_frames(self) -> None:
+        class Camera:
+            def __init__(self) -> None:
+                self.active = True
+                self.starts = 0
+                self.stops = 0
+
+            def isActive(self) -> bool:
+                return self.active
+
+            def start(self) -> None:
+                self.active = True
+                self.starts += 1
+
+            def stop(self) -> None:
+                self.active = False
+                self.stops += 1
+
+        broker = LatestFrameBroker()
+        source = LocalCameraVideoSource(broker)
+        camera = Camera()
+        source.camera = camera
+        source._output_active = True
+
+        source.set_output_active(False)
+        self.assertEqual(1, camera.stops)
+        self.assertFalse(camera.active)
+        self.assertEqual(VideoSourceState.STOPPED, broker.snapshot(VideoSourceKey.PTZ).state)
+
+        source.set_output_active(True)
+        self.assertEqual(1, camera.starts)
+        self.assertTrue(camera.active)
+        source.camera = None
+
     def test_camera_control_preset_recall_uses_panasonic_service(self) -> None:
         with TemporaryDirectory() as directory:
             context = build_context(Path(directory))
@@ -94,6 +128,19 @@ class VideoPhaseOneTests(unittest.TestCase):
                 APP.processEvents()
                 time.sleep(0.01)
             self.assertIn("Preset 07 recalled", page.status.text())
+            page.close()
+            context.video.shutdown()
+
+    def test_camera_page_construction_does_not_request_camera_access(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            with patch.object(context.video, "initialize_qt") as initialize:
+                page = CameraControlPage(context)
+                initialize.assert_not_called()
+                page._ensure_video_initialized()
+                initialize.assert_called_once_with()
             page.close()
             context.video.shutdown()
 
@@ -119,6 +166,33 @@ class VideoPhaseOneTests(unittest.TestCase):
             source._matches_configured_source("OBS-MAC (Production Hub - Audience Cam)")
         )
         self.assertFalse(source._matches_configured_source("Production Hub - PTZ Cam"))
+
+    def test_ndi_receiver_does_not_drain_frames_while_output_is_inactive(self) -> None:
+        class Library:
+            def __init__(self) -> None:
+                self.capture_calls = 0
+                self.destroy_calls = 0
+
+            def ph_ndi_receiver_capture_video(self, *_args) -> int:
+                self.capture_calls += 1
+                return 0
+
+            def ph_ndi_receiver_destroy(self, _receiver) -> None:
+                self.destroy_calls += 1
+
+        class Runtime:
+            def __init__(self) -> None:
+                self.library = Library()
+
+        source = AudienceNDISource(
+            LatestFrameBroker(),
+            NDISourceSettings("Production Hub - Audience Cam"),
+        )
+        runtime = Runtime()
+
+        self.assertIsNone(source._capture_until_reconnect(runtime, object()))
+        self.assertEqual(0, runtime.library.capture_calls)
+        self.assertEqual(1, runtime.library.destroy_calls)
 
     def test_diagnostic_recording_can_be_replayed(self) -> None:
         with TemporaryDirectory() as directory:

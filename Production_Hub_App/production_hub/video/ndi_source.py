@@ -111,6 +111,15 @@ class NDIVideoSource:
             with self._lock:
                 self._runtime_version = runtime.version
             while not self._stop_event.is_set():
+                if not self._output_active.is_set():
+                    self.broker.set_status(
+                        self.settings.source,
+                        VideoSourceState.STOPPED,
+                        f"{self.settings.display_name} capture is suspended until a camera feature is in use.",
+                        source_name=self.settings.source_name,
+                    )
+                    self._output_active.wait(0.5)
+                    continue
                 if receiver is None:
                     receiver = self._discover_and_connect(runtime)
                     if receiver is None:
@@ -161,12 +170,11 @@ class NDIVideoSource:
         last_native_frame = time.monotonic()
         last_publish = 0.0
         last_performance_check = 0.0
-        last_status_publish = 0.0
         received_frames = 0
         dropped_frames = 0
         minimum_interval = 1.0 / max(1.0, self.settings.publish_fps)
 
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and self._output_active.is_set():
             frame = NativeVideoFrame()
             result = int(runtime.library.ph_ndi_receiver_capture_video(receiver, 250, ctypes.byref(frame)))
             now = time.monotonic()
@@ -203,15 +211,6 @@ class NDIVideoSource:
                         received_frames = max(received_frames, int(performance.total_video_frames))
                         dropped_frames = max(0, int(performance.dropped_video_frames))
                     last_performance_check = now
-                if now - last_status_publish >= 1.0 and not self._output_active.is_set():
-                    self.broker.set_status(
-                        self.settings.source,
-                        VideoSourceState.RUNNING,
-                        "Receiving video; preview is suspended",
-                        received_frames=received_frames,
-                        dropped_frames=dropped_frames,
-                    )
-                    last_status_publish = now
                 if not self._output_active.is_set():
                     continue
                 if now - last_publish < minimum_interval:

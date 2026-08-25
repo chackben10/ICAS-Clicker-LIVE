@@ -298,6 +298,7 @@ def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
     )
     info["NSBonjourServices"] = ["_ndi._tcp", "_ndi._udp"]
     info["NSCameraUseContinuityCameraDeviceType"] = True
+    info["LSMultipleInstancesProhibited"] = True
     with info_plist.open("wb") as handle:
         plistlib.dump(info, handle)
     run(["/usr/bin/touch", str(app_path)])

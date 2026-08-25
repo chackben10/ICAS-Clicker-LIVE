@@ -79,6 +79,10 @@ class VideoService:
         return self.recorder.available
 
     @property
+    def qt_initialized(self) -> bool:
+        return self._qt_initialized
+
+    @property
     def recordings_root(self) -> Path:
         return self.data_root / "recordings"
 

@@ -65,6 +65,16 @@ class ProPresenterService:
     async def slide_index(self) -> dict[str, Any]:
         return await self.client.get_json("/presentation/slide_index")
 
+    async def slide_status(self) -> dict[str, Any]:
+        """Return ProPresenter's currently rendered cue status.
+
+        Dynamic Bible presentations intentionally do not expose a presentation
+        slide index.  The status endpoint still reports a distinct cue UUID for
+        every selected verse, so it is the reliable, lightweight event source
+        for those slides.
+        """
+        return await self.client.get_json("/status/slide")
+
     async def current_look_name(self) -> str:
         data = await self.client.get_json("/look/current")
         return str(((data.get("id") or {}).get("name")) or "").strip()

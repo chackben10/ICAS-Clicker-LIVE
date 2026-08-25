@@ -9,6 +9,7 @@ from pathlib import Path
 
 from production_hub.app.bootstrap import build_context
 from production_hub.app.lifecycle import start_api_server, start_background_services, startup_checks
+from production_hub.app.single_instance import SingleInstanceLock
 
 
 class RuntimeHandle:
@@ -36,6 +37,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    instance_lock = None if args.api_only else SingleInstanceLock.acquire()
+    if not args.api_only and instance_lock is None:
+        print("Production Hub is already running.", file=sys.stderr)
+        return 0
+    try:
+        return _run(args)
+    finally:
+        if instance_lock is not None:
+            instance_lock.release()
+
+
+def _run(args: argparse.Namespace) -> int:
     context = build_context(args.data_dir)
     if args.host:
         context.config.api.bind_host = args.host

@@ -148,7 +148,29 @@ class LocalCameraVideoSource(QObject):
         return bool(self.camera and self.camera.isActive())
 
     def set_output_active(self, active: bool) -> None:
-        self._output_active = bool(active)
+        active = bool(active)
+        if active == self._output_active:
+            return
+        self._output_active = active
+        camera = self.camera
+        if camera is None:
+            return
+        if active:
+            self._last_native_frame = time.monotonic()
+            self._start_requested_at = self._last_native_frame
+            self.watchdog.start()
+            if not camera.isActive():
+                camera.start()
+            return
+        if camera.isActive():
+            camera.stop()
+        self.watchdog.stop()
+        self.broker.set_status(
+            self.source,
+            VideoSourceState.STOPPED,
+            f"{self.display_name} capture is suspended until a camera feature is in use.",
+            source_name=self.device_id,
+        )
 
     def start(self, device_id: str) -> None:
         self.stop()
@@ -224,8 +246,16 @@ class LocalCameraVideoSource(QObject):
         self._received_frames = 0
         self._last_native_frame = time.monotonic()
         self._start_requested_at = self._last_native_frame
-        self.watchdog.start()
-        self.camera.start()
+        if self._output_active:
+            self.watchdog.start()
+            self.camera.start()
+        else:
+            self.broker.set_status(
+                self.source,
+                VideoSourceState.STOPPED,
+                f"{self.display_name} is ready; capture is suspended until needed.",
+                source_name=self.device_id,
+            )
 
     def stop(self) -> None:
         self._permission_generation += 1

@@ -25,14 +25,12 @@ def router(context) -> APIRouter:
 
     @api.get("/auto-show")
     async def get_auto_show() -> dict:
-        state = context.runtime_state_repo.load()
-        return {"enabled": state.auto_show_enabled}
+        return {"enabled": context.runtime_state_repo.auto_show_enabled()}
 
     @api.post("/auto-show")
     async def post_auto_show(payload: dict) -> dict:
         if "enabled" not in payload:
-            state = context.runtime_state_repo.load()
-            return {"enabled": state.auto_show_enabled}
+            return {"enabled": context.runtime_state_repo.auto_show_enabled()}
         state = context.runtime_state_repo.update(
             lambda current: setattr(current, "auto_show_enabled", _enabled(payload["enabled"]))
         )
@@ -40,8 +38,9 @@ def router(context) -> APIRouter:
 
     @api.get("/clicker-presentation-activation")
     async def get_clicker_presentation_activation() -> dict:
-        state = context.runtime_state_repo.load()
-        return {"enabled": state.clicker_presentation_activation_enabled}
+        return {
+            "enabled": context.runtime_state_repo.clicker_presentation_activation_enabled()
+        }
 
     @api.post("/clicker-presentation-activation")
     async def post_clicker_presentation_activation(payload: dict) -> dict:

@@ -104,6 +104,13 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertIn('id="presentationFocusSeconds"', html)
         self.assertIn('/presentation-focus-time', html)
         self.assertIn('Presentation Focus Time', html)
+        self.assertIn('grid-template-columns: minmax(135px, 0.9fr) minmax(150px, 1fr) minmax(290px, 1.45fr);', html)
+        self.assertRegex(
+            html,
+            r"(?s)\.remote-focus-setting\s*\{[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;",
+        )
+        self.assertIn('.remote-focus-setting:has(.switch-input:disabled)', html)
+        self.assertIn('white-space: nowrap;', html)
         self.assertNotIn('<div class="panel-title">Presets</div>', html)
         self.assertNotIn('These buttons are presets that trigger multiple actions at once', html)
         self.assertNotIn('id="presetsHeader"', html)
