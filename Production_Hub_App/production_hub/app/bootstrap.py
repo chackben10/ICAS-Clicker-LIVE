@@ -9,7 +9,12 @@ from typing import Any
 
 from production_hub.core.automation.engine import AutomationEngine
 from production_hub.core.automation.catalog import normalize_trigger
-from production_hub.core.config.defaults import build_default_automations, build_default_endpoints, build_default_midi_mappings
+from production_hub.core.config.defaults import (
+    PRESENTATION_FOCUS_AUTOMATION_KEY,
+    build_default_automations,
+    build_default_endpoints,
+    build_default_midi_mappings,
+)
 from production_hub.core.config.input_lists import ensure_default_input_lists
 from production_hub.core.config.models import AppPaths
 from production_hub.core.config.repository import ConfigRepository, default_app_root
@@ -347,6 +352,10 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
             if action.action_type == "propresenter.audio_trigger" and "slide_label" in str(action.params):
                 automation.actions = [ActionDefinition("propresenter.audio_from_slide_label")]
         repaired.append(automation)
+    existing = {automation.key for automation in repaired}
+    for required_key in (PRESENTATION_FOCUS_AUTOMATION_KEY,):
+        if required_key not in existing:
+            repaired.append(defaults[required_key])
     return repaired
 
 

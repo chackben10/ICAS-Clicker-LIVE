@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import build_context
-from production_hub.core.config.defaults import build_default_config
+from production_hub.core.config.defaults import PRESENTATION_FOCUS_AUTOMATION_KEY, build_default_config
 from production_hub.core.config.input_lists import row, static_cell
 from production_hub.core.config.models import InputListDefinition
 from production_hub.core.config.remote_pages import discover_remote_pages
@@ -100,6 +100,13 @@ class RemotePageDiscoveryTests(unittest.TestCase):
 
         self.assertIn('id="clickerActivationToggle"', html)
         self.assertIn('/clicker-presentation-activation', html)
+        self.assertIn('id="presentationFocusToggle"', html)
+        self.assertIn('id="presentationFocusSeconds"', html)
+        self.assertIn('/presentation-focus-time', html)
+        self.assertIn('Presentation Focus Time', html)
+        self.assertNotIn('<div class="panel-title">Presets</div>', html)
+        self.assertNotIn('These buttons are presets that trigger multiple actions at once', html)
+        self.assertNotIn('id="presetsHeader"', html)
         self.assertIn('id="obsModeToggle"', html)
         self.assertIn('icas-control-obs-mode', html)
         self.assertIn('id="pickerOverlay"', html)
@@ -142,6 +149,8 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             'attachTapHandler(btnClearAudio, async () => {',
             'autoShowToggle.addEventListener("change"',
             'clickerActivationToggle.addEventListener("change"',
+            'presentationFocusToggle.addEventListener("change"',
+            'presentationFocusSeconds.addEventListener("change"',
             'obsModeToggle.addEventListener("change"',
             'btnTextSizeSlider.addEventListener("input"',
         ]:
@@ -154,11 +163,10 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         for selector, property_name in {
             ".page-title": "font-size",
             ".top-btn": "font-size",
-            ".remote-switch": "padding",
+            ".remote-switch,\n.remote-focus-setting": "padding",
             ".remote-switch-label": "font-size",
             ".switch-track": "width",
-            ".panel-title": "font-size",
-            ".desc": "font-size",
+            ".focus-time-input": "font-size",
             ".settings-card": "font-size",
             ".settings-section": "padding",
             ".settings-label": "font-size",
@@ -233,6 +241,7 @@ class RemotePageDiscoveryTests(unittest.TestCase):
                 "/audio/active",
                 "/auto-show",
                 "/clicker-presentation-activation",
+                "/presentation-focus-time",
             ]:
                 with self.subTest(method="GET", route=route):
                     self.assertEqual(200, client.get(route).status_code)
@@ -263,6 +272,7 @@ class RemotePageDiscoveryTests(unittest.TestCase):
                 ("/audio/clear", None),
                 ("/auto-show", {"enabled": True}),
                 ("/clicker-presentation-activation", {"enabled": False}),
+                ("/presentation-focus-time", {"enabled": True, "debounceSeconds": 10}),
             ]
             for route, payload in post_requests:
                 with self.subTest(method="POST", route=route):
@@ -272,6 +282,42 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             context.propresenter.trigger_macro.assert_awaited_with("Stage Display")
             context.propresenter.audio.trigger.assert_awaited_with("Pads", "Peace.mp3")
             context.propresenter.audio.clear.assert_awaited_once()
+
+    def test_presentation_focus_time_endpoint_updates_and_persists_automation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            context = build_context(data_dir)
+            client = TestClient(create_app(context))
+
+            initial = client.get("/presentation-focus-time")
+            updated = client.post(
+                "/presentation-focus-time",
+                json={"enabled": False, "debounceSeconds": 14.5},
+            )
+            invalid = client.post(
+                "/presentation-focus-time",
+                json={"debounceSeconds": -1},
+            )
+
+            self.assertEqual(
+                {"enabled": True, "debounceSeconds": 10.0},
+                initial.json(),
+            )
+            self.assertEqual(
+                {"enabled": False, "debounceSeconds": 14.5},
+                updated.json(),
+            )
+            self.assertEqual("no-store", updated.headers.get("cache-control"))
+            self.assertEqual(422, invalid.status_code)
+            self.assertFalse(context.automation_engine.states[PRESENTATION_FOCUS_AUTOMATION_KEY].enabled)
+
+            persisted = next(
+                item
+                for item in context.config_repository.load_automations()
+                if item.key == PRESENTATION_FOCUS_AUTOMATION_KEY
+            )
+            self.assertFalse(persisted.enabled)
+            self.assertEqual(14.5, persisted.debounce_seconds)
 
     def test_discovers_all_repository_html_pages(self) -> None:
         workspace = Path(__file__).resolve().parents[4]

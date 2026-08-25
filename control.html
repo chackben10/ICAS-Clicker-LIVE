@@ -159,12 +159,13 @@ transform: translateY(1px) scale(0.995);
 
 .remote-controls {
 display: grid;
-grid-template-columns: repeat(2, minmax(0, 1fr));
+grid-template-columns: repeat(3, minmax(0, 1fr));
 gap: calc(8px * var(--btn-scale));
 margin: calc(10px * var(--btn-scale)) 0 calc(4px * var(--btn-scale));
 }
 
-.remote-switch {
+.remote-switch,
+.remote-focus-setting {
 position: relative;
 min-width: 0;
 display: flex;
@@ -179,6 +180,60 @@ color: var(--card-text);
 cursor: pointer;
 user-select: none;
 -webkit-user-select: none;
+}
+
+.remote-focus-setting {
+cursor: default;
+flex-direction: column;
+align-items: stretch;
+gap: calc(6px * var(--btn-scale));
+}
+
+.remote-focus-actions {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: calc(7px * var(--btn-scale));
+}
+
+.focus-toggle {
+display: flex;
+align-items: center;
+cursor: pointer;
+}
+
+.focus-time-control {
+display: flex;
+align-items: center;
+gap: calc(3px * var(--btn-scale));
+font-size: calc(0.76rem * var(--btn-scale));
+font-weight: 800;
+color: var(--status-grey);
+}
+
+.focus-time-input {
+width: calc(50px * var(--btn-scale));
+min-width: 46px;
+padding: calc(4px * var(--btn-scale)) calc(3px * var(--btn-scale));
+border: 1px solid var(--border-color);
+border-radius: calc(7px * var(--btn-scale));
+background: var(--btn-bg);
+color: var(--btn-text);
+font: inherit;
+font-size: calc(0.82rem * var(--btn-scale));
+font-weight: 800;
+text-align: center;
+}
+
+.focus-time-input:focus-visible {
+outline: 3px solid color-mix(in srgb, var(--title-color) 42%, transparent);
+outline-offset: 1px;
+}
+
+.focus-toggle:has(.switch-input:disabled),
+.focus-time-input:disabled {
+opacity: 0.55;
+cursor: not-allowed;
 }
 
 .remote-switch-label {
@@ -237,21 +292,6 @@ outline-offset: 2px;
 .remote-switch:has(.switch-input:disabled) {
 opacity: 0.55;
 cursor: not-allowed;
-}
-
-.panel-title {
-color: var(--title-color);
-font-size: calc(1.45rem * var(--btn-scale));
-font-weight: 800;
-margin: calc(6px * var(--btn-scale)) 0 calc(8px * var(--btn-scale));
-line-height: 1.1;
-}
-
-.desc {
-color: var(--status-grey);
-font-size: calc(0.98rem * var(--btn-scale));
-line-height: 1.35;
-margin-bottom: calc(12px * var(--btn-scale));
 }
 
 /* Grid */
@@ -828,11 +868,6 @@ transform: none !important;
 min-height: calc(24px * var(--btn-scale));
 }
 
-/* Hide Presets heading + description when toggled off */
-.presets-header[hidden] {
-display: none !important;
-}
-
 /* Audio Pads UI Elements */
 .audio-now-playing {
 margin-top: calc(10px * var(--btn-scale));
@@ -945,6 +980,16 @@ width: calc(34px * var(--btn-scale));
 transform: translateX(calc(12px * var(--btn-scale)));
 }
 }
+
+@media (max-width: 560px) {
+.remote-controls {
+grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.remote-focus-setting {
+grid-column: 1 / -1;
+}
+}
 </style>
 </head>
 
@@ -968,14 +1013,20 @@ transform: translateX(calc(12px * var(--btn-scale)));
 <input class="switch-input" type="checkbox" id="clickerActivationToggle">
 <span class="switch-track" aria-hidden="true"></span>
 </label>
-</div>
-</div>
 
-<div class="presets-header" id="presetsHeader">
-<div class="panel-title">Presets</div>
-<div class="desc">
-These buttons are presets that trigger multiple actions at once (ProPresenter + OBS).
-You can still control ProPresenter and OBS manually on their own screens anytime.
+<div class="remote-focus-setting">
+<span class="remote-switch-label">Presentation Focus Time</span>
+<div class="remote-focus-actions">
+<label class="focus-toggle" aria-label="Enable Presentation Focus Time">
+<input class="switch-input" type="checkbox" id="presentationFocusToggle">
+<span class="switch-track" aria-hidden="true"></span>
+</label>
+<label class="focus-time-control">
+<input class="focus-time-input" type="number" id="presentationFocusSeconds" min="0" max="3600" step="0.5" value="10" inputmode="decimal" aria-label="Presentation Focus Time debounce seconds">
+<span>sec</span>
+</label>
+</div>
+</div>
 </div>
 </div>
 
@@ -1148,18 +1199,6 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 </div>
 
 <div class="settings-section">
-<div class="settings-label">Show Description</div>
-<div class="settings-muted">Hide/show the “Presets” header and description on the main page.</div>
-
-<div class="pill-row" style="margin-top: calc(10px * var(--btn-scale));">
-<label class="pill" style="cursor:pointer; user-select:none;">
-<input id="showDescToggle" type="checkbox" style="margin-right: 10px; transform: scale(1.2);">
-<span class="status-text" style="font-weight:900;">Enabled</span>
-</label>
-</div>
-</div>
-
-<div class="settings-section">
 <div class="settings-label">OBS Dock Mode</div>
 <div class="settings-muted">Keep the standard layout, but open logo and macro choices in reliable in-page popup menus.</div>
 
@@ -1214,7 +1253,6 @@ const MACRO_NAME_KEY = "icas-macro-name";
 
 // Settings
 const BTN_SCALE_KEY = "icas-control-btn-scale";
-const SHOW_DESC_KEY = "icas-control-show-description";
 const OBS_MODE_KEY = "icas-control-obs-mode";
 
 function normalizeBase(u) {
@@ -1244,7 +1282,8 @@ audioTrigger: `${base}/audio/trigger`,
 audioClear: `${base}/audio/clear`,
 audioActive: `${base}/audio/active`,
 autoShow: `${base}/auto-show`,
-clickerPresentationActivation: `${base}/clicker-presentation-activation`
+clickerPresentationActivation: `${base}/clicker-presentation-activation`,
+presentationFocusTime: `${base}/presentation-focus-time`
 };
 }
 
@@ -1301,26 +1340,6 @@ applyBtnScale(n);
 function applyBtnScale(percent) {
 const s = clamp((percent || 100) / 100, 0.4, 2.0);
 document.documentElement.style.setProperty("--btn-scale", String(s));
-}
-
-// ====== Show Description toggle ======
-const presetsHeader = document.getElementById("presetsHeader");
-const showDescToggle = document.getElementById("showDescToggle");
-
-function getShowDesc() {
-const raw = localStorage.getItem(SHOW_DESC_KEY);
-if (raw === null) return true;
-return raw === "1";
-}
-
-function setShowDesc(v) {
-localStorage.setItem(SHOW_DESC_KEY, v ? "1" : "0");
-applyShowDesc(v);
-}
-
-function applyShowDesc(enabled) {
-if (presetsHeader) presetsHeader.hidden = !enabled;
-if (showDescToggle) showDescToggle.checked = !!enabled;
 }
 
 // ====== OBS dock mode ======
@@ -1386,6 +1405,8 @@ const audioNowPlayingItem = document.getElementById("audioNowPlayingItem");
 const btnTextSizeSlider = document.getElementById("btnTextSizeSlider");
 const autoShowToggle = document.getElementById("autoShowToggle");
 const clickerActivationToggle = document.getElementById("clickerActivationToggle");
+const presentationFocusToggle = document.getElementById("presentationFocusToggle");
+const presentationFocusSeconds = document.getElementById("presentationFocusSeconds");
 const obsModeToggle = document.getElementById("obsModeToggle");
 const settingsOverlay = document.getElementById("settingsOverlay");
 const settingsButton = document.getElementById("settingsButton");
@@ -1400,6 +1421,8 @@ let macroItems = [];
 let backendAvailable = false;
 let autoShowUpdatePending = false;
 let clickerActivationUpdatePending = false;
+let presentationFocusUpdatePending = false;
+let presentationFocusDebounceSeconds = 10;
 let pickerReturnFocus = null;
 
 function setBackendStatus(ok, text) {
@@ -1450,6 +1473,12 @@ if (macroPickerButton) macroPickerButton.disabled = !enabled || !hasMacros;
 if (autoShowToggle) autoShowToggle.disabled = !enabled || autoShowUpdatePending;
 if (clickerActivationToggle) {
 clickerActivationToggle.disabled = !enabled || clickerActivationUpdatePending;
+}
+if (presentationFocusToggle) {
+presentationFocusToggle.disabled = !enabled || presentationFocusUpdatePending;
+}
+if (presentationFocusSeconds) {
+presentationFocusSeconds.disabled = !enabled || presentationFocusUpdatePending;
 }
 }
 
@@ -1767,6 +1796,31 @@ clickerActivationToggle.checked = !!data.enabled;
 } catch {}
 }
 
+function applyPresentationFocusState(data) {
+if (presentationFocusToggle) {
+presentationFocusToggle.checked = !!data?.enabled;
+}
+
+const seconds = Number(data?.debounceSeconds);
+if (!Number.isFinite(seconds) || seconds < 0 || seconds > 3600) return;
+presentationFocusDebounceSeconds = seconds;
+if (presentationFocusSeconds && document.activeElement !== presentationFocusSeconds) {
+presentationFocusSeconds.value = String(seconds);
+}
+}
+
+async function refreshPresentationFocus() {
+if ((!presentationFocusToggle && !presentationFocusSeconds) || presentationFocusUpdatePending) return;
+
+const { presentationFocusTime } = endpoints();
+
+try {
+const res = await fetch(presentationFocusTime, { cache: "no-cache" });
+if (!res.ok) throw new Error("Bad response");
+applyPresentationFocusState(await res.json());
+} catch {}
+}
+
 if (autoShowToggle) {
 autoShowToggle.addEventListener("change", async e => {
 const { autoShow } = endpoints();
@@ -1821,6 +1875,68 @@ e.target.checked = !enabled;
 setLastAction("Failed to update Clicker Presentation Access");
 } finally {
 clickerActivationUpdatePending = false;
+setButtonsEnabled(backendAvailable);
+}
+});
+}
+
+if (presentationFocusToggle) {
+presentationFocusToggle.addEventListener("change", async e => {
+const { presentationFocusTime } = endpoints();
+const enabled = e.target.checked;
+presentationFocusUpdatePending = true;
+setButtonsEnabled(backendAvailable);
+
+try {
+const res = await fetch(presentationFocusTime, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ enabled })
+});
+if (!res.ok) throw new Error("Failed to update Presentation Focus Time");
+
+const data = await res.json();
+applyPresentationFocusState(data);
+setLastAction(data.enabled ? "Presentation Focus Time Enabled" : "Presentation Focus Time Disabled");
+} catch {
+e.target.checked = !enabled;
+setLastAction("Failed to update Presentation Focus Time");
+} finally {
+presentationFocusUpdatePending = false;
+setButtonsEnabled(backendAvailable);
+}
+});
+}
+
+if (presentationFocusSeconds) {
+presentationFocusSeconds.addEventListener("change", async e => {
+const { presentationFocusTime } = endpoints();
+const seconds = Number(e.target.value);
+if (!Number.isFinite(seconds) || seconds < 0 || seconds > 3600) {
+e.target.value = String(presentationFocusDebounceSeconds);
+setLastAction("Presentation Focus Time must be between 0 and 3600 seconds");
+return;
+}
+
+presentationFocusUpdatePending = true;
+setButtonsEnabled(backendAvailable);
+
+try {
+const res = await fetch(presentationFocusTime, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ debounceSeconds: seconds })
+});
+if (!res.ok) throw new Error("Failed to update Presentation Focus Time");
+
+const data = await res.json();
+applyPresentationFocusState(data);
+setLastAction(`Presentation Focus Time Set to ${data.debounceSeconds} Seconds`);
+} catch {
+e.target.value = String(presentationFocusDebounceSeconds);
+setLastAction("Failed to update Presentation Focus Time");
+} finally {
+presentationFocusUpdatePending = false;
 setButtonsEnabled(backendAvailable);
 }
 });
@@ -2312,6 +2428,7 @@ await refreshServiceLogos();
 await refreshMacros();
 await refreshAutoShow();
 await refreshClickerActivation();
+await refreshPresentationFocus();
 }
 };
 }
@@ -2336,12 +2453,6 @@ setBtnScalePercent(btnTextSizeSlider.value);
 });
 }
 
-if (showDescToggle) {
-showDescToggle.addEventListener("change", () => {
-setShowDesc(showDescToggle.checked);
-});
-}
-
 if (obsModeToggle) {
 obsModeToggle.addEventListener("change", () => {
 setObsMode(obsModeToggle.checked);
@@ -2351,7 +2462,6 @@ setObsMode(obsModeToggle.checked);
 async function init() {
 loadTheme();
 updateThemeSegmentUI(localStorage.getItem(THEME_KEY) || "system");
-applyShowDesc(getShowDesc());
 applyObsMode(getObsMode());
 syncBtnSliderUI();
 
@@ -2368,6 +2478,7 @@ await refreshServiceLogos();
 await refreshMacros();
 await refreshAutoShow();
 await refreshClickerActivation();
+await refreshPresentationFocus();
 }
 };
 
@@ -2382,7 +2493,8 @@ const ok = await testBackend();
 if (ok) {
 await Promise.all([
 refreshAutoShow(),
-refreshClickerActivation()
+refreshClickerActivation(),
+refreshPresentationFocus()
 ]);
 }
 } finally {

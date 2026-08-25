@@ -20,6 +20,9 @@ from production_hub.core.endpoints.models import (
 from production_hub.integrations.midi.models import MidiMapping
 
 
+PRESENTATION_FOCUS_AUTOMATION_KEY = "presentation_macro_after_presentation_look"
+
+
 PRESENTATIONS = [
     PresentationMapping("Starting Announcements", "C62E6449-3FD6-42C1-BDF4-CABCA5F8E491"),
     PresentationMapping("PTZ Camera", "D47223A2-73BD-4C86-BB82-0D95E90D83F5"),
@@ -380,6 +383,33 @@ def build_default_automations() -> list[AutomationDefinition]:
             conditions=[{"condition_type": "always", "params": {}}],
             actions=[ActionDefinition("propresenter.audio_from_slide_label")],
             description="Trigger matching pad audio from active slide labels.",
+        ),
+        AutomationDefinition(
+            key=PRESENTATION_FOCUS_AUTOMATION_KEY,
+            name="Presentation Macro After Presentation Look",
+            trigger="propresenter.slide_changed",
+            enabled=True,
+            interval_seconds=0.2,
+            debounce_seconds=10.0,
+            rules={
+                "operator": "or",
+                "children": [
+                    {
+                        "condition_type": "propresenter.current_look",
+                        "params": {"look_name": look_name, "matches": True},
+                    }
+                    for look_name in (
+                        "Presentation Streamer",
+                        "Presentation Picture-in-Picture",
+                        "Presentation Fullscreen",
+                    )
+                ],
+            },
+            actions=[ActionDefinition("propresenter.trigger_macro", {"macro_name": "Presentation Macro"})],
+            description=(
+                "After a presentation slide remains active for 10 seconds in the Streamer, "
+                "Picture-in-Picture, or Fullscreen look, trigger Presentation Macro."
+            ),
         ),
         AutomationDefinition(
             key="auto_show_slides",

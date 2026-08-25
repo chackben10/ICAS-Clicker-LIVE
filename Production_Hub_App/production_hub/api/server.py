@@ -178,7 +178,10 @@ def create_app(context):
                 vary = response.headers.get("Vary", "")
                 if "*" not in allowed_origins and "origin" not in vary.lower():
                     response.headers["Vary"] = f"{vary}, Origin" if vary else "Origin"
-            if request.url.path == "/clicker-presentation-activation":
+            if request.url.path in {
+                "/clicker-presentation-activation",
+                "/presentation-focus-time",
+            }:
                 response.headers["Cache-Control"] = "no-store"
             return response
         except Exception as exc:

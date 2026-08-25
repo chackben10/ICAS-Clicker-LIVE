@@ -91,12 +91,81 @@ class SlideTriggerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event["presentation_uuid"], "presentation-a")
         self.assertEqual(await monitor.due(definition, now=0.22), (False, {}))
 
+    async def test_presentation_macro_default_waits_ten_seconds_for_a_stable_slide(self) -> None:
+        snapshots = iter(
+            [
+                ("presentation-a", 0),
+                ("presentation-a", 1),
+                ("presentation-a", 1),
+                ("presentation-a", 1),
+            ]
+        )
+
+        class ProPresenter:
+            async def slide_index(self):
+                uuid, index = next(snapshots)
+                return {
+                    "presentation_index": {
+                        "index": index,
+                        "presentation_id": {"uuid": uuid, "name": "Service"},
+                    }
+                }
+
+        context = SimpleNamespace(
+            propresenter=ProPresenter(),
+            config=SimpleNamespace(
+                integrations=SimpleNamespace(
+                    propresenter=SimpleNamespace(polling_interval_seconds=0.1),
+                )
+            ),
+        )
+        definition = next(
+            item
+            for item in build_default_automations()
+            if item.key == "presentation_macro_after_presentation_look"
+        )
+        monitor = AutomationTriggerMonitor(context)
+
+        self.assertEqual(await monitor.due(definition, now=0.0), (False, {}))
+        self.assertEqual(await monitor.due(definition, now=0.2), (False, {}))
+        self.assertEqual(await monitor.due(definition, now=10.19), (False, {}))
+        due, event = await monitor.due(definition, now=10.4)
+        self.assertTrue(due)
+        self.assertEqual(event["slide_index"], 1)
+
     def test_default_automations_have_no_connection_watchdog(self) -> None:
         defaults = build_default_automations()
         self.assertNotIn("obs_connection_watchdog", {item.key for item in defaults})
         auto_show = next(item for item in defaults if item.key == "auto_show_slides")
         self.assertEqual(auto_show.trigger, "propresenter.slide_changed")
         self.assertEqual([action.action_type for action in auto_show.actions], ["propresenter.clear_announcements", "obs.set_scene"])
+
+        presentation_macro = next(
+            item for item in defaults if item.key == "presentation_macro_after_presentation_look"
+        )
+        self.assertEqual(presentation_macro.trigger, "propresenter.slide_changed")
+        self.assertEqual(presentation_macro.interval_seconds, 0.2)
+        self.assertEqual(presentation_macro.debounce_seconds, 10.0)
+        self.assertEqual(presentation_macro.rules["operator"], "or")
+        self.assertEqual(
+            {
+                child["params"]["look_name"]
+                for child in presentation_macro.rules["children"]
+            },
+            {
+                "Presentation Streamer",
+                "Presentation Picture-in-Picture",
+                "Presentation Fullscreen",
+            },
+        )
+        self.assertEqual(
+            [action.action_type for action in presentation_macro.actions],
+            ["propresenter.trigger_macro"],
+        )
+        self.assertEqual(
+            presentation_macro.actions[0].params,
+            {"macro_name": "Presentation Macro"},
+        )
 
     def test_legacy_watchdog_is_removed_and_auto_show_trigger_is_migrated(self) -> None:
         migrated = ensure_builtin_automation_steps(
@@ -115,7 +184,10 @@ class SlideTriggerTests(unittest.IsolatedAsyncioTestCase):
                 ),
             ]
         )
-        self.assertEqual([item.key for item in migrated], ["auto_show_slides"])
+        self.assertEqual(
+            [item.key for item in migrated],
+            ["auto_show_slides", "presentation_macro_after_presentation_look"],
+        )
         self.assertEqual(migrated[0].trigger, "propresenter.slide_changed")
         self.assertEqual(migrated[0].interval_seconds, 0.2)
 
