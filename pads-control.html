@@ -452,7 +452,7 @@ gap: 6px;
 <span id="backendDot" class="status-dot"></span>
 <span id="backendStatus">Checking…</span>
 </div>
-<button class="top-btn" id="settingsButton" type="button">Settings</button>
+<button class="top-btn" id="settingsButton" data-testid="settingsButton" type="button">Settings</button>
 </div>
 </div>
 
@@ -464,7 +464,7 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 
 <div id="audioGrid" class="audio-grid"></div>
 
-<button id="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
+<button id="btnClearAudio" data-testid="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
 </div>
 </div>
 
@@ -475,9 +475,9 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 <div class="settings-section">
 <div class="settings-label">Display Theme</div>
 <div class="segment" id="themeSegment">
-<button data-mode="light" type="button">Light</button>
-<button data-mode="dark" type="button">Dark</button>
-<button data-mode="system" type="button">System</button>
+<button data-mode="light" data-testid="theme-light" type="button">Light</button>
+<button data-mode="dark" data-testid="theme-dark" type="button">Dark</button>
+<button data-mode="system" data-testid="theme-system" type="button">System</button>
 </div>
 </div>
 
@@ -488,7 +488,7 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 <div class="settings-value" id="padsZoomValue">100%</div>
 </div>
 
-<button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+<button id="settingsCloseButton" data-testid="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
 </div>
 </div>
 
@@ -801,6 +801,8 @@ audioPlaylistSegment.innerHTML = "";
 
 items.forEach((name, i) => {
 const btn = document.createElement("button");
+btn.type = "button";
+btn.dataset.testid = `audio-playlist-${i}`;
 
 if (i === 0) btn.className = "active";
 

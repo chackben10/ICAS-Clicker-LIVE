@@ -7,6 +7,9 @@ from production_hub.tracking.models import TrackingSnapshot
 from production_hub.video.models import VideoSourceKey
 
 
+API_ACTIVITY_OWNER = "api-camera-automation"
+
+
 def _snapshot_payload(snapshot: TrackingSnapshot) -> dict:
     return {
         "source": snapshot.source.value,
@@ -120,6 +123,13 @@ def router(context) -> APIRouter:
         context.ptz_automation.reconfigure(config)
         if mode == "off":
             context.ptz_automation.disarm("Framing mode was turned off through the API")
+            context.video.set_tracking_activity(False, owner=API_ACTIVITY_OWNER)
+            context.video.set_calibration_activity(False, owner=API_ACTIVITY_OWNER)
+        else:
+            # API clients need a safe way to warm the camera analysis before
+            # setting a calibrated target or requesting motion authority.
+            context.video.set_tracking_activity(True, owner=API_ACTIVITY_OWNER)
+            context.video.set_calibration_activity(True, owner=API_ACTIVITY_OWNER)
         return _automation_payload(context.ptz_automation.snapshot())
 
     @api.post("/automation/click-target")
@@ -158,6 +168,8 @@ def router(context) -> APIRouter:
         await context.ptz_automation.disarm_async(
             "Operator disarmed PTZ automation through the API"
         )
+        context.video.set_tracking_activity(False, owner=API_ACTIVITY_OWNER)
+        context.video.set_calibration_activity(False, owner=API_ACTIVITY_OWNER)
         return _automation_payload(context.ptz_automation.snapshot())
 
     @api.get("/tracking/{source_name}")

@@ -504,8 +504,8 @@
       </div>
 
       <div class="top-actions">
-        <button id="refreshNowButton" class="button" type="button">Refresh Now</button>
-        <a href="index.html" class="back-link">Back</a>
+        <button id="refreshNowButton" data-testid="refreshNowButton" class="button" type="button">Refresh Now</button>
+        <a href="index.html" class="back-link" data-testid="backToViewer">Back</a>
       </div>
     </div>
 
@@ -1011,6 +1011,7 @@
           const button = document.createElement("button");
           button.className = "button";
           button.type = "button";
+          button.dataset.testid = "manual-audio-tracks";
           button.textContent = "Fetch Tracks";
           button.addEventListener("click", () => fetchAudioTracks());
 
@@ -1023,6 +1024,7 @@
           const button = document.createElement("button");
           button.className = "button";
           button.type = "button";
+          button.dataset.testid = "manual-thumbnail";
           button.textContent = "Load Current Thumbnail";
           button.addEventListener("click", () => fetchThumbnail({ force: true }));
 
@@ -1045,6 +1047,7 @@
         const button = document.createElement("button");
         button.className = "button";
         button.type = "button";
+        button.dataset.testid = `manual-${definition.id}`;
         button.textContent = "Fetch Manually";
         button.addEventListener("click", () => fetchDefinition(definition));
 

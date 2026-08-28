@@ -44,7 +44,7 @@ class InteractiveNestingParser(HTMLParser):
 
 class RemotePageDiscoveryTests(unittest.TestCase):
     def test_root_clicker_has_live_song_library_search_view(self) -> None:
-        root_index = Path(__file__).resolve().parents[4] / "index.html"
+        root_index = Path(__file__).resolve().parents[3] / "index.html"
         html = root_index.read_text(encoding="utf-8")
         self.assertIn('id="searchModeButton"', html)
         self.assertIn('id="songSearchInput"', html)
@@ -95,7 +95,7 @@ class RemotePageDiscoveryTests(unittest.TestCase):
         self.assertEqual(set(), referenced_ids - parser.ids)
 
     def test_control_page_has_shared_clicker_toggle_and_obs_safe_pickers(self) -> None:
-        root_control = Path(__file__).resolve().parents[4] / "control.html"
+        root_control = Path(__file__).resolve().parents[3] / "control.html"
         html = root_control.read_text(encoding="utf-8")
 
         self.assertIn('id="clickerActivationToggle"', html)
@@ -164,7 +164,7 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             self.assertIn(interaction, html)
 
     def test_control_page_interface_scale_covers_main_page_and_settings(self) -> None:
-        root_control = Path(__file__).resolve().parents[4] / "control.html"
+        root_control = Path(__file__).resolve().parents[3] / "control.html"
         html = root_control.read_text(encoding="utf-8")
 
         for selector, property_name in {
@@ -327,7 +327,7 @@ class RemotePageDiscoveryTests(unittest.TestCase):
             self.assertEqual(14.5, persisted.debounce_seconds)
 
     def test_discovers_all_repository_html_pages(self) -> None:
-        workspace = Path(__file__).resolve().parents[4]
+        workspace = Path(__file__).resolve().parents[3]
         pages = discover_remote_pages(workspace, build_default_config().remote_pages)
         paths = {str(page["path"]) for page in pages}
 

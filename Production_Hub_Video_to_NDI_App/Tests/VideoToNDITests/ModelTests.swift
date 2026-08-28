@@ -1,19 +1,17 @@
 import Foundation
-import XCTest
+import Testing
 @testable import VideoToNDICore
 
-final class ModelTests: XCTestCase {
-    func testDefaultRoutesHaveStableOperatorNames() {
+@Suite
+struct ModelTests {
+    @Test func defaultRoutesHaveStableOperatorNames() {
         let configuration = AppConfiguration()
 
-        XCTAssertEqual(configuration.routes.map(\.name), ["Audience Cam"])
-        XCTAssertEqual(
-            configuration.routes.map(\.ndiSourceName),
-            ["Production Hub - Audience Cam"]
-        )
+        #expect(configuration.routes.map(\.name) == ["Audience Cam"])
+        #expect(configuration.routes.map(\.ndiSourceName) == ["Production Hub - Audience Cam"])
     }
 
-    func testDuplicateEnabledNDINameIsRejectedCaseInsensitively() {
+    @Test func duplicateEnabledNDINameIsRejectedCaseInsensitively() {
         let first = VideoRoute(
             name: "Audience",
             sourceKind: .testPattern,
@@ -25,12 +23,15 @@ final class ModelTests: XCTestCase {
             ndiSourceName: "production hub - audience cam"
         )
 
-        XCTAssertThrowsError(try RouteValidator.validate(second, among: [first, second])) { error in
-            XCTAssertEqual(error as? RouteValidationError, .duplicateNDIName)
+        do {
+            try RouteValidator.validate(second, among: [first, second])
+            Issue.record("Expected a duplicate NDI name error")
+        } catch {
+            #expect(error as? RouteValidationError == .duplicateNDIName)
         }
     }
 
-    func testDisabledDuplicateNDINameIsAllowed() throws {
+    @Test func disabledDuplicateNDINameIsAllowed() throws {
         let first = VideoRoute(
             name: "Audience",
             sourceKind: .testPattern,
@@ -43,40 +44,43 @@ final class ModelTests: XCTestCase {
             isEnabled: false
         )
 
-        XCTAssertNoThrow(try RouteValidator.validate(second, among: [first, second]))
+        try RouteValidator.validate(second, among: [first, second])
     }
 
-    func testReservedCharactersAreRejected() {
+    @Test func reservedCharactersAreRejected() {
         let route = VideoRoute(
             name: "Invalid",
             sourceKind: .testPattern,
             ndiSourceName: "Production Hub / Audience"
         )
 
-        XCTAssertThrowsError(try RouteValidator.validate(route, among: [route])) { error in
-            XCTAssertEqual(error as? RouteValidationError, .invalidNDIName("/"))
+        do {
+            try RouteValidator.validate(route, among: [route])
+            Issue.record("Expected an invalid NDI name error")
+        } catch {
+            #expect(error as? RouteValidationError == .invalidNDIName("/"))
         }
     }
 
-    func testCameraRequiresADeviceButTestPatternDoesNot() {
+    @Test func cameraRequiresADeviceButTestPatternDoesNot() throws {
         let camera = VideoRoute(name: "Camera", ndiSourceName: "Camera")
         let pattern = VideoRoute(name: "Pattern", sourceKind: .testPattern, ndiSourceName: "Pattern")
 
-        XCTAssertThrowsError(try RouteValidator.validate(camera, among: [camera])) { error in
-            XCTAssertEqual(error as? RouteValidationError, .missingDevice)
+        do {
+            try RouteValidator.validate(camera, among: [camera])
+            Issue.record("Expected a missing device error")
+        } catch {
+            #expect(error as? RouteValidationError == .missingDevice)
         }
-        XCTAssertNoThrow(try RouteValidator.validate(pattern, among: [pattern]))
+        try RouteValidator.validate(pattern, among: [pattern])
     }
 
-    func testCapturePreferenceDisplayName() {
-        XCTAssertEqual(CapturePreference.automatic.displayName, "Automatic")
-        XCTAssertEqual(
-            CapturePreference(width: 1920, height: 1080, framesPerSecond: 29.97).displayName,
-            "1920×1080 @ 29.97 fps"
-        )
+    @Test func capturePreferenceDisplayName() {
+        #expect(CapturePreference.automatic.displayName == "Automatic")
+        #expect(CapturePreference(width: 1920, height: 1080, framesPerSecond: 29.97).displayName == "1920×1080 @ 29.97 fps")
     }
 
-    func testOrientationSettingsRoundTripThroughJSON() throws {
+    @Test func orientationSettingsRoundTripThroughJSON() throws {
         let route = VideoRoute(
             name: "Rotated",
             sourceKind: .testPattern,
@@ -89,18 +93,18 @@ final class ModelTests: XCTestCase {
         let data = try JSONEncoder().encode(route)
         let decoded = try JSONDecoder().decode(VideoRoute.self, from: data)
 
-        XCTAssertEqual(decoded, route)
-        XCTAssertEqual(decoded.orientationDescription, "270° · Horizontal flip · Vertical flip")
+        #expect(decoded == route)
+        #expect(decoded.orientationDescription == "270° · Horizontal flip · Vertical flip")
     }
 
-    func testOlderRouteJSONDefaultsToNoOrientationTransform() throws {
+    @Test func olderRouteJSONDefaultsToNoOrientationTransform() throws {
         let route = VideoRoute(
             name: "Existing",
             sourceKind: .testPattern,
             ndiSourceName: "Existing"
         )
         let encoded = try JSONEncoder().encode(route)
-        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         object.removeValue(forKey: "rotation")
         object.removeValue(forKey: "flipHorizontal")
         object.removeValue(forKey: "flipVertical")
@@ -108,8 +112,8 @@ final class ModelTests: XCTestCase {
 
         let decoded = try JSONDecoder().decode(VideoRoute.self, from: legacyData)
 
-        XCTAssertEqual(decoded.rotation, .degrees0)
-        XCTAssertFalse(decoded.flipHorizontal)
-        XCTAssertFalse(decoded.flipVertical)
+        #expect(decoded.rotation == .degrees0)
+        #expect(!decoded.flipHorizontal)
+        #expect(!decoded.flipVertical)
     }
 }

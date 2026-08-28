@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtGui import QIntValidator
+from PySide6.QtGui import QAction, QIntValidator
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -31,6 +33,54 @@ MAX_WIDGET_WIDTH = 16777215
 PAGE_MARGIN = 24
 SECTION_GAP = 16
 PANE_GAP = 18
+
+
+def _test_identifier(value: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", "_", str(value or "").strip()).strip("_")
+    return normalized or "control"
+
+
+def assign_test_identifiers(root: QWidget, prefix: str = "productionHub") -> None:
+    """Give Qt controls stable names for tests and macOS Accessibility.
+
+    Explicit object names always win. Generated names derive from visible text,
+    tooltips, or accessible names and receive deterministic suffixes only when
+    a page contains duplicate labels.
+    """
+
+    seen = {item.objectName() for item in root.findChildren(QAbstractButton) if item.objectName()}
+    counts: dict[str, int] = {}
+    for button in root.findChildren(QAbstractButton):
+        label = button.accessibleName() or button.text() or button.toolTip()
+        if not button.objectName():
+            base = f"{prefix}_{_test_identifier(label)}"
+            counts[base] = counts.get(base, 0) + 1
+            candidate = base if counts[base] == 1 else f"{base}_{counts[base]}"
+            while candidate in seen:
+                counts[base] += 1
+                candidate = f"{base}_{counts[base]}"
+            button.setObjectName(candidate)
+            seen.add(candidate)
+        if not button.accessibleName():
+            button.setAccessibleName(label or button.objectName())
+    action_seen = {
+        action.objectName()
+        for action in root.findChildren(QAction)
+        if action.objectName()
+    }
+    action_counts: dict[str, int] = {}
+    for action in root.findChildren(QAction):
+        if action.isSeparator():
+            continue
+        if not action.objectName():
+            base = f"{prefix}_action_{_test_identifier(action.text() or action.toolTip())}"
+            action_counts[base] = action_counts.get(base, 0) + 1
+            candidate = base if action_counts[base] == 1 else f"{base}_{action_counts[base]}"
+            while candidate in action_seen:
+                action_counts[base] += 1
+                candidate = f"{base}_{action_counts[base]}"
+            action.setObjectName(candidate)
+            action_seen.add(candidate)
 
 
 class _BackgroundResultBridge(QObject):

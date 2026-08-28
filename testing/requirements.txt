@@ -1,0 +1,12 @@
+pytest>=8.2
+pytest-asyncio>=0.23
+pytest-timeout>=2.3
+pytest-qt>=4.4
+pytest-json-report>=1.5
+pytest-html>=4.1
+playwright>=1.46
+pytest-playwright>=0.5
+respx>=0.21
+psutil>=6.0
+websockets>=13.0
+pyinstaller>=6.10

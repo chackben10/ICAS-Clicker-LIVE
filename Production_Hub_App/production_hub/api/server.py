@@ -11,6 +11,7 @@ from production_hub.api.clicker_policy import (
 )
 from production_hub.state.runtime_state import RequestRecord
 from production_hub.core.security.sanitize import redact_secrets
+from production_hub.integrations.scoreboard.service import ScoreboardConflict, ScoreboardDisabled
 
 
 STATIC_EXTENSIONS = {".html", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".css", ".js"}
@@ -64,7 +65,10 @@ def create_app(context):
             if raw:
                 content_type = request.headers.get("content-type", "")
                 if "application/json" in content_type:
-                    payload = json.loads(raw.decode("utf-8"))
+                    try:
+                        payload = json.loads(raw.decode("utf-8"))
+                    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                        raise HTTPException(status_code=400, detail="Malformed JSON request body") from exc
                     if isinstance(payload, dict):
                         data.update(payload)
                         data["body"] = payload
@@ -131,7 +135,10 @@ def create_app(context):
                 {"detail": presentation_activation_disabled_detail()},
                 status_code=403,
             )
-        seed = await dynamic_context(request, {})
+        try:
+            seed = await dynamic_context(request, {})
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         match = context.endpoint_registry.matching_endpoint(request.url.path, request.method, seed)
         if not match:
             return None
@@ -140,7 +147,25 @@ def create_app(context):
             execution_context = apply_endpoint_inputs(endpoint, await dynamic_context(request, path_params))
         except HTTPException as exc:
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-        execution = await context.endpoint_executor.execute(endpoint, execution_context)
+        try:
+            execution = await context.endpoint_executor.execute(endpoint, execution_context)
+        except ScoreboardConflict as exc:
+            return JSONResponse(
+                {
+                    "detail": {
+                        "ok": False,
+                        "error": "revision_conflict",
+                        "expected": exc.expected,
+                        "actual": exc.actual,
+                    }
+                },
+                status_code=409,
+            )
+        except ScoreboardDisabled as exc:
+            return JSONResponse(
+                {"detail": {"ok": False, "error": "scoreboard_disabled", "message": str(exc)}},
+                status_code=503,
+            )
         payload = context.endpoint_executor.response_payload(endpoint, execution, execution_context)
         status_code = 200 if execution.ok else 500
         if endpoint.response.response_type == "binary":
@@ -267,8 +292,7 @@ def create_app(context):
     async def root_remote_page():
         return remote_file_response(page_aliases[""])
 
-    @app.api_route("/{page_path:path}", methods=["GET", "POST"])
-    async def remote_page_alias(page_path: str, request: Request):
+    async def remote_page_alias_response(page_path: str, request: Request):
         normalized = page_path.strip("/")
         response = await configured_endpoint_response(request)
         if response is not None:
@@ -286,5 +310,13 @@ def create_app(context):
         if normalized and Path(normalized).suffix.lower() in STATIC_EXTENSIONS:
             return remote_file_response(normalized)
         raise HTTPException(status_code=404, detail="Not found")
+
+    @app.get("/{page_path:path}")
+    async def remote_page_alias_get(page_path: str, request: Request):
+        return await remote_page_alias_response(page_path, request)
+
+    @app.post("/{page_path:path}")
+    async def remote_page_alias_post(page_path: str, request: Request):
+        return await remote_page_alias_response(page_path, request)
 
     return app

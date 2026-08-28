@@ -13,21 +13,49 @@ from production_hub.api.clicker_policy import (
 def router(context) -> APIRouter:
     api = APIRouter()
 
-    @api.api_route("/next", methods=["GET", "POST"])
-    async def next_slide() -> Response:
+    async def _next_slide() -> Response:
         await context.propresenter.next_slide()
         return Response("OK\n", media_type="text/plain")
 
-    @api.api_route("/previous", methods=["GET", "POST"])
-    @api.api_route("/prev", methods=["GET", "POST"])
-    async def previous_slide() -> Response:
+    @api.get("/next")
+    async def next_slide_get() -> Response:
+        return await _next_slide()
+
+    @api.post("/next")
+    async def next_slide_post() -> Response:
+        return await _next_slide()
+
+    async def _previous_slide() -> Response:
         await context.propresenter.previous_slide()
         return Response("OK\n", media_type="text/plain")
 
-    @api.api_route("/focus", methods=["GET", "POST"])
-    async def focus(index: int = Query(...)) -> Response:
+    @api.get("/previous")
+    async def previous_slide_get() -> Response:
+        return await _previous_slide()
+
+    @api.post("/previous")
+    async def previous_slide_post() -> Response:
+        return await _previous_slide()
+
+    @api.get("/prev")
+    async def prev_slide_get() -> Response:
+        return await _previous_slide()
+
+    @api.post("/prev")
+    async def prev_slide_post() -> Response:
+        return await _previous_slide()
+
+    async def _focus(index: int) -> Response:
         await context.propresenter.focus_slide(index)
         return Response("OK\n", media_type="text/plain")
+
+    @api.get("/focus")
+    async def focus_get(index: int = Query(...)) -> Response:
+        return await _focus(index)
+
+    @api.post("/focus")
+    async def focus_post(index: int = Query(...)) -> Response:
+        return await _focus(index)
 
     @api.get("/active-presentation")
     async def active_presentation() -> dict:
@@ -129,25 +157,46 @@ def router(context) -> APIRouter:
         await context.propresenter.audio.trigger(playlist, track)
         return {"ok": True}
 
-    @api.api_route("/audio/clear", methods=["GET", "POST"])
-    async def audio_clear() -> dict:
+    async def _audio_clear() -> dict:
         await context.propresenter.audio.clear()
         return {"ok": True}
+
+    @api.get("/audio/clear")
+    async def audio_clear_get() -> dict:
+        return await _audio_clear()
+
+    @api.post("/audio/clear")
+    async def audio_clear_post() -> dict:
+        return await _audio_clear()
 
     @api.get("/audio/active")
     async def audio_active() -> Response:
         return Response(await context.propresenter.audio.active_text(), media_type="text/plain; charset=utf-8")
 
-    @api.api_route("/timer/start", methods=["GET", "POST"])
-    async def timer_start() -> Response:
+    async def _timer_start() -> Response:
         await context.propresenter.timer_start()
         return Response("OK\n", media_type="text/plain")
 
-    @api.api_route("/timer/stop-reset", methods=["GET", "POST"])
-    async def timer_stop_reset() -> Response:
+    @api.get("/timer/start")
+    async def timer_start_get() -> Response:
+        return await _timer_start()
+
+    @api.post("/timer/start")
+    async def timer_start_post() -> Response:
+        return await _timer_start()
+
+    async def _timer_stop_reset() -> Response:
         await context.propresenter.timer_stop()
         await asyncio.sleep(context.config.integrations.propresenter.timer.stop_reset_delay_seconds)
         await context.propresenter.timer_reset()
         return Response("OK\n", media_type="text/plain")
+
+    @api.get("/timer/stop-reset")
+    async def timer_stop_reset_get() -> Response:
+        return await _timer_stop_reset()
+
+    @api.post("/timer/stop-reset")
+    async def timer_stop_reset_post() -> Response:
+        return await _timer_stop_reset()
 
     return api

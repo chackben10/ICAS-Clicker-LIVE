@@ -28,7 +28,11 @@ class ProPresenterClient(IntegrationBase):
         body = await self.get_bytes(path, accept="application/json")
         if not body:
             return {}
-        return json.loads(body.decode("utf-8"))
+        try:
+            return json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            self.mark_error(f"Malformed ProPresenter JSON from {path}: {exc}")
+            raise
 
     async def get_text(self, path: str) -> str:
         body = await self.get_bytes(path, accept="text/plain")

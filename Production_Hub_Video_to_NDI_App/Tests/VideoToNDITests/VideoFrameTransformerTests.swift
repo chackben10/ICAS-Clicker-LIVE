@@ -1,9 +1,10 @@
 import CoreVideo
-import XCTest
+import Testing
 @testable import VideoToNDICore
 
-final class VideoFrameTransformerTests: XCTestCase {
-    func testIdentityTransformKeepsOriginalDimensionsAndBuffer() throws {
+@Suite
+struct VideoFrameTransformerTests {
+    @Test func identityTransformKeepsOriginalDimensionsAndBuffer() throws {
         let input = try makeFrame(width: 4, height: 3)
         let transformer = VideoFrameTransformer(
             rotation: .degrees0,
@@ -13,12 +14,12 @@ final class VideoFrameTransformerTests: XCTestCase {
 
         let output = try transformer.transform(input)
 
-        XCTAssertEqual(output.width, 4)
-        XCTAssertEqual(output.height, 3)
-        XCTAssertTrue(CFEqual(output.pixelBuffer, input.pixelBuffer))
+        #expect(output.width == 4)
+        #expect(output.height == 3)
+        #expect(CFEqual(output.pixelBuffer, input.pixelBuffer))
     }
 
-    func testQuarterTurnSwapsOutputDimensions() throws {
+    @Test func quarterTurnSwapsOutputDimensions() throws {
         let input = try makeFrame(width: 4, height: 3)
 
         for rotation in [VideoRotation.degrees90, .degrees270] {
@@ -29,13 +30,13 @@ final class VideoFrameTransformerTests: XCTestCase {
             )
             let output = try transformer.transform(input)
 
-            XCTAssertEqual(output.width, 3)
-            XCTAssertEqual(output.height, 4)
-            XCTAssertEqual(CVPixelBufferGetPixelFormatType(output.pixelBuffer), kCVPixelFormatType_32BGRA)
+            #expect(output.width == 3)
+            #expect(output.height == 4)
+            #expect(CVPixelBufferGetPixelFormatType(output.pixelBuffer) == kCVPixelFormatType_32BGRA)
         }
     }
 
-    func testFlipsKeepOutputDimensions() throws {
+    @Test func flipsKeepOutputDimensions() throws {
         let input = try makeFrame(width: 4, height: 3)
         let transformer = VideoFrameTransformer(
             rotation: .degrees180,
@@ -45,8 +46,8 @@ final class VideoFrameTransformerTests: XCTestCase {
 
         let output = try transformer.transform(input)
 
-        XCTAssertEqual(output.width, 4)
-        XCTAssertEqual(output.height, 3)
+        #expect(output.width == 4)
+        #expect(output.height == 3)
     }
 
     private func makeFrame(width: Int, height: Int) throws -> VideoFrame {
@@ -62,8 +63,7 @@ final class VideoFrameTransformerTests: XCTestCase {
             attributes as CFDictionary,
             &buffer
         )
-        XCTAssertEqual(result, kCVReturnSuccess)
-        return VideoFrame(pixelBuffer: try XCTUnwrap(buffer), width: width, height: height)
+        #expect(result == kCVReturnSuccess)
+        return VideoFrame(pixelBuffer: try #require(buffer), width: width, height: height)
     }
 }
-

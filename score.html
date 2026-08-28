@@ -433,8 +433,8 @@
     <div class="top-row">
       <div class="page-title">ICAS Score</div>
       <div class="top-buttons">
-        <button class="top-btn" id="undoBtn">Undo</button>
-        <button class="top-btn" id="clearBtn">Clear</button>
+        <button class="top-btn" id="undoBtn" data-testid="undoBtn">Undo</button>
+        <button class="top-btn" id="clearBtn" data-testid="clearBtn">Clear</button>
       </div>
     </div>
 
@@ -448,12 +448,12 @@
 
     <!-- Add row button -->
     <div class="buttons-single">
-      <button id="addRowBtn" class="btn-add">Add Row</button>
+      <button id="addRowBtn" data-testid="addRowBtn" class="btn-add">Add Row</button>
     </div>
 
     <!-- Queue (collapsed by default) -->
     <div class="panel" id="queuePanel">
-      <button type="button" class="panel-toggle" id="queueToggle">
+      <button type="button" class="panel-toggle" id="queueToggle" data-testid="queueToggle">
         <span class="panel-left">
           <span>Queue</span>
         </span>
@@ -470,9 +470,9 @@
         </div>
 
         <div class="queue-row1">
-          <button type="button" class="queue-btn" id="queuePlus">+1</button>
-          <button type="button" class="queue-btn" id="queueMinus">-1</button>
-          <button type="button" class="queue-btn" id="queueClear">Clear</button>
+          <button type="button" class="queue-btn" id="queuePlus" data-testid="queuePlus">+1</button>
+          <button type="button" class="queue-btn" id="queueMinus" data-testid="queueMinus">-1</button>
+          <button type="button" class="queue-btn" id="queueClear" data-testid="queueClear">Clear</button>
         </div>
 
         <div class="queue-row2">
@@ -482,13 +482,13 @@
           </div>
         </div>
 
-        <button type="button" class="queue-apply" id="queueApply">Apply</button>
+        <button type="button" class="queue-apply" id="queueApply" data-testid="queueApply">Apply</button>
       </div>
     </div>
 
     <!-- History (collapsed by default, UNDER queue) -->
     <div class="panel" id="historyPanelWrap">
-      <button type="button" class="panel-toggle" id="historyToggle">
+      <button type="button" class="panel-toggle" id="historyToggle" data-testid="historyToggle">
         <span class="panel-left">
           <span>History</span>
         </span>
@@ -960,12 +960,14 @@
 
       const minusBtn = document.createElement("button");
       minusBtn.type = "button";
+      minusBtn.dataset.testid = `score-minus-${row.id}`;
       minusBtn.className = "seg-btn";
       minusBtn.textContent = "-1";
       minusBtn.onclick = () => updateScore(row.id, -1, `-1 → ${rowLabelById(row.id)}`);
 
       const plusBtn = document.createElement("button");
       plusBtn.type = "button";
+      plusBtn.dataset.testid = `score-plus-${row.id}`;
       plusBtn.className = "seg-btn";
       plusBtn.textContent = "+1";
       plusBtn.onclick = () => updateScore(row.id, 1, `+1 → ${rowLabelById(row.id)}`);
@@ -985,12 +987,14 @@
 
       const clr = document.createElement("button");
       clr.type = "button";
+      clr.dataset.testid = `score-clear-${row.id}`;
       clr.className = "seg-btn";
       clr.textContent = "Clear";
       clr.onclick = () => clearRow(row.id);
 
       const del = document.createElement("button");
       del.type = "button";
+      del.dataset.testid = `score-delete-${row.id}`;
       del.className = "seg-btn seg-danger";
       del.textContent = "Delete";
       del.onclick = () => deleteRow(row.id);

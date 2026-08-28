@@ -934,10 +934,10 @@
     <main id="clickerView">
       <div class="top-row">
         <div class="page-title">ICAS Presentation Clicker</div>
-        <button class="top-btn" id="settingsButton" type="button">Settings</button>
+        <button class="top-btn" id="settingsButton" data-testid="settingsButton" type="button">Settings</button>
       </div>
 
-      <button id="searchModeButton" class="search-launch" type="button" aria-controls="searchView">
+      <button id="searchModeButton" data-testid="searchModeButton" class="search-launch" type="button" aria-controls="searchView">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
           <circle cx="11" cy="11" r="7"></circle>
           <path d="m20 20-4-4"></path>
@@ -952,7 +952,7 @@
             Only this device is previewing this presentation.
           </div>
         </div>
-        <button id="returnToLiveButton" class="return-live-btn" type="button">
+        <button id="returnToLiveButton" data-testid="returnToLiveButton" class="return-live-btn" type="button">
           Return to Active Presentation
         </button>
       </div>
@@ -966,15 +966,15 @@
       <div id="slidesContainer" class="slides-list"></div>
 
       <div id="playlistControls" class="playlist-controls" aria-label="Playlist presentation controls" hidden>
-        <button id="previousPresentationButton" class="playlist-nav-btn" type="button">
+        <button id="previousPresentationButton" data-testid="previousPresentationButton" class="playlist-nav-btn" type="button">
           <span class="playlist-nav-direction">← Previous</span>
           <span id="previousPresentationTitle" class="playlist-nav-title"></span>
         </button>
-        <button id="nextPresentationButton" class="playlist-nav-btn" type="button">
+        <button id="nextPresentationButton" data-testid="nextPresentationButton" class="playlist-nav-btn" type="button">
           <span class="playlist-nav-direction">Next →</span>
           <span id="nextPresentationTitle" class="playlist-nav-title"></span>
         </button>
-        <button id="playlistMenuButton" class="playlist-menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="playlistMenuOverlay">
+        <button id="playlistMenuButton" data-testid="playlistMenuButton" class="playlist-menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="playlistMenuOverlay">
           <span class="playlist-menu-context">Playlist</span>
           <span id="playlistMenuName" class="playlist-menu-name"></span>
         </button>
@@ -984,7 +984,7 @@
 
     <section id="searchView" class="search-view" aria-label="Song Library Search" hidden>
       <div class="search-mode-header">
-        <button id="searchBackButton" class="search-back-btn" type="button">Back</button>
+        <button id="searchBackButton" data-testid="searchBackButton" class="search-back-btn" type="button">Back</button>
         <label class="search-input-shell">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="11" cy="11" r="7"></circle>
@@ -1056,8 +1056,8 @@
       <div class="settings-row-column">
         <label>Slide Preview Preference</label>
         <div class="segment" id="previewPreferenceSegment">
-          <button type="button" data-pref="text">Text</button>
-          <button type="button" data-pref="image">Image</button>
+          <button type="button" data-pref="text" data-testid="display-text">Text</button>
+          <button type="button" data-pref="image" data-testid="display-image">Image</button>
         </div>
       </div>
 
@@ -1072,13 +1072,13 @@
       <div class="settings-row-column" style="margin-top: 14px;">
         <label style="margin-bottom: 6px;">Display Theme</label>
         <div class="segment" id="themeSegment" style="margin-top: 0;">
-          <button type="button" data-mode="light">Light</button>
-          <button type="button" data-mode="dark">Dark</button>
-          <button type="button" data-mode="system">System</button>
+          <button type="button" data-mode="light" data-testid="theme-light">Light</button>
+          <button type="button" data-mode="dark" data-testid="theme-dark">Dark</button>
+          <button type="button" data-mode="system" data-testid="theme-system">System</button>
         </div>
       </div>
 
-      <button id="advancedSettingsButton" class="advanced-toggle-btn" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">
+      <button id="advancedSettingsButton" data-testid="advancedSettingsButton" class="advanced-toggle-btn" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">
         <span>Advanced Settings</span>
         <span class="advanced-toggle-icon" aria-hidden="true">⌄</span>
       </button>
@@ -1121,7 +1121,7 @@
         <div class="settings-subtitle">Shows playlist navigation below the active presentation</div>
       </div>
 
-      <button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+      <button id="settingsCloseButton" data-testid="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
     </div>
   </div>
 
@@ -1129,7 +1129,7 @@
     <div class="settings-card playlist-dialog-card" role="dialog" aria-modal="true" aria-labelledby="playlistMenuTitle">
       <div id="playlistMenuTitle" class="settings-title">Playlist</div>
       <div id="playlistMenuItems" class="playlist-menu-list"></div>
-      <button id="playlistMenuCloseButton" class="settings-close-btn" type="button">Close</button>
+      <button id="playlistMenuCloseButton" data-testid="playlistMenuCloseButton" class="settings-close-btn" type="button">Close</button>
     </div>
   </div>
 
@@ -1138,8 +1138,8 @@
       <div id="switchConfirmationTitle" class="settings-title">Switch presentation?</div>
       <div id="switchConfirmationMessage" class="dialog-message"></div>
       <div class="dialog-actions">
-        <button id="switchConfirmationCancel" class="dialog-action-btn" type="button">Cancel</button>
-        <button id="switchConfirmationConfirm" class="dialog-action-btn primary" type="button">Switch Presentation</button>
+        <button id="switchConfirmationCancel" data-testid="switchConfirmationCancel" class="dialog-action-btn" type="button">Cancel</button>
+        <button id="switchConfirmationConfirm" data-testid="switchConfirmationConfirm" class="dialog-action-btn primary" type="button">Switch Presentation</button>
       </div>
     </div>
   </div>
@@ -1740,6 +1740,7 @@
       const item = document.createElement("button");
       item.className = "slide-item";
       item.type = "button";
+      item.dataset.testid = `slide-item-${index}`;
 
       const isCurrent = !state.focused && index === state.currentIndex;
       const isPending = pendingSelectedIndex === index;
@@ -2031,6 +2032,7 @@
         button.textContent = name;
         const itemIndex = playlistItemIndex(item);
         button.dataset.playlistItemIndex = String(itemIndex);
+        button.dataset.testid = `playlist-item-${itemIndex}`;
         button.classList.toggle("current", itemIndex === playlistState.focusedIndex);
         if (itemIndex === playlistState.focusedIndex) {
           button.setAttribute("aria-current", "true");

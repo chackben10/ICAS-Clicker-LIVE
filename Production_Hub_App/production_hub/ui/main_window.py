@@ -36,6 +36,7 @@ from production_hub.ui.pages import (
     scoreboard_page,
     settings_page,
 )
+from production_hub.ui.pages.common import assign_test_identifiers
 
 
 NAV_EXPANDED_WIDTH = 220
@@ -194,6 +195,7 @@ class MainWindow(QMainWindow):
         self.camera_state_timer.timeout.connect(self.sync_camera_global_controls)
         self.camera_state_timer.start()
         self.sync_camera_global_controls()
+        assign_test_identifiers(self)
 
     def set_nav_collapsed(self, collapsed: bool) -> None:
         self.nav_collapsed = collapsed
@@ -375,6 +377,7 @@ class MainWindow(QMainWindow):
                 name,
                 shortcut,
                 lambda _checked=False, page_index=index: self.show_page(page_index),
+                menu_role=QAction.MenuRole.NoRole,
             )
 
     def setup_tools_menu(self) -> None:
@@ -414,8 +417,18 @@ class MainWindow(QMainWindow):
         self.help_menu = self.menuBar().addMenu("Help")
         self.add_menu_action(self.help_menu, "About Production Hub", "", self.show_about_dialog)
 
-    def add_menu_action(self, menu: QMenu, label: str, sequence, handler) -> QAction:
+    def add_menu_action(
+        self,
+        menu: QMenu,
+        label: str,
+        sequence,
+        handler,
+        *,
+        menu_role: QAction.MenuRole | None = None,
+    ) -> QAction:
         action = QAction(label, self)
+        if menu_role is not None:
+            action.setMenuRole(menu_role)
         if isinstance(sequence, QKeySequence):
             action.setShortcut(sequence)
         elif isinstance(sequence, str):

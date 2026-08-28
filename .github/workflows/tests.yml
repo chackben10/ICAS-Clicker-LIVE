@@ -1,0 +1,84 @@
+name: Regression tests
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  python-quick:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r Production_Hub_App/requirements.txt
+          python -m pip install -r testing/requirements.txt
+      - name: Unit, contracts, simulated integrations, Qt, and benchmarks
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python testing/run_end_to_end.py --mode quick --skip-browser --skip-swift
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-quick-reports
+          path: testing/benchmarks/outputs/
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application and browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r Production_Hub_App/requirements.txt
+          python -m pip install -r testing/requirements.txt
+          python -m playwright install --with-deps ${{ matrix.engine }}
+      - name: Test local and deployed pages without production mutations
+        env:
+          PRODUCTION_HUB_LIVE: "0"
+          PRODUCTION_HUB_DEPLOYED_SMOKE: "1"
+          PRODUCTION_HUB_BROWSER_OUTPUT: testing/benchmarks/outputs/ci-browser-${{ matrix.engine }}/screenshots
+          PRODUCTION_HUB_BROWSER_METRICS: testing/benchmarks/outputs/ci-browser-${{ matrix.engine }}/metrics.json
+        run: >-
+          python -m pytest testing/tests/browser
+          --browser ${{ matrix.engine }}
+          --tracing retain-on-failure
+          --junitxml=testing/benchmarks/outputs/ci-browser-${{ matrix.engine }}.junit.xml
+      - name: Upload browser artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-${{ matrix.engine }}-reports
+          path: testing/benchmarks/outputs/
+
+  swift:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show selected Xcode toolchain
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+      - name: Run genuine Swift and C bridge tests
+        run: Production_Hub_Video_to_NDI_App/scripts/test.sh --skip-live-ndi

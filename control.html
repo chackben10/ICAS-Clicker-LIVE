@@ -1008,7 +1008,7 @@ grid-column: 1 / -1;
 <div class="control-header">
 <div class="top-row">
 <div class="page-title">ICAS Media Control Panel</div>
-<button class="top-btn" id="settingsButton" type="button">Settings</button>
+<button class="top-btn" id="settingsButton" data-testid="settingsButton" type="button">Settings</button>
 </div>
 
 <div class="remote-controls" aria-label="Remote presentation controls">
@@ -1042,7 +1042,7 @@ grid-column: 1 / -1;
 
 <div class="grid">
 <div class="preset-card" id="cardStreamBeginning">
-<button class="preset-main" id="btnStreamBeginning" type="button">
+<button class="preset-main" id="btnStreamBeginning" data-testid="btnStreamBeginning" type="button">
 <div class="preset-title">Stream Beginning</div>
 <div class="preset-sub">
 Sets ProPresenter to <b>Starting Announcements</b> and sets OBS scene to <b>Stream Start</b>.
@@ -1051,17 +1051,17 @@ Sets ProPresenter to <b>Starting Announcements</b> and sets OBS scene to <b>Stre
 </div>
 
 <div class="preset-card has-addon" id="cardCamera">
-<button class="preset-main" id="btnCamera" type="button">
+<button class="preset-main" id="btnCamera" data-testid="btnCamera" type="button">
 <div class="preset-title">Camera</div>
 <div class="preset-sub">
 Sets ProPresenter to <b>PTZ Camera</b> and sets OBS scene to <b>PTZ Camera</b>.
 </div>
 </button>
-<button class="preset-addon danger-fill" id="btnCameraClearSlide" type="button">Camera + Clear Slide</button>
+<button class="preset-addon danger-fill" id="btnCameraClearSlide" data-testid="btnCameraClearSlide" type="button">Camera + Clear Slide</button>
 </div>
 
 <div class="preset-card has-selector has-addon" id="cardServiceLogo">
-<button class="preset-main" id="btnServiceLogo" type="button">
+<button class="preset-main" id="btnServiceLogo" data-testid="btnServiceLogo" type="button">
 <div class="preset-title">Service Logo</div>
 <div class="preset-sub" id="serviceLogoDesc">
 Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</b> on OBS.
@@ -1072,16 +1072,16 @@ Sets ProPresenter Announcement to <b>—</b>, and shows the <b>Audience Camera</
 <div class="select-wrap" style="flex: 1;">
 <select id="serviceLogoSelect" class="select" aria-label="Default Service Logo"></select>
 </div>
-<button class="picker-open-btn" id="serviceLogoPickerButton" type="button" aria-haspopup="dialog">
+<button class="picker-open-btn" id="serviceLogoPickerButton" data-testid="serviceLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="serviceLogoPickerValue">—</span>
 <span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
 </div>
-<button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
+<button class="preset-addon danger-fill" id="btnServiceLogoClearSlide" data-testid="btnServiceLogoClearSlide" type="button">Service Logo + Clear Slide</button>
 </div>
 
 <div class="preset-card" id="cardShowSlides">
-<button class="preset-main" id="btnShowSlides" type="button">
+<button class="preset-main" id="btnShowSlides" data-testid="btnShowSlides" type="button">
 <div class="preset-title">Show Slides</div>
 <div class="preset-sub">
 Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b>.
@@ -1090,7 +1090,7 @@ Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b
 </div>
 
 <div class="preset-card has-selector" id="cardTestimonies">
-<button class="preset-main" id="btnTestimonies" type="button">
+<button class="preset-main" id="btnTestimonies" data-testid="btnTestimonies" type="button">
 <div class="preset-title">Testimonies</div>
 <div class="preset-sub" id="testimoniesDesc">
 Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonies</b>.
@@ -1101,7 +1101,7 @@ Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonie
 <div class="select-wrap" style="flex: 1;">
 <select id="testimoniesLogoSelect" class="select" aria-label="Testimonies Service Logo"></select>
 </div>
-<button class="picker-open-btn" id="testimoniesLogoPickerButton" type="button" aria-haspopup="dialog">
+<button class="picker-open-btn" id="testimoniesLogoPickerButton" data-testid="testimoniesLogoPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="testimoniesLogoPickerValue">—</span>
 <span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
@@ -1109,7 +1109,7 @@ Sets ProPresenter Announcement to <b>—</b> and sets OBS scene to <b>Testimonie
 </div>
 
 <div class="preset-card" id="cardEndingStream">
-<button class="preset-main" id="btnEndingStream" type="button">
+<button class="preset-main" id="btnEndingStream" data-testid="btnEndingStream" type="button">
 <div class="preset-title">Ending Stream</div>
 <div class="preset-sub">
 Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks Screen</b>.
@@ -1118,7 +1118,7 @@ Sets ProPresenter to <b>Ending Announcements</b> and sets OBS scene to <b>Thanks
 </div>
 
 <div class="preset-card has-selector" id="cardSetMacro">
-<button class="preset-main" id="btnSetMacro" type="button">
+<button class="preset-main" id="btnSetMacro" data-testid="btnSetMacro" type="button">
 <div class="preset-title">Set Macro</div>
 <div class="preset-sub" id="macroDesc">
 Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
@@ -1129,7 +1129,7 @@ Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 <div class="select-wrap" style="flex: 1;">
 <select id="macroSelect" class="select" aria-label="Control Macro"></select>
 </div>
-<button class="picker-open-btn" id="macroPickerButton" type="button" aria-haspopup="dialog">
+<button class="picker-open-btn" id="macroPickerButton" data-testid="macroPickerButton" type="button" aria-haspopup="dialog">
 <span class="picker-open-value" id="macroPickerValue">—</span>
 <span class="picker-open-action" aria-hidden="true">▾</span>
 </button>
@@ -1137,7 +1137,7 @@ Triggers ProPresenter Macro: <b>—</b> (sets look for In-House TVs + OBS).
 </div>
 
 <div class="preset-card" id="cardClearSlide">
-<button class="preset-main danger-fill" id="btnClearSlide" type="button">
+<button class="preset-main danger-fill" id="btnClearSlide" data-testid="btnClearSlide" type="button">
 <div class="preset-title">Clear Slide</div>
 <div class="preset-sub">
 Clears only the ProPresenter slide layer. OBS scenes and camera feeds stay unchanged.
@@ -1146,7 +1146,7 @@ Clears only the ProPresenter slide layer. OBS scenes and camera feeds stay uncha
 </div>
 
 <div class="preset-card" id="cardAudioControl">
-<button class="preset-main" id="btnAudioControl" type="button">
+<button class="preset-main" id="btnAudioControl" data-testid="btnAudioControl" type="button">
 <div class="preset-title">Control Background Pads Audio</div>
 <div class="preset-sub">
 Open pad controller to play ambient drones.
@@ -1155,7 +1155,7 @@ Open pad controller to play ambient drones.
 </div>
 
 <div class="preset-card" id="cardNSCSetup">
-<button class="preset-main" id="btnNSCSetup" type="button">
+<button class="preset-main" id="btnNSCSetup" data-testid="btnNSCSetup" type="button">
 <div class="preset-title">NSC setup</div>
 <div class="preset-sub">
 Setup ProPresenter to display iMac screen on all in-house TVs.
@@ -1175,8 +1175,8 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 
 <div class="segment" id="audioPlaylistSegment"></div>
 <div id="audioGrid" class="audio-grid"></div>
-<button id="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
-<button id="audioCloseButton" class="settings-close-btn" type="button">Close</button>
+<button id="btnClearAudio" data-testid="btnClearAudio" class="audio-clear-btn" type="button">Clear Ambient Audio</button>
+<button id="audioCloseButton" data-testid="audioCloseButton" class="settings-close-btn" type="button">Close</button>
 </div>
 </div>
 
@@ -1199,8 +1199,8 @@ Playing:&nbsp;<span id="audioNowPlayingItem">—</span>
 </div>
 
 <div class="mini-row">
-<button class="mini-btn" id="refreshLogosBtn" type="button">Refresh List</button>
-<button class="mini-btn" id="testBackendBtn" type="button">Test Backend</button>
+<button class="mini-btn" id="refreshLogosBtn" data-testid="refreshLogosBtn" type="button">Refresh List</button>
+<button class="mini-btn" id="testBackendBtn" data-testid="testBackendBtn" type="button">Test Backend</button>
 </div>
 
 <div class="settings-muted" style="margin-top: calc(10px * var(--btn-scale));">
@@ -1229,13 +1229,13 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 <div class="settings-section">
 <div class="settings-label">Display Theme</div>
 <div class="segment" id="themeSegment">
-<button data-mode="light" type="button">Light</button>
-<button data-mode="dark" type="button">Dark</button>
-<button data-mode="system" type="button">System</button>
+<button data-mode="light" data-testid="theme-light" type="button">Light</button>
+<button data-mode="dark" data-testid="theme-dark" type="button">Dark</button>
+<button data-mode="system" data-testid="theme-system" type="button">System</button>
 </div>
 </div>
 
-<button id="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
+<button id="settingsCloseButton" data-testid="settingsCloseButton" class="settings-close-btn" type="button">Close</button>
 </div>
 </div>
 
@@ -1243,7 +1243,7 @@ Backend: <b>local Production Hub when served locally; hosted fallback otherwise<
 <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
 <div class="settings-title" id="pickerTitle">Choose an item</div>
 <div class="picker-options" id="pickerOptions"></div>
-<button id="pickerCloseButton" class="settings-close-btn" type="button">Cancel</button>
+<button id="pickerCloseButton" data-testid="pickerCloseButton" class="settings-close-btn" type="button">Cancel</button>
 </div>
 </div>
 
@@ -1587,13 +1587,14 @@ empty.className = "picker-empty";
 empty.textContent = "No choices are available.";
 pickerOptions.appendChild(empty);
 } else {
-choices.forEach(item => {
+choices.forEach((item, itemIndex) => {
 const value = String(item?.value || "");
 const label = String(item?.label || "(Unnamed)");
 const button = document.createElement("button");
 button.type = "button";
 button.className = "picker-option";
 button.textContent = label;
+button.dataset.testid = `picker-option-${itemIndex}`;
 
 if (value === String(selectedValue || "")) {
 button.classList.add("selected");
@@ -2246,7 +2247,7 @@ const items = Array.isArray(data?.items) ? data.items : [];
 
 audioGrid.innerHTML = "";
 
-items.forEach(trackName => {
+items.forEach((trackName, trackIndex) => {
 const clean = String(trackName)
 .replace(/\.[^/.]+$/, "")
 .replace(/\s*\((Major|minor|nuetral|neutral)\)/gi, "")
@@ -2256,6 +2257,7 @@ const btn = document.createElement("button");
 btn.type = "button";
 btn.className = "audio-btn";
 btn.textContent = clean;
+btn.dataset.testid = `audio-track-${trackIndex}`;
 
 attachTapHandler(btn, () => window.triggerAudio(name, trackName));
 audioGrid.appendChild(btn);
@@ -2311,6 +2313,7 @@ audioPlaylistSegment.innerHTML = "";
 items.forEach((name, i) => {
 const btn = document.createElement("button");
 btn.type = "button";
+btn.dataset.testid = `audio-playlist-${i}`;
 
 if (i === 0) btn.className = "active";
 
