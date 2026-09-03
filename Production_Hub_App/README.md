@@ -65,10 +65,49 @@ After the first dependency install, you can usually rebuild with:
 python3 Production_Hub_App/scripts/build_macos_app.py --install
 ```
 
-Do not rebuild the installed bundle for ordinary source development. Run
-`python3 Production_Hub_App/main.py`; it uses the stable `Production Hub
-Dev.app` identity and loads the current source tree, so Accessibility, Input
-Monitoring, Camera, and local-network permissions survive source edits.
+### Production Hub Dev — the staging app
+
+`Production Hub Dev` is the **staging application**. Every change is exercised
+there first, on the production machine and against the real cameras,
+ProPresenter, and NDI sources, and only promoted into the installed
+`Production Hub.app` once it has been shown to behave.
+
+Run it with:
+
+```bash
+python3 Production_Hub_App/main.py
+```
+
+On macOS that relaunches the GUI through `.build/dev/Production Hub Dev.app`, a
+small stable wrapper that loads the **live source tree** while supplying its own
+bundle identity (`org.icas.productionhub.dev`). Source edits change what it
+runs without changing what macOS thinks it is, so Accessibility, Input
+Monitoring, Camera, and local-network grants are given once to
+`Production Hub Dev` and survive every subsequent edit.
+
+Why it exists, and why it is kept:
+
+- **It is a separate application to macOS.** Its own bundle identifier means
+  its privacy grants are its own. Testing never disturbs the permissions the
+  installed release depends on, and a broken source tree cannot cost the
+  release its Camera access.
+- **No rebuild between edits.** It loads source directly, so the
+  edit-run-observe loop costs seconds rather than a full PyInstaller build.
+- **The two can run side by side**, though not on the same API port — stop one
+  before starting the other, or pass `--port` to the staging instance.
+
+Do **not** rebuild and reinstall `Production Hub.app` to try a change. That is
+what the staging app is for. Promote to the installed release only when the
+change is ready for a service:
+
+1. Exercise it in `Production Hub Dev` against the real rig.
+2. `python3 testing/run_end_to_end.py --mode quick` (the release gate; `--mode
+   fast` is the per-edit gate).
+3. `python3 Production_Hub_App/scripts/build_macos_app.py --install`.
+4. Restart before the next service, never during one.
+
+Treat the installed `Production Hub.app` as production: it is what runs on a
+Sunday, and it should only ever be updated deliberately, between services.
 
 Installed release builds must use the same persistent signing identity every
 time. Create the local one once:
@@ -327,11 +366,12 @@ are available at `GET /api/camera/tracking` and
 `GET /api/camera/tracking/{audience|ptz}` for future dashboards and automation
 observability.
 
-For source development on macOS, `python3 main.py` automatically relaunches the
-GUI through `.build/dev/Production Hub Dev.app`. That small, stable app wrapper
-loads the live source tree while supplying the bundle identity and privacy
-description macOS requires for Camera access. Grant Camera permission once to
-`Production Hub Dev`; source edits do not rebuild or change that identity.
+Camera work is done in the staging app. `python3 main.py` relaunches the GUI
+through `.build/dev/Production Hub Dev.app`, which loads the live source tree
+while supplying the bundle identity and privacy description macOS requires for
+Camera access. Grant Camera permission once to `Production Hub Dev`; source
+edits do not rebuild or change that identity, and the installed release keeps
+its own grants. See "Production Hub Dev — the staging app" above.
 
 ## Phase 3 Calibration, Curation, Relocalization, and Scene Planes
 

@@ -21,6 +21,22 @@ These instructions apply to every change in this repository.
   regression. Baseline changes require an explicit `--accept-baseline` run and
   a written explanation in the change summary.
 
+## Staging before production
+
+- `Production Hub Dev` is the staging application. Run it with
+  `python3 Production_Hub_App/main.py`; it loads the live source tree under its
+  own bundle identity (`org.icas.productionhub.dev`) and its own privacy grants.
+- Exercise every change there, against the real cameras, ProPresenter, and NDI
+  sources, before it goes anywhere near the installed release.
+- The installed `/Applications/Production Hub.app` is production. Do not
+  rebuild or reinstall it to try something out; that is what staging is for.
+  Promote only after the quick suite passes and the change is ready for a
+  service, and never mid-service.
+- Do not remove or bypass the development launcher
+  (`production_hub/app/dev_launcher.py`). Losing it means testing against the
+  release bundle, which costs a full build per edit and puts the release's
+  permissions at risk.
+
 ## Performance work is measured, not asserted
 
 - The number that matters for cue responsiveness is press-to-cue: the CGEventTap
