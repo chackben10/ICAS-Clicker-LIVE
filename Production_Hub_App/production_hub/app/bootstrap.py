@@ -195,7 +195,7 @@ def ensure_required_endpoints(endpoints: list[EndpointDefinition]) -> list[Endpo
 
 
 def ensure_camera_calibration_defaults(config, data_root: Path) -> bool:
-    """Migrate drawings and retire failed generated-plane experiments."""
+    """Migrate drawings, calibration metadata, and legacy performance defaults."""
 
     from production_hub.calibration.review import load_active_calibration_review
 
@@ -203,6 +203,17 @@ def ensure_camera_calibration_defaults(config, data_root: Path) -> bool:
     reference = review.created_at if review is not None else ""
     changed = False
     tracking = config.integrations.camera_tracking
+    # These were the original relocalizer defaults.  The fixed-camera drift
+    # guard remained accurate at 640px in the sanctuary reference, while the
+    # old 1280px/1Hz SIFT pass was the dominant tracking-on CPU cost.  Migrate
+    # only the exact legacy pair so deliberate operator tuning is preserved.
+    if (
+        tracking.relocalization_maximum_width == 1280
+        and tracking.relocalization_fps == 1.0
+    ):
+        tracking.relocalization_maximum_width = 640
+        tracking.relocalization_fps = 0.5
+        changed = True
     retained_regions = [
         region
         for region in tracking.scene_regions
@@ -330,7 +341,7 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
     defaults = {item.key: item for item in build_default_automations()}
     repaired = []
     for automation in automations:
-        if automation.key == "obs_connection_watchdog":
+        if automation.key in {"obs_connection_watchdog", "bible_look_enforcement"}:
             continue
         default = defaults.get(automation.key)
         if default is None:
@@ -345,14 +356,11 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
             automation.interval_seconds = default.interval_seconds
         if automation.key == "slide_label_audio_sync" and automation.interval_seconds <= 0:
             automation.interval_seconds = default.interval_seconds
-        if automation.key in {
-            "bible_look_enforcement",
-            AUTO_SHOW_BIBLE_AUTOMATION_KEY,
-        } and automation.trigger != default.trigger:
+        if (
+            automation.key == AUTO_SHOW_BIBLE_AUTOMATION_KEY
+            and automation.trigger != default.trigger
+        ):
             automation.trigger = default.trigger
-        if automation.key == "bible_look_enforcement" and automation.trigger == default.trigger:
-            automation.conditions = [dict(condition) for condition in default.conditions]
-            automation.rules = dict(default.rules)
         if not automation.conditions and default.conditions:
             automation.conditions = [dict(condition) for condition in default.conditions]
             automation.rules = dict(default.rules)

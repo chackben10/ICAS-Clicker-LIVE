@@ -65,6 +65,23 @@ After the first dependency install, you can usually rebuild with:
 python3 Production_Hub_App/scripts/build_macos_app.py --install
 ```
 
+Do not rebuild the installed bundle for ordinary source development. Run
+`python3 Production_Hub_App/main.py`; it uses the stable `Production Hub
+Dev.app` identity and loads the current source tree, so Accessibility, Input
+Monitoring, Camera, and local-network permissions survive source edits.
+
+Installed release builds should use the same persistent Keychain signing
+identity every time:
+
+```bash
+python3 Production_Hub_App/scripts/build_macos_app.py --install \
+  --codesign-identity "Developer ID Application: Your Team (TEAMID)"
+```
+
+The identity can instead be supplied in `PRODUCTION_HUB_CODESIGN_IDENTITY`.
+Without one, the script clearly warns that the ad-hoc release signature cannot
+retain macOS privacy permissions across rebuilt versions.
+
 The generated app is written to:
 
 ```text

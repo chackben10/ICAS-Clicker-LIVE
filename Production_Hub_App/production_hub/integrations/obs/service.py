@@ -45,6 +45,10 @@ class ObsService:
                 pass
 
     async def set_scene(self, scene_name: str, use_policy: bool = True) -> bool:
+        # Auto Show can request the same scene for every cue. Avoid repeatedly
+        # resetting OBS's transition and program scene when nothing changed.
+        if self.current_scene == scene_name:
+            return True
         transition = self.config.default_transition
         duration: int | None = None
         if use_policy:

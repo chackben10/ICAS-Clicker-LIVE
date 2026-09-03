@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import importlib.metadata
+import os
 import plistlib
 import shutil
 import subprocess
@@ -198,7 +199,12 @@ def stage_remote_pages() -> Path:
     return staging
 
 
-def build_app(icon_path: Path, remote_pages: Path, native_video_bridge: Path) -> Path:
+def build_app(
+    icon_path: Path,
+    remote_pages: Path,
+    native_video_bridge: Path,
+    codesign_identity: str,
+) -> Path:
     log("Checking build environment...")
     require_pyinstaller()
     reject_obsolete_pathlib_backport()
@@ -248,6 +254,8 @@ def build_app(icon_path: Path, remote_pages: Path, native_video_bridge: Path) ->
         "--hidden-import",
         "Quartz",
         "--hidden-import",
+        "ApplicationServices",
+        "--hidden-import",
         "CoreML",
         "--hidden-import",
         "Vision",
@@ -261,19 +269,39 @@ def build_app(icon_path: Path, remote_pages: Path, native_video_bridge: Path) ->
         "uvicorn.protocols.websockets.auto",
         "--hidden-import",
         "uvicorn.lifespan.on",
-        str(APP_ROOT / "main.py"),
     ]
+    if codesign_identity != "-":
+        command.extend(["--codesign-identity", codesign_identity])
+    command.append(str(APP_ROOT / "main.py"))
     log("Building Production Hub.app with PyInstaller...")
     run(command, cwd=APP_ROOT, stream_output=True)
     app_path = DIST_ROOT / f"{APP_NAME}.app"
     if not app_path.exists():
         raise BuildError(f"PyInstaller finished, but {app_path} was not created.")
     log("Finalizing app bundle...")
-    finalize_bundle_icon(app_path, icon_path)
+    finalize_bundle_icon(app_path, icon_path, codesign_identity)
     return app_path
 
 
-def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
+def codesign_command(app_path: Path, identity: str) -> list[str]:
+    command = [
+        "/usr/bin/codesign",
+        "--force",
+        "--deep",
+        "--sign",
+        identity,
+    ]
+    if identity.startswith("Developer ID Application"):
+        command.extend(["--timestamp", "--options", "runtime"])
+    command.append(str(app_path))
+    return command
+
+
+def finalize_bundle_icon(
+    app_path: Path,
+    icon_path: Path,
+    codesign_identity: str,
+) -> None:
     resources = app_path / "Contents" / "Resources"
     resources.mkdir(parents=True, exist_ok=True)
     shutil.copy2(icon_path, resources / "ProductionHub.icns")
@@ -304,8 +332,9 @@ def finalize_bundle_icon(app_path: Path, icon_path: Path) -> None:
     run(["/usr/bin/touch", str(app_path)])
     # PyInstaller signs before we apply the final bundle metadata. Re-sign the
     # completed artifact so Gatekeeper validates the exact plist and resources
-    # that are delivered. A Developer ID can replace this ad-hoc identity later.
-    run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", str(app_path)])
+    # that are delivered. A persistent identity gives every release a compatible
+    # designated requirement, allowing macOS to retain privacy permissions.
+    run(codesign_command(app_path, codesign_identity))
 
 
 def install_app(app_path: Path, target: Path) -> Path:
@@ -333,6 +362,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--install-deps", action="store_true", help="Install runtime and build dependencies before building.")
     parser.add_argument("--icon-only", action="store_true", help="Only generate assets/ProductionHub.icns from Production_hub.icon.")
+    parser.add_argument(
+        "--codesign-identity",
+        default=os.environ.get("PRODUCTION_HUB_CODESIGN_IDENTITY", "-"),
+        help=(
+            "Persistent Keychain code-signing identity. Defaults to "
+            "PRODUCTION_HUB_CODESIGN_IDENTITY or ad-hoc signing (-)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -348,7 +385,21 @@ def main() -> int:
         log("Building the in-process NDI receiver bridge…")
         native_video_bridge = build_native_video()
         remote_pages = stage_remote_pages()
-        app_path = build_app(icon_path, remote_pages, native_video_bridge)
+        codesign_identity = str(args.codesign_identity or "-").strip() or "-"
+        if codesign_identity == "-":
+            log(
+                "WARNING: Ad-hoc release signing cannot retain macOS privacy permissions "
+                "across rebuilds. Use the stable source-development wrapper or pass "
+                "--codesign-identity for installed releases."
+            )
+        else:
+            log(f"Signing installed releases with persistent identity: {codesign_identity}")
+        app_path = build_app(
+            icon_path,
+            remote_pages,
+            native_video_bridge,
+            codesign_identity,
+        )
         print(f"Built: {app_path}")
         if not args.no_install:
             installed = install_app(app_path, args.install_destination)

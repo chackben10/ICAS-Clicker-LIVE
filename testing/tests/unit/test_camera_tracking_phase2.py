@@ -5,6 +5,7 @@ import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -21,6 +22,7 @@ from production_hub.core.config.models import (
     SceneRegionPoint,
 )
 from production_hub.app.dev_launcher import (
+    DEV_APP_NAME,
     DEV_CHILD_ARGUMENT,
     should_use_development_app,
     without_dev_child_argument,
@@ -76,6 +78,21 @@ class _SlowDetector:
 
 
 class CameraTrackingPhaseTwoTests(unittest.TestCase):
+    def test_tracking_settings_use_the_owner_released_when_page_hides(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            page = CameraControlPage(context)
+            set_activity = MagicMock()
+            context.video.set_tracking_activity = set_activity
+
+            page.update_tracking_config()
+
+            set_activity.assert_called_once_with(False, owner="camera_page")
+            page.close()
+            context.video.shutdown()
+
     def test_read_only_tracking_api_exposes_both_sources(self) -> None:
         with TemporaryDirectory() as directory:
             context = build_context(Path(directory))
@@ -189,6 +206,15 @@ class CameraTrackingPhaseTwoTests(unittest.TestCase):
         self.assertFalse(should_use_development_app(["--api-only"]))
         self.assertFalse(should_use_development_app([DEV_CHILD_ARGUMENT]))
         self.assertEqual([], without_dev_child_argument([DEV_CHILD_ARGUMENT]))
+        self.assertEqual("Production Hub Dev", DEV_APP_NAME)
+
+    def test_live_runner_quits_stable_development_bundle_gracefully(self) -> None:
+        from testing.harness.live_system import ApplicationLifecycle
+
+        script = ApplicationLifecycle._quit_script(DEV_APP_NAME)
+
+        self.assertIn('process "Production Hub Dev"', script)
+        self.assertIn('keystroke "q" using command down', script)
 
     def test_old_configs_receive_safe_tracking_defaults(self) -> None:
         config = AppConfig.from_dict({"app_name": "Production Hub"})

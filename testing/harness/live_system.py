@@ -15,6 +15,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from production_hub.app.dev_launcher import (
+    DEV_APP_NAME,
+    DEV_CHILD_ARGUMENT,
+    prepare_development_app,
+)
 from production_hub.core.config.models import AppConfig
 from production_hub.integrations.obs.service import ObsService
 from production_hub.integrations.panasonic_awp.service import PanasonicAwpService
@@ -302,6 +307,7 @@ class ApplicationLifecycle:
         self.initially_running = {
             "ProPresenter": self.is_running("ProPresenter"),
             "Production Hub": self.is_running("Production Hub"),
+            DEV_APP_NAME: self.is_running(DEV_APP_NAME),
         }
 
     @staticmethod
@@ -315,13 +321,13 @@ class ApplicationLifecycle:
 
     @staticmethod
     def _quit_script(app_name: str) -> str:
-        if app_name == "Production Hub":
+        if app_name in {"Production Hub", DEV_APP_NAME}:
             # The app intentionally stays resident when its window is closed.
             # Drive its own Quit action so MainWindow marks the close as a real
             # application shutdown before QApplication receives it.
-            return """tell application "System Events"
-if exists process "Production Hub" then
-    tell process "Production Hub"
+            return f"""tell application "System Events"
+if exists process "{app_name}" then
+    tell process "{app_name}"
         set frontmost to true
         keystroke "q" using command down
     end tell
@@ -388,6 +394,25 @@ end tell"""
         bundle = APP_ROOT / "dist" / "Production Hub.app"
         if not bundle.is_dir():
             raise RuntimeError(f"Build did not produce {bundle}")
+        return bundle
+
+    @staticmethod
+    def open_source_development_hub() -> Path:
+        """Launch live source through a stable TCC/code-signing identity."""
+
+        bundle = prepare_development_app(APP_ROOT)
+        subprocess.run(
+            [
+                "open",
+                "-n",
+                str(bundle),
+                "--args",
+                str(APP_ROOT / "main.py"),
+                DEV_CHILD_ARGUMENT,
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+        )
         return bundle
 
 

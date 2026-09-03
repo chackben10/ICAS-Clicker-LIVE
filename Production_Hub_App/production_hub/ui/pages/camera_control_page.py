@@ -872,7 +872,7 @@ class CameraControlPage(QWidget):
         self.context = context
         self.click_to_frame_window = ClickToFrameWindow(context)
         self.click_to_frame_window.visibility_changed.connect(
-            lambda _visible: self._update_preview_activity()
+            lambda visible: self._update_preview_activity(click_visible=visible)
         )
         self.click_to_frame_window.visibility_changed.connect(
             lambda visible: self._update_calibration_activity(
@@ -937,7 +937,7 @@ class CameraControlPage(QWidget):
         super().showEvent(event)
         if hasattr(self, "refresh_timer"):
             self._ensure_video_initialized()
-            self._update_preview_activity()
+            self._update_preview_activity(page_visible=True)
             tracking_requested = (
                 self.context.config.integrations.camera_tracking.automation.mode
                 == "subject"
@@ -982,7 +982,7 @@ class CameraControlPage(QWidget):
                 False,
                 owner="camera_page",
             )
-            self._update_preview_activity()
+            self._update_preview_activity(page_visible=False)
             self._update_calibration_activity(page_visible=False)
         super().hideEvent(event)
 
@@ -2926,9 +2926,27 @@ class CameraControlPage(QWidget):
         self.click_to_frame_window.center_default_geometry()
         self.show_click_to_frame_window()
 
-    def _update_preview_activity(self) -> None:
-        self.context.video.set_preview_active(
-            self.isVisible() or self.click_to_frame_window.isVisible()
+    def _update_preview_activity(
+        self,
+        *,
+        page_visible: bool | None = None,
+        click_visible: bool | None = None,
+    ) -> None:
+        page_active = self.isVisible() if page_visible is None else bool(page_visible)
+        click_active = (
+            self.click_to_frame_window.isVisible()
+            if click_visible is None
+            else bool(click_visible)
+        )
+        self.context.video.set_preview_activity(
+            page_active,
+            owner="camera_page",
+            sources={VideoSourceKey.AUDIENCE, VideoSourceKey.PTZ},
+        )
+        self.context.video.set_preview_activity(
+            click_active,
+            owner="click_to_frame",
+            sources={VideoSourceKey.AUDIENCE},
         )
 
     def clear_ptz_click_target(self) -> None:
@@ -3355,7 +3373,13 @@ class CameraControlPage(QWidget):
         config.analysis_fps = float(self.tracking_rate.currentData())
         config.__post_init__()
         self._save_tracking_config(config)
-        self.context.video.set_tracking_activity(config.enabled and self.isVisible())
+        # Use the same owner that hideEvent releases.  The former default
+        # "ui" owner survived after leaving this page and kept Vision/SIFT
+        # analysis running for the entire service.
+        self.context.video.set_tracking_activity(
+            config.enabled and self.isVisible(),
+            owner="camera_page",
+        )
         self.status.setText(
             "Person detection enabled in shadow mode. No camera commands will be sent."
             if config.enabled

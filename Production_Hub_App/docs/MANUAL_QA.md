@@ -43,7 +43,19 @@
 
 ## Automations
 
-- Bible Look Enforcement triggers only after cooldown.
+- Entering ProPresenter's Bible mode applies the Bible macro before a verse is
+  selected. Production Hub uses the native value-change notification where the
+  control supports it. ProPresenter 21's custom Bible radio rejects that
+  notification and retains stale control objects, so the compatibility path
+  resolves and reads only the Bible radio within the toolbar twice per second.
+  It does not install a global mouse listener, poll mouse state, traverse the
+  presentation library, or post a synthetic click/key after the cue. Each
+  Bible-mode entry performs one `/look/current` verification because
+  ProPresenter 21 can leave its aggregate Look stream one transition behind.
+- Grant the signed Production Hub app Accessibility access, switch from Show to
+  Bible mode while a Malayalam or English Song look is live, and confirm the
+  toolbar Look changes to Bible before selecting the first verse. Confirm the
+  first verse remains live and visually correct without a second cue click.
 - OBS Look Sync avoids duplicate applications.
 - Slide Label Audio Sync waits 0.5 seconds and prevents duplicates.
 - Auto Show clears announcements and sets OBS to ProPresenter Input.

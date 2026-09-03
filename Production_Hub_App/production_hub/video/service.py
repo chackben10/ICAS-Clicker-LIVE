@@ -66,7 +66,7 @@ class VideoService:
         self._ndi_runtime_version = "not loaded"
         self._discovery_lock = threading.RLock()
         self._qt_initialized = False
-        self._preview_active = False
+        self._preview_activity_owners: dict[str, set[VideoSourceKey]] = {}
         self._tracking_activity_owners: set[str] = set()
         self._calibration_activity_owners: set[str] = set()
         self._shutdown_lock = threading.Lock()
@@ -131,7 +131,28 @@ class VideoService:
         self._update_output_activity()
 
     def set_preview_active(self, active: bool) -> None:
-        self._preview_active = bool(active)
+        """Compatibility wrapper for callers that need both video previews."""
+
+        self.set_preview_activity(active, owner="legacy")
+
+    def set_preview_activity(
+        self,
+        active: bool,
+        *,
+        owner: str = "ui",
+        sources: set[VideoSourceKey] | None = None,
+    ) -> None:
+        """Keep only the video sources an active preview owner actually consumes."""
+
+        selected_owner = str(owner or "ui")
+        if active:
+            self._preview_activity_owners[selected_owner] = set(
+                sources
+                if sources is not None
+                else (VideoSourceKey.AUDIENCE, VideoSourceKey.PTZ)
+            )
+        else:
+            self._preview_activity_owners.pop(selected_owner, None)
         self._update_output_activity()
 
     def set_tracking_activity(self, active: bool, *, owner: str = "ui") -> None:
@@ -392,7 +413,11 @@ class VideoService:
         )
 
     def _update_output_activity(self) -> None:
-        shared_active = self._preview_active or self.recorder.recording
+        preview_sources = {
+            source_key
+            for owner_sources in self._preview_activity_owners.values()
+            for source_key in owner_sources
+        }
         for source_key, source in self._sources.items():
             tracking_config = self.tracking.config
             tracking_active = bool(self._tracking_activity_owners) and tracking_config.enabled and (
@@ -405,4 +430,9 @@ class VideoService:
                 and self.relocalization.config.relocalization_enabled
                 and source_key == VideoSourceKey.AUDIENCE
             )
-            source.set_output_active(shared_active or tracking_active or calibration_active)
+            source.set_output_active(
+                source_key in preview_sources
+                or self.recorder.recording
+                or tracking_active
+                or calibration_active
+            )

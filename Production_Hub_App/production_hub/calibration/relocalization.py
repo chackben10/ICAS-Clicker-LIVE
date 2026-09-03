@@ -102,7 +102,7 @@ class AudienceRelocalizer:
         reference_bgr: np.ndarray,
         review: CalibrationReviewData,
         *,
-        maximum_width: int = 1280,
+        maximum_width: int = 640,
         maximum_features: int = 8000,
     ) -> None:
         if reference_bgr is None or reference_bgr.size == 0:
@@ -301,6 +301,12 @@ class AudienceRelocalizationService:
                 )
                 self._snapshot.marker_positions = ()
                 self._snapshot.analysis_fps = 0.0
+        # Activity can be requested after a worker failed during camera/app
+        # lifecycle churn.  Treat the request as a health edge as well as a
+        # throttle edge; otherwise the UI says "waiting" forever while no
+        # relocalization thread exists to consume the fresh frame.
+        if selected and not self.running:
+            self.start()
 
     def start(self) -> None:
         if not self.config.relocalization_enabled or self.running:

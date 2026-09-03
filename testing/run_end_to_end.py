@@ -45,6 +45,7 @@ from testing.harness.live_system import (  # noqa: E402
     restore_external_state,
     sanitized_checks,
 )
+from production_hub.app.dev_launcher import DEV_APP_NAME  # noqa: E402
 from testing.harness.paths import OUTPUT_ROOT, VIDEO_TO_NDI_ROOT  # noqa: E402
 from testing.harness.performance import run_deterministic_benchmarks  # noqa: E402
 from testing.harness.reporting import PhaseResult, RunReport, redact  # noqa: E402
@@ -453,15 +454,22 @@ def run_full(report: RunReport, *, soak_minutes: float | None = None, assume_yes
         report.write()
 
         lifecycle.quit_gracefully("Production Hub", 30)
+        lifecycle.quit_gracefully(DEV_APP_NAME, 30)
         lifecycle.quit_gracefully("ProPresenter", 45)
         lifecycle.open_application("ProPresenter")
         propresenter_ready = lifecycle.wait_http(f"{config.integrations.propresenter.base_url}/presentation/slide_index", 90)
         report.add(PhaseResult("propresenter-fresh-start", True, duration_seconds=propresenter_ready))
 
-        build_started = time.perf_counter()
-        bundle = lifecycle.build_production_hub(sys.executable)
-        report.add(PhaseResult("production-hub-build", True, duration_seconds=time.perf_counter() - build_started, details={"bundle": str(bundle)}))
-        lifecycle.open_application(str(bundle), new_instance=True)
+        launch_started = time.perf_counter()
+        bundle = lifecycle.open_source_development_hub()
+        report.add(
+            PhaseResult(
+                "production-hub-stable-development-launch",
+                True,
+                duration_seconds=time.perf_counter() - launch_started,
+                details={"bundle": str(bundle), "loads_live_source": True},
+            )
+        )
         test_hub_running = True
         hub_ready = lifecycle.wait_http(f"{config.api.base_url}/health", 90)
         report.add(PhaseResult("production-hub-fresh-start", True, duration_seconds=hub_ready))
@@ -483,13 +491,13 @@ def run_full(report: RunReport, *, soak_minutes: float | None = None, assume_yes
     except Exception as exc:
         report.add(PhaseResult("live-lifecycle", False, 1, details={"error": str(exc), "traceback": traceback.format_exc()}))
     finally:
-        if test_hub_running and ApplicationLifecycle.is_running("Production Hub"):
+        if test_hub_running and ApplicationLifecycle.is_running(DEV_APP_NAME):
             try:
                 restoration_errors.extend(asyncio.run(restore_external_state(config, external_state)))
             except Exception as exc:
                 restoration_errors.append(f"external restoration: {exc}")
             try:
-                lifecycle.quit_gracefully("Production Hub", 30)
+                lifecycle.quit_gracefully(DEV_APP_NAME, 30)
             except Exception as exc:
                 restoration_errors.append(f"quit test Production Hub: {exc}")
         try:
@@ -500,7 +508,13 @@ def run_full(report: RunReport, *, soak_minutes: float | None = None, assume_yes
         if recovery.restored and not restoration_errors:
             recovery.discard()
             report.recovery["discarded"] = True
-        if lifecycle.initially_running["Production Hub"]:
+        if lifecycle.initially_running[DEV_APP_NAME]:
+            try:
+                lifecycle.open_source_development_hub()
+                lifecycle.wait_http(f"{config.api.base_url}/health", 90)
+            except Exception as exc:
+                restoration_errors.append(f"reopen source Production Hub: {exc}")
+        elif lifecycle.initially_running["Production Hub"]:
             try:
                 lifecycle.open_application("/Applications/Production Hub.app")
                 lifecycle.wait_http(f"{config.api.base_url}/health", 90)

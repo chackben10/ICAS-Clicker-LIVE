@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from typing import Any
 
 from production_hub.core.config.models import ProPresenterConfig
 from production_hub.integrations.propresenter.audio_service import ProPresenterAudioService
 from production_hub.integrations.propresenter.client import ProPresenterClient
+from production_hub.integrations.propresenter.status_stream import ProPresenterStatusStream
 from production_hub.integrations.propresenter.thumbnail_cache import ThumbnailCache
 
 
@@ -19,6 +22,77 @@ class ProPresenterService:
         self.audio = ProPresenterAudioService(self.client, config.audio)
         self.thumbnails = ThumbnailCache(self.client, config.thumbnails)
         self._current_base = "/presentation/focused"
+        self._monitor_cache: dict[str, tuple[float, Any]] = {}
+        self._monitor_cache_lock = threading.Lock()
+        # Auto Show still reacts within half a second, while repeated trigger
+        # rules share state instead of opening several API requests per tick.
+        self._monitor_cache_seconds = 0.45
+        self._stream_cache_seconds = 1.5
+        self._status_stream: ProPresenterStatusStream | None = None
+
+    def _cache_monitor_value(self, key: str, value: Any) -> Any:
+        with self._monitor_cache_lock:
+            self._monitor_cache[key] = (time.monotonic(), value)
+        return value
+
+    def _cached_monitor_value(self, key: str, *, max_age: float | None = None) -> Any:
+        with self._monitor_cache_lock:
+            cached = self._monitor_cache.get(key)
+        if cached is None:
+            return None
+        recorded_at, value = cached
+        if max_age is not None and time.monotonic() - recorded_at > max_age:
+            return None
+        return value
+
+    @property
+    def status_stream_connected(self) -> bool:
+        return bool(self._status_stream and self._status_stream.connected)
+
+    def start_status_stream(self, callback=None) -> ProPresenterStatusStream:
+        if self._status_stream is not None:
+            return self._status_stream
+
+        def ingest(path: str, data: Any) -> None:
+            cache_keys = {
+                "look/current": "current_look_payload",
+                "presentation/current": "active_presentation",
+                "presentation/slide_index": "slide_index",
+                "status/slide": "slide_status",
+            }
+            cache_key = cache_keys.get(path)
+            if cache_key is not None:
+                self._cache_monitor_value(cache_key, data if data is not None else {})
+            if path == "look/current" and isinstance(data, dict):
+                self._cache_monitor_value(
+                    "current_look",
+                    str(((data.get("id") or {}).get("name")) or "").strip(),
+                )
+            if callback is not None:
+                callback(path, data)
+
+        self._status_stream = ProPresenterStatusStream(
+            self.config.base_url,
+            ingest,
+            timeout_seconds=max(12.0, self.config.request_timeout_seconds),
+        )
+        self._status_stream.start()
+        return self._status_stream
+
+    def stop_status_stream(self) -> None:
+        if self._status_stream is not None:
+            self._status_stream.stop()
+            self._status_stream = None
+
+    def _monitor_max_age(self) -> float | None:
+        # ProPresenter 21 occasionally omits live updates for dynamic Bible
+        # presentations.  Keep the stream as the fast path, but let one shared
+        # GET refresh a quiet cache instead of trusting stale initial data.
+        return (
+            self._stream_cache_seconds
+            if self.status_stream_connected
+            else self._monitor_cache_seconds
+        )
 
     def _presentation_uuid(self, label: str) -> str:
         for item in self.config.presentations:
@@ -40,7 +114,15 @@ class ProPresenterService:
         return True
 
     async def active_presentation(self) -> dict[str, Any]:
-        return await self.client.get_json("/presentation/active")
+        data = await self.client.get_json("/presentation/active")
+        return self._cache_monitor_value("active_presentation", data)
+
+    async def monitored_active_presentation(self) -> dict[str, Any]:
+        cached = self._cached_monitor_value(
+            "active_presentation",
+            max_age=self._monitor_max_age(),
+        )
+        return cached if isinstance(cached, dict) else await self.active_presentation()
 
     async def focused_presentation(self) -> dict[str, Any]:
         return await self.client.get_json("/presentation/focused")
@@ -63,21 +145,30 @@ class ProPresenterService:
         return await self.client.get_json(f"/playlist/{uuid_q}")
 
     async def slide_index(self) -> dict[str, Any]:
-        return await self.client.get_json("/presentation/slide_index")
+        data = await self.client.get_json("/presentation/slide_index")
+        return self._cache_monitor_value("slide_index", data)
+
+    async def monitored_slide_index(self) -> dict[str, Any]:
+        cached = self._cached_monitor_value("slide_index", max_age=self._monitor_max_age())
+        return cached if isinstance(cached, dict) else await self.slide_index()
 
     async def slide_status(self) -> dict[str, Any]:
-        """Return ProPresenter's currently rendered cue status.
+        """Return the rendered cue when ProPresenter exposes one."""
+        data = await self.client.get_json("/status/slide")
+        return self._cache_monitor_value("slide_status", data)
 
-        Dynamic Bible presentations intentionally do not expose a presentation
-        slide index.  The status endpoint still reports a distinct cue UUID for
-        every selected verse, so it is the reliable, lightweight event source
-        for those slides.
-        """
-        return await self.client.get_json("/status/slide")
+    async def monitored_slide_status(self) -> dict[str, Any]:
+        cached = self._cached_monitor_value("slide_status", max_age=self._monitor_max_age())
+        return cached if isinstance(cached, dict) else await self.slide_status()
 
     async def current_look_name(self) -> str:
         data = await self.client.get_json("/look/current")
-        return str(((data.get("id") or {}).get("name")) or "").strip()
+        look = str(((data.get("id") or {}).get("name")) or "").strip()
+        return self._cache_monitor_value("current_look", look)
+
+    async def monitored_current_look_name(self) -> str:
+        cached = self._cached_monitor_value("current_look", max_age=self._monitor_max_age())
+        return str(cached) if cached is not None else await self.current_look_name()
 
     async def refresh_presentation_base(self) -> str:
         try:

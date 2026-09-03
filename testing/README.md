@@ -30,8 +30,11 @@ python3 testing/run_end_to_end.py --mode soak
   integrations, offscreen Qt tests, safe browser tests, Swift tests, and stable
   local benchmarks.
 - `full` includes `quick`, then performs live preflight, restarts ProPresenter
-  and Production Hub in that order, exercises configured integrations, and
-  restores captured state. It moves the PTZ camera.
+  and launches the current Production Hub source through the stable `Production
+  Hub Dev.app` identity, exercises configured integrations, and restores
+  captured state. It moves the PTZ camera. Grant Accessibility, Input
+  Monitoring, Camera, and local-network access to that development identity
+  once; source edits do not rebuild it or invalidate those grants.
 - `soak` includes `full` and then samples the live system for 60 minutes by
   default. It repeatedly polls every hosted page and representative API,
   samples CPU/memory/video health, sends MIDI and deterministic NDI scenarios,

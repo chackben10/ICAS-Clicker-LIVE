@@ -345,27 +345,6 @@ def build_default_endpoints() -> list[EndpointDefinition]:
 def build_default_automations() -> list[AutomationDefinition]:
     return [
         AutomationDefinition(
-            key="bible_look_enforcement",
-            name="Bible Look Enforcement",
-            trigger="propresenter.cue_changed",
-            enabled=True,
-            interval_seconds=0.75,
-            cooldown_seconds=2.5,
-            conditions=[
-                {
-                    "condition_type": "propresenter.active_presentation",
-                    "params": {"group_count": "1", "first_group_contains": ":"},
-                },
-                {
-                    "condition_type": "propresenter.current_look",
-                    "params": {"look_name": "{{bible_look}}", "matches": True},
-                    "negate": True,
-                }
-            ],
-            actions=[ActionDefinition("propresenter.trigger_macro", {"macro_name": "{{bible_macro}}"})],
-            description="Trigger Bible Macro when a one-group colon-titled active presentation is not using the Bible look.",
-        ),
-        AutomationDefinition(
             key="obs_look_sync",
             name="Sync OBS Layout From ProPresenter Look",
             trigger="propresenter.look_changed",

@@ -678,8 +678,11 @@ class CameraTrackingConfig(JsonModel):
         default_factory=lambda: ["stage", "front_stage", "altar", "podium"]
     )
     relocalization_enabled: bool = True
-    relocalization_fps: float = 1.0
-    relocalization_maximum_width: int = 1280
+    # Relocalization is a slow drift guard for the fixed Audience camera, not
+    # the responsive subject-tracking loop.  Keep its SIFT pass deliberately
+    # light so tracking can remain armed during a service without starving UI.
+    relocalization_fps: float = 0.5
+    relocalization_maximum_width: int = 640
     relocalization_stale_seconds: float = 4.0
     scene_regions: list[CameraSceneRegion] = field(default_factory=list)
     automation: PtzAutomationConfig = field(default_factory=PtzAutomationConfig)

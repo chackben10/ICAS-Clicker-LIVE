@@ -4,11 +4,14 @@ import asyncio
 import socket
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any
 
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
+from production_hub.app.bible_cue_corrector import BibleCueCorrector
+from production_hub.app.clicker_dispatcher import ClickerActionDispatcher
 from production_hub.core.automation.evaluator import evaluate_rule_tree
 from production_hub.core.automation.triggers import AutomationTriggerMonitor
 from production_hub.core.config.input_lists import poll_due_input_lists
@@ -36,6 +39,8 @@ class ApiServerHandle:
 
 LEGACY_API_PORTS = (17777, 5000)
 AUTO_SHOW_AUTOMATION_KEYS = frozenset({"auto_show_slides", "auto_show_bible_slides"})
+CLICKER_LISTENER_RETRY_SECONDS = 3.0
+CLICKER_UNAVAILABLE_LOG_SECONDS = 30.0
 
 
 @dataclass
@@ -52,10 +57,12 @@ class BackgroundServicesHandle:
 class ClickerListenerHandle:
     thread: threading.Thread
     stop_event: threading.Event
+    dispatcher: ClickerActionDispatcher
 
     def stop(self) -> None:
         self.stop_event.set()
         self.thread.join(timeout=3)
+        self.dispatcher.stop()
 
 
 def _bind_probe(host: str, port: int) -> None:
@@ -256,68 +263,112 @@ def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEv
         context.logger.warning("clicker_listener_unavailable", "Quartz is unavailable; global clicker keys are disabled", error=str(exc))
         return None
 
+    del loop  # Clicker actions intentionally use a dedicated worker/async loop.
     stop_event = threading.Event()
-
-    async def trigger_next() -> None:
-        await context.propresenter.next_slide()
-
-    async def trigger_previous() -> None:
-        await context.propresenter.previous_slide()
-
-    def schedule_clicker_action(coro) -> None:
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-
-        def _done(done_future) -> None:
-            try:
-                done_future.result()
-            except Exception as exc:
-                context.logger.warning("clicker_action_failed", "Clicker slide action failed", error=str(exc))
-
-        future.add_done_callback(_done)
+    dispatcher = ClickerActionDispatcher(context.propresenter, context.logger)
 
     def _run() -> None:
         next_key = int(context.config.integrations.propresenter.next_slide_key_code)
         previous_key = int(context.config.integrations.propresenter.previous_slide_key_code)
+        tap_ref: dict[str, Any] = {}
 
         def callback(_proxy, event_type, event, _refcon):
+            disabled_types = {
+                value
+                for value in (
+                    getattr(Quartz, "kCGEventTapDisabledByTimeout", None),
+                    getattr(Quartz, "kCGEventTapDisabledByUserInput", None),
+                )
+                if value is not None
+            }
+            if event_type in disabled_types:
+                tap = tap_ref.get("tap")
+                if tap is not None:
+                    Quartz.CGEventTapEnable(tap, True)
+                    context.logger.warning(
+                        "clicker_listener_reenabled",
+                        "macOS disabled the input listener; Production Hub re-enabled it",
+                    )
+                return event
             if event_type != Quartz.kCGEventKeyDown:
                 return event
             key_code = int(Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode))
             if key_code == next_key:
-                schedule_clicker_action(trigger_next())
-                return None
+                dispatcher.submit("next")
+                return None if tap_ref.get("consume", True) else event
             if key_code == previous_key:
-                schedule_clicker_action(trigger_previous())
-                return None
+                dispatcher.submit("previous")
+                return None if tap_ref.get("consume", True) else event
             return event
 
         event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
-        tap = Quartz.CGEventTapCreate(
-            Quartz.kCGSessionEventTap,
-            Quartz.kCGHeadInsertEventTap,
-            Quartz.kCGEventTapOptionDefault,
-            event_mask,
-            callback,
-            None,
-        )
-        if tap is None:
-            context.logger.warning(
-                "clicker_listener_unavailable",
-                "Global clicker keys are disabled; grant Accessibility permission to Production Hub if needed.",
-            )
-            return
-
-        source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
-        Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetCurrent(), source, Quartz.kCFRunLoopCommonModes)
-        Quartz.CGEventTapEnable(tap, True)
-        context.logger.info("clicker_listener_started", "Global clicker key listener started", next_key=next_key, previous_key=previous_key)
+        last_unavailable_log = 0.0
+        listen_request_attempted = False
         while not stop_event.is_set():
-            Quartz.CFRunLoopRunInMode(Quartz.kCFRunLoopDefaultMode, 0.2, False)
-        Quartz.CGEventTapEnable(tap, False)
+            tap_ref["consume"] = True
+            tap = Quartz.CGEventTapCreate(
+                Quartz.kCGSessionEventTap,
+                Quartz.kCGHeadInsertEventTap,
+                Quartz.kCGEventTapOptionDefault,
+                event_mask,
+                callback,
+                None,
+            )
+            listen_only_option = getattr(Quartz, "kCGEventTapOptionListenOnly", None)
+            preflight_listen = getattr(Quartz, "CGPreflightListenEventAccess", None)
+            listen_access = bool(preflight_listen()) if callable(preflight_listen) else False
+            if not listen_access and not listen_request_attempted:
+                listen_request_attempted = True
+                request_listen = getattr(Quartz, "CGRequestListenEventAccess", None)
+                if callable(request_listen):
+                    listen_access = bool(request_listen())
+            if tap is None and listen_only_option is not None and listen_access:
+                tap = Quartz.CGEventTapCreate(
+                    Quartz.kCGSessionEventTap,
+                    Quartz.kCGHeadInsertEventTap,
+                    listen_only_option,
+                    event_mask,
+                    callback,
+                    None,
+                )
+                if tap is not None:
+                    # Listen-only taps cannot swallow the keypad event, but
+                    # they remain reliable when macOS grants Input Monitoring
+                    # while withholding active event-tap control.
+                    tap_ref["consume"] = False
+                    context.logger.warning(
+                        "clicker_listener_listen_only",
+                        "Clicker listener started in keyboard listen-only mode",
+                    )
+            if tap is None:
+                now = time.monotonic()
+                if now - last_unavailable_log >= CLICKER_UNAVAILABLE_LOG_SECONDS:
+                    last_unavailable_log = now
+                    context.logger.warning(
+                        "clicker_listener_unavailable",
+                        "Global input listener is unavailable; Production Hub will retry. Grant Input Monitoring and Accessibility permission if needed.",
+                    )
+                stop_event.wait(CLICKER_LISTENER_RETRY_SECONDS)
+                continue
+
+            tap_ref["tap"] = tap
+            source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
+            Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetCurrent(), source, Quartz.kCFRunLoopCommonModes)
+            Quartz.CGEventTapEnable(tap, True)
+            context.logger.info(
+                "clicker_listener_started",
+                "Global clicker key listener started",
+                next_key=next_key,
+                previous_key=previous_key,
+            )
+            while not stop_event.is_set():
+                Quartz.CFRunLoopRunInMode(Quartz.kCFRunLoopDefaultMode, 0.2, False)
+            Quartz.CGEventTapEnable(tap, False)
+            tap_ref.clear()
 
     thread = threading.Thread(target=_run, name="production-hub-clicker-listener", daemon=True)
     thread.start()
-    return ClickerListenerHandle(thread=thread, stop_event=stop_event)
+    return ClickerListenerHandle(thread=thread, stop_event=stop_event, dispatcher=dispatcher)
 
 
 def register_automation_handlers(context: ApplicationContext) -> None:
@@ -409,6 +460,17 @@ async def _run_due_automations(
 async def _background_services_main(context: ApplicationContext, stop_event: threading.Event) -> None:
     register_automation_handlers(context)
     loop = asyncio.get_running_loop()
+    bible_corrector = BibleCueCorrector(context.propresenter, context.logger)
+    status_stream = None
+    if context.config.integrations.propresenter.enabled:
+        status_stream = context.propresenter.start_status_stream(
+            lambda path, data: loop.call_soon_threadsafe(
+                bible_corrector.observe,
+                path,
+                data,
+            )
+        )
+        bible_corrector.start(loop)
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
     midi_receiver = start_midi_receiver(context, loop)
@@ -472,6 +534,9 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
                 if context.config.integrations.visca.enabled and listener is None:
                     listener = await start_visca_listener(context)
     finally:
+        bible_corrector.stop()
+        if status_stream is not None:
+            context.propresenter.stop_status_stream()
         for task in input_list_poll_tasks.values():
             task.cancel()
         if input_list_poll_tasks:

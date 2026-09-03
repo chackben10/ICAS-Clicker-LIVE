@@ -450,7 +450,7 @@ class SlideTriggerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(migrated[0].trigger, "propresenter.slide_changed")
         self.assertEqual(migrated[0].interval_seconds, 0.25)
 
-    def test_existing_bible_automations_migrate_to_rendered_cue_trigger(self) -> None:
+    def test_legacy_bible_look_polling_is_removed(self) -> None:
         migrated = ensure_builtin_automation_steps(
             [
                 AutomationDefinition(
@@ -467,10 +467,7 @@ class SlideTriggerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         by_key = {item.key: item for item in migrated}
-        self.assertEqual(
-            "propresenter.cue_changed",
-            by_key["bible_look_enforcement"].trigger,
-        )
+        self.assertNotIn("bible_look_enforcement", by_key)
         self.assertEqual(
             "propresenter.cue_changed",
             by_key[AUTO_SHOW_BIBLE_AUTOMATION_KEY].trigger,

@@ -62,10 +62,10 @@
     },
     "automations": {
       "tests": [
-        "testing/tests/integration/test_simulated_automations.py::test_every_default_automation_runs_once_and_deduplicates"
+        "testing/tests/integration/test_simulated_automations.py::test_every_default_automation_runs_once_and_deduplicates",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_bible_mode_entry_applies_macro_before_any_cue_event"
       ],
       "features": [
-        "bible_look_enforcement",
         "obs_look_sync",
         "slide_label_audio_sync",
         "presentation_macro_after_presentation_look",
@@ -76,7 +76,8 @@
     "actions": {
       "tests": [
         "testing/tests/unit/test_action_palette_catalog.py::ActionPaletteCatalogTests::test_palette_and_registered_handlers_stay_in_sync",
-        "testing/tests/contracts/test_action_contracts.py::test_every_action_has_an_executable_contract"
+        "testing/tests/contracts/test_action_contracts.py::test_every_action_has_an_executable_contract",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_obs_same_scene_request_is_a_no_op"
       ],
       "features": [
         "propresenter.next_slide",
@@ -140,7 +141,22 @@
     "integrations": {
       "tests": [
         "testing/tests/integration/test_simulated_integrations.py::test_all_integrations_have_offline_and_recovery_scenarios",
-        "testing/tests/live/test_live_system.py::test_enabled_live_integrations"
+        "testing/tests/live/test_live_system.py::test_enabled_live_integrations",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_clicker_listener_retries_creation_and_recovers_disabled_tap",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_clicker_listener_falls_back_to_keyboard_listen_only",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_official_status_stream_cache_replaces_repeated_api_polls",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_post_cue_status_events_never_switch_looks_or_post_keys",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_native_bible_mode_observer_emits_only_value_transitions",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_native_bible_mode_observer_rejects_invalid_control_handle",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_native_bible_mode_observer_refreshes_replaced_toolbar_radio",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_native_bible_mode_observer_wraps_retained_ax_callback",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_native_bible_mode_observer_uses_bounded_semantic_poll_when_needed",
+        "testing/tests/unit/test_reliability_fixes.py::ReliabilityFixTests::test_release_build_supports_persistent_codesign_identity",
+        "testing/tests/unit/test_video_phase1.py::VideoPhaseOneTests::test_preview_owners_activate_only_the_sources_they_consume",
+        "testing/tests/unit/test_camera_tracking_phase2.py::CameraTrackingPhaseTwoTests::test_tracking_settings_use_the_owner_released_when_page_hides",
+        "testing/tests/unit/test_camera_tracking_phase2.py::CameraTrackingPhaseTwoTests::test_live_runner_quits_stable_development_bundle_gracefully",
+        "testing/tests/unit/test_camera_calibration_phase3abc.py::CameraCalibrationPhaseThreeABCTests::test_legacy_relocalizer_defaults_migrate_without_overwriting_tuning",
+        "testing/tests/unit/test_camera_calibration_phase3abc.py::CameraCalibrationPhaseThreeABCTests::test_activity_request_restarts_a_missing_relocalization_worker"
       ],
       "features": [
         "propresenter",

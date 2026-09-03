@@ -38,7 +38,8 @@ async def evaluate_condition(context: Any, condition: dict[str, Any], action_con
         matches = boolish(params.get("matches", True))
         actual = str(action_context.get("current_look") or "")
         if not actual:
-            actual = await context.propresenter.current_look_name()
+            monitored = getattr(context.propresenter, "monitored_current_look_name", None)
+            actual = await monitored() if monitored is not None else await context.propresenter.current_look_name()
         result = actual == wanted
         return result == matches, f"look={actual}"
 
@@ -58,7 +59,8 @@ async def evaluate_condition(context: Any, condition: dict[str, Any], action_con
     if condition_type == "propresenter.active_presentation":
         active = action_context.get("active_presentation")
         if not isinstance(active, dict):
-            active = await context.propresenter.active_presentation()
+            monitored = getattr(context.propresenter, "monitored_active_presentation", None)
+            active = await monitored() if monitored is not None else await context.propresenter.active_presentation()
         presentation = active.get("presentation") if isinstance(active, dict) else {}
         groups = presentation.get("groups") if isinstance(presentation, dict) else []
         groups = groups if isinstance(groups, list) else []

@@ -5,7 +5,7 @@ import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -108,6 +108,40 @@ class VideoPhaseOneTests(unittest.TestCase):
         self.assertEqual(1, camera.starts)
         self.assertTrue(camera.active)
         source.camera = None
+
+    def test_preview_owners_activate_only_the_sources_they_consume(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = VideoConfig(audience_auto_connect=False, ptz_auto_connect=False)
+            service = VideoService(config, Path(directory))
+            audience = Mock()
+            ptz = Mock()
+            service._sources = {
+                VideoSourceKey.AUDIENCE: audience,
+                VideoSourceKey.PTZ: ptz,
+            }
+
+            service.set_preview_activity(
+                True,
+                owner="click_to_frame",
+                sources={VideoSourceKey.AUDIENCE},
+            )
+            audience.set_output_active.assert_called_with(True)
+            ptz.set_output_active.assert_called_with(False)
+
+            service.set_preview_activity(
+                True,
+                owner="camera_page",
+                sources={VideoSourceKey.AUDIENCE, VideoSourceKey.PTZ},
+            )
+            ptz.set_output_active.assert_called_with(True)
+
+            service.set_preview_activity(False, owner="camera_page")
+            audience.set_output_active.assert_called_with(True)
+            ptz.set_output_active.assert_called_with(False)
+
+            service.set_preview_activity(False, owner="click_to_frame")
+            audience.set_output_active.assert_called_with(False)
+            ptz.set_output_active.assert_called_with(False)
 
     def test_camera_control_preset_recall_uses_panasonic_service(self) -> None:
         with TemporaryDirectory() as directory:

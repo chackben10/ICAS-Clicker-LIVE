@@ -15,9 +15,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from production_hub.calibration.relocalization import (
     AudienceRelocalizer,
+    AudienceRelocalizationService,
     RelocalizationState,
     _is_motion_safe_lock,
 )
+from production_hub.core.config.models import CameraTrackingConfig
+from production_hub.video.frame_broker import LatestFrameBroker
 from production_hub.calibration.review import (
     CalibrationReviewData,
     CalibrationReviewMarker,
@@ -43,6 +46,20 @@ APP = QApplication.instance() or QApplication([])
 
 
 class CameraCalibrationPhaseThreeABCTests(unittest.TestCase):
+    def test_activity_request_restarts_a_missing_relocalization_worker(self) -> None:
+        with TemporaryDirectory() as directory:
+            service = AudienceRelocalizationService(
+                LatestFrameBroker(),
+                Path(directory),
+                CameraTrackingConfig(),
+                initially_active=False,
+            )
+            with patch.object(service, "start") as start:
+                service.set_active(True)
+
+            start.assert_called_once_with()
+            self.assertTrue(service.active)
+
     def test_startup_activates_latest_successful_automatic_calibration(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -241,6 +258,28 @@ class CameraCalibrationPhaseThreeABCTests(unittest.TestCase):
             self.assertEqual("podium", region.kind)
             self.assertEqual("calibration_reference", region.coordinate_space)
             self.assertEqual("2026-08-09T09:00:00+00:00", region.calibration_reference)
+
+    def test_legacy_relocalizer_defaults_migrate_without_overwriting_tuning(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = AppConfig()
+            legacy.integrations.camera_tracking.relocalization_maximum_width = 1280
+            legacy.integrations.camera_tracking.relocalization_fps = 1.0
+
+            self.assertTrue(ensure_camera_calibration_defaults(legacy, root))
+            self.assertEqual(
+                640,
+                legacy.integrations.camera_tracking.relocalization_maximum_width,
+            )
+            self.assertEqual(0.5, legacy.integrations.camera_tracking.relocalization_fps)
+
+            tuned = AppConfig()
+            tuned.integrations.camera_tracking.relocalization_maximum_width = 960
+            tuned.integrations.camera_tracking.relocalization_fps = 0.75
+
+            self.assertFalse(ensure_camera_calibration_defaults(tuned, root))
+            self.assertEqual(960, tuned.integrations.camera_tracking.relocalization_maximum_width)
+            self.assertEqual(0.75, tuned.integrations.camera_tracking.relocalization_fps)
 
     @staticmethod
     def _feature_scene() -> tuple[np.ndarray, tuple[CalibrationReviewMarker, ...]]:

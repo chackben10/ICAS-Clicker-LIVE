@@ -41,11 +41,13 @@ def _slide_status(data: dict[str, Any]) -> tuple[str, str, str]:
 async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[str, Any]]:
     trigger_type = normalize_trigger(trigger_type)
     if trigger_type == "propresenter.look_changed":
-        look = await context.propresenter.current_look_name()
+        monitored = getattr(context.propresenter, "monitored_current_look_name", None)
+        look = await monitored() if monitored is not None else await context.propresenter.current_look_name()
         return look, {"current_look": look, "trigger": trigger_type}
 
     if trigger_type == "propresenter.presentation_changed":
-        active = await context.propresenter.active_presentation()
+        monitored = getattr(context.propresenter, "monitored_active_presentation", None)
+        active = await monitored() if monitored is not None else await context.propresenter.active_presentation()
         presentation = active.get("presentation") if isinstance(active, dict) else {}
         presentation = presentation if isinstance(presentation, dict) else {}
         identifier = presentation.get("id")
@@ -69,7 +71,8 @@ async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[s
         }
 
     if trigger_type == "propresenter.slide_changed":
-        data = await context.propresenter.slide_index()
+        monitored = getattr(context.propresenter, "monitored_slide_index", None)
+        data = await monitored() if monitored is not None else await context.propresenter.slide_index()
         index, uuid, name, total, remaining = _presentation_index(data)
         # An empty signature means ProPresenter currently has no active slide. It is
         # still observed so the next real slide is treated as a change.
@@ -85,7 +88,8 @@ async def trigger_snapshot(context: Any, trigger_type: str) -> tuple[str, dict[s
         }
 
     if trigger_type == "propresenter.cue_changed":
-        data = await context.propresenter.slide_status()
+        monitored = getattr(context.propresenter, "monitored_slide_status", None)
+        data = await monitored() if monitored is not None else await context.propresenter.slide_status()
         uuid, text, notes = _slide_status(data if isinstance(data, dict) else {})
         # Cue UUIDs are stable for normal slides and unique for every verse in
         # ProPresenter's dynamic Bible tab.  Text is included as a defensive
