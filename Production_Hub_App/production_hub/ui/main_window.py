@@ -528,6 +528,7 @@ class MainWindow(QMainWindow):
             self.tray_icon.hide()
         self.tracking_indicator.hide()
         self.camera_control_page.hide_click_to_frame_window()
+        self.camera_control_page.stop_click_to_frame_blender()
         if self.api_handle:
             self.api_handle.stop()
         event.accept()

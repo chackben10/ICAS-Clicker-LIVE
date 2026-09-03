@@ -70,17 +70,39 @@ Do not rebuild the installed bundle for ordinary source development. Run
 Dev.app` identity and loads the current source tree, so Accessibility, Input
 Monitoring, Camera, and local-network permissions survive source edits.
 
-Installed release builds should use the same persistent Keychain signing
-identity every time:
+Installed release builds must use the same persistent signing identity every
+time. Create the local one once:
+
+```bash
+python3 Production_Hub_App/scripts/ensure_codesign_identity.py --create
+```
+
+That adds a self-signed `Production Hub Local Signing` certificate to the login
+keychain, and every later build picks it up automatically.
+
+Two password prompts follow, and both block until answered. The script itself
+prompts once to trust the certificate. Then the **first build** that uses the
+key stops with "codesign wants to access key ... in your keychain" — answer it
+with **Always Allow**, because plain "Allow" brings the prompt back on every
+rebuild. Until it is answered the build produces no output and appears hung. macOS ties a privacy
+grant to an application's Designated Requirement; an ad-hoc signature (`-`)
+names one exact build, so each rebuild reads as a different application and its
+Accessibility, Input Monitoring, Camera, and local-network grants are silently
+dropped while System Settings still shows them enabled.
+
+A Developer ID certificate can be used instead, by flag or by
+`PRODUCTION_HUB_CODESIGN_IDENTITY`:
 
 ```bash
 python3 Production_Hub_App/scripts/build_macos_app.py --install \
   --codesign-identity "Developer ID Application: Your Team (TEAMID)"
 ```
 
-The identity can instead be supplied in `PRODUCTION_HUB_CODESIGN_IDENTITY`.
-Without one, the script clearly warns that the ad-hoc release signature cannot
-retain macOS privacy permissions across rebuilt versions.
+With no identity available the build still succeeds, but warns that the ad-hoc
+signature cannot retain permissions across rebuilds.
+
+Never rebuild during a live-verification session: build, install, grant
+permissions, then test, in that order, once.
 
 The generated app is written to:
 

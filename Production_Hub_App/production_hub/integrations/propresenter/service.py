@@ -7,7 +7,7 @@ from typing import Any
 
 from production_hub.core.config.models import ProPresenterConfig
 from production_hub.integrations.propresenter.audio_service import ProPresenterAudioService
-from production_hub.integrations.propresenter.client import ProPresenterClient
+from production_hub.integrations.propresenter.client import ProPresenterClient, ProPresenterHttpError
 from production_hub.integrations.propresenter.status_stream import ProPresenterStatusStream
 from production_hub.integrations.propresenter.thumbnail_cache import ThumbnailCache
 
@@ -29,6 +29,36 @@ class ProPresenterService:
         self._monitor_cache_seconds = 0.45
         self._stream_cache_seconds = 1.5
         self._status_stream: ProPresenterStatusStream | None = None
+        # Set by the application so the stream can stop the press-to-cue clock.
+        self.press_to_cue: Any | None = None
+
+    @staticmethod
+    def _cue_signature(path: str, data: Any) -> str:
+        """Identify the cue a status push describes.
+
+        slide_index is the normal path.  Dynamic Bible verses never carry a
+        presentation index, so status/slide -- which does report a distinct cue
+        UUID per verse -- is the only signal for them.
+        """
+
+        if not isinstance(data, dict):
+            return ""
+        if path == "presentation/slide_index":
+            index = data.get("presentation_index")
+            if not isinstance(index, dict):
+                return ""
+            identifier = index.get("presentation_id")
+            uuid = identifier.get("uuid") if isinstance(identifier, dict) else ""
+            position = index.get("index")
+            return f"slide:{uuid}:{position}" if position is not None else ""
+        if path == "status/slide":
+            for key in ("current", "slide"):
+                current = data.get(key)
+                if isinstance(current, dict) and current.get("uuid"):
+                    return f"cue:{current.get('uuid')}"
+            if data.get("uuid"):
+                return f"cue:{data.get('uuid')}"
+        return ""
 
     def _cache_monitor_value(self, key: str, value: Any) -> Any:
         with self._monitor_cache_lock:
@@ -67,6 +97,10 @@ class ProPresenterService:
                     "current_look",
                     str(((data.get("id") or {}).get("name")) or "").strip(),
                 )
+            if self.press_to_cue is not None:
+                signature = self._cue_signature(path, data)
+                if signature:
+                    self.press_to_cue.record_cue(signature)
             if callback is not None:
                 callback(path, data)
 
@@ -174,11 +208,7 @@ class ProPresenterService:
 
     async def refresh_presentation_base(self) -> str:
         try:
-            data = await self.slide_index()
-            if (data.get("presentation_index") or {}).get("index") is not None:
-                self._current_base = "/presentation/active"
-            else:
-                self._current_base = "/presentation/focused"
+            return self._base_from_slide_index(await self.slide_index())
         except Exception:
             self._current_base = "/presentation/focused"
         return self._current_base
@@ -250,13 +280,46 @@ class ProPresenterService:
 
         return focused_full
 
+    def _base_from_slide_index(self, data: dict[str, Any]) -> str:
+        index = (data.get("presentation_index") or {}).get("index") if isinstance(data, dict) else None
+        self._current_base = "/presentation/active" if index is not None else "/presentation/focused"
+        return self._current_base
+
+    async def _fast_presentation_base(self) -> str:
+        """Decide active-vs-focused from the stream cache, without a blocking GET."""
+
+        try:
+            return self._base_from_slide_index(await self.monitored_slide_index())
+        except Exception:
+            # A cold or failed cache is not worth delaying a keypress for; the
+            # last known base is retried and corrected below if it was wrong.
+            return self._current_base
+
+    async def _advance(self, verb: str) -> bool:
+        """Fire on the cached base, then correct once if the cache was stale.
+
+        A clicker press used to cost two round-trips: an uncached slide_index
+        GET to choose the base, then the trigger.  The status stream already
+        pushes slide_index, so the first request is usually avoidable entirely.
+        """
+
+        base = await self._fast_presentation_base()
+        try:
+            return await self.client.trigger(f"{base}/{verb}/trigger")
+        except ProPresenterHttpError:
+            # ProPresenter rejected the cached base. Re-read it authoritatively
+            # and retry once. A transport failure is not retried here: the
+            # second request would fail the same way.
+            corrected = await self.refresh_presentation_base()
+            if corrected == base:
+                raise
+            return await self.client.trigger(f"{corrected}/{verb}/trigger")
+
     async def next_slide(self) -> bool:
-        await self.refresh_presentation_base()
-        return await self.client.trigger(f"{self._current_base}/next/trigger")
+        return await self._advance("next")
 
     async def previous_slide(self) -> bool:
-        await self.refresh_presentation_base()
-        return await self.client.trigger(f"{self._current_base}/previous/trigger")
+        return await self._advance("previous")
 
     async def focus_slide(self, index: int) -> bool:
         await self.refresh_presentation_base()

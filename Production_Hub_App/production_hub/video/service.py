@@ -380,6 +380,7 @@ class VideoService:
             preferred_width=config.preferred_width,
             preferred_height=config.preferred_height,
             preferred_fps=config.preferred_fps,
+            match_device_format=config.match_device_capture_format,
             stale_after_seconds=config.stale_after_seconds,
         )
 

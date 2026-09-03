@@ -28,6 +28,16 @@ class MidiMapping(JsonModel):
         return self.actions[0]
 
     @classmethod
+    def bible_mode(cls, number: int, channel: int = -1) -> "MidiMapping":
+        return cls(
+            event_type="note_on",
+            channel=channel,
+            number=number,
+            actions=[ActionDefinition("propresenter.trigger_macro", {"macro_name": "{{bible_macro}}"})],
+            metadata={"label": "Bible Mode"},
+        )
+
+    @classmethod
     def audio_pad(cls, number: int, playlist: str, track: str, channel: int = 0) -> "MidiMapping":
         return cls(
             event_type="note_on",

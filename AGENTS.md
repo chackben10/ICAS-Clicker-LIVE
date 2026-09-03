@@ -7,7 +7,12 @@ These instructions apply to every change in this repository.
 - Every feature, behavior change, or bug fix must add or update automated tests.
 - Update `testing/feature_matrix.json` whenever an endpoint, automation, action type,
   integration, hosted page, or actionable UI control is added or changed.
-- Run `python3 testing/run_end_to_end.py --mode quick` before handing work back.
+- Run `python3 testing/run_end_to_end.py --mode fast` before handing work back. It is
+  the Python unit, contract, and integration suites and finishes in under a minute.
+- Run `python3 testing/run_end_to_end.py --mode quick` once before a release, and
+  whenever a change touches a hosted page, a `data-testid`, or the Swift NDI app.
+  Quick adds two 213-scenario browser passes and a Swift build; it costs about five
+  minutes and must not be the gate on every handback.
 - Run the relevant live scenarios when a change affects ProPresenter, OBS, MIDI,
   VISCA, Panasonic PTZ, NDI/video, tracking, or macOS application lifecycle.
 - A full live run must not skip an enabled capability. Missing hardware or
@@ -15,6 +20,19 @@ These instructions apply to every change in this repository.
 - Do not replace, weaken, or accept a benchmark baseline merely to hide a
   regression. Baseline changes require an explicit `--accept-baseline` run and
   a written explanation in the change summary.
+
+## Performance work is measured, not asserted
+
+- The number that matters for cue responsiveness is press-to-cue: the CGEventTap
+  timestamp of a physical clicker press to the ProPresenter status-stream push that
+  reports the resulting slide. Hub-to-ProPresenter HTTP latency is not that number
+  and must not be reported as it.
+- Never add a poller or an Accessibility observer that reads ProPresenter's UI.
+  Those are synchronous cross-process calls served by the same main thread that
+  renders cues, so they add load to the thread they are meant to help.
+- A performance fix is accepted only against a press-to-cue distribution captured
+  under realistic load, alongside ProPresenter's resident size. A green test suite
+  is not evidence that a service feels better.
 
 ## Safety and artifacts
 

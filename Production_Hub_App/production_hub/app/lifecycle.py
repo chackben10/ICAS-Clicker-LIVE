@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from production_hub.api.server import create_app
+from production_hub.app.bible_look_guard import BibleLookGuard
 from production_hub.app.bootstrap import ApplicationContext
 from production_hub.app.clicker_dispatcher import ClickerActionDispatcher
 from production_hub.core.automation.evaluator import evaluate_rule_tree
@@ -262,13 +263,27 @@ def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEv
         context.logger.warning("clicker_listener_unavailable", "Quartz is unavailable; global clicker keys are disabled", error=str(exc))
         return None
 
+    if not context.config.integrations.propresenter.clicker_listener_enabled:
+        # Nothing is intercepted, so macOS is never asked for Input Monitoring
+        # or Accessibility. The clicker's keypresses reach ProPresenter directly.
+        context.logger.info(
+            "clicker_listener_disabled",
+            "Global clicker listener is disabled; clicker keys go straight to ProPresenter",
+        )
+        return None
+
     del loop  # Clicker actions intentionally use a dedicated worker/async loop.
     stop_event = threading.Event()
-    dispatcher = ClickerActionDispatcher(context.propresenter, context.logger)
+    dispatcher = ClickerActionDispatcher(
+        context.propresenter,
+        context.logger,
+        recorder=getattr(context, "press_to_cue", None),
+    )
 
     def _run() -> None:
         next_key = int(context.config.integrations.propresenter.next_slide_key_code)
         previous_key = int(context.config.integrations.propresenter.previous_slide_key_code)
+        bible_key = int(context.config.integrations.propresenter.bible_mode_key_code or 0)
         tap_ref: dict[str, Any] = {}
 
         def callback(_proxy, event_type, event, _refcon):
@@ -292,19 +307,27 @@ def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEv
             if event_type != Quartz.kCGEventKeyDown:
                 return event
             key_code = int(Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode))
-            if key_code == next_key:
-                dispatcher.submit("next")
+            if not tap_ref.get("forward", True):
+                # Listening only: ProPresenter already has this keystroke.
+                return event
+            if bible_key and key_code == bible_key:
+                # Bible mode is not a slide move, so it is not timed as one.
+                dispatcher.submit("bible")
                 return None if tap_ref.get("consume", True) else event
-            if key_code == previous_key:
-                dispatcher.submit("previous")
-                return None if tap_ref.get("consume", True) else event
-            return event
+            if key_code not in (next_key, previous_key):
+                return event
+            # Taken here, in the tap callback, so press-to-cue starts at the
+            # press itself rather than after the queue and the HTTP request.
+            pressed_at = time.monotonic()
+            dispatcher.submit("next" if key_code == next_key else "previous", pressed_at)
+            return None if tap_ref.get("consume", True) else event
 
         event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
         last_unavailable_log = 0.0
         listen_request_attempted = False
         while not stop_event.is_set():
             tap_ref["consume"] = True
+            tap_ref["forward"] = True
             tap = Quartz.CGEventTapCreate(
                 Quartz.kCGSessionEventTap,
                 Quartz.kCGHeadInsertEventTap,
@@ -331,10 +354,14 @@ def start_clicker_listener(context: ApplicationContext, loop: asyncio.AbstractEv
                     None,
                 )
                 if tap is not None:
-                    # Listen-only taps cannot swallow the keypad event, but
-                    # they remain reliable when macOS grants Input Monitoring
-                    # while withholding active event-tap control.
+                    # A listen-only tap cannot swallow the keypress, so
+                    # ProPresenter receives it too. Forwarding as well would
+                    # advance twice, which is why forwarding is off unless the
+                    # operator has explicitly accepted that risk.
                     tap_ref["consume"] = False
+                    tap_ref["forward"] = bool(
+                        context.config.integrations.propresenter.clicker_forward_when_listen_only
+                    )
                     context.logger.warning(
                         "clicker_listener_listen_only",
                         "Clicker listener started in keyboard listen-only mode",
@@ -461,9 +488,49 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
     loop = asyncio.get_running_loop()
     status_stream = None
     if context.config.integrations.propresenter.enabled:
+        propresenter_config = context.config.integrations.propresenter
+
+        def _fire_bible_macro() -> None:
+            # The guard runs on the stream's reader thread; the trigger is async
+            # and belongs on this loop.
+            asyncio.run_coroutine_threadsafe(
+                context.propresenter.trigger_macro(propresenter_config.bible_macro_trigger_uuid),
+                loop,
+            ).add_done_callback(_log_bible_macro_result)
+
+        def _log_bible_macro_result(completed) -> None:
+            try:
+                completed.result()
+            except Exception as exc:
+                context.logger.warning(
+                    "bible_look_correction_failed",
+                    "Bible macro could not be triggered",
+                    error=str(exc),
+                )
+
+        def _schedule_bible_verify(delay: float, callback) -> None:
+            # The guard runs on the stream's reader thread; confirmation is a
+            # timer and belongs on this loop.
+            loop.call_soon_threadsafe(loop.call_later, delay, callback)
+
+        bible_guard = BibleLookGuard(
+            propresenter_config.bible_look_name,
+            _fire_bible_macro,
+            logger=context.logger,
+            schedule=_schedule_bible_verify,
+            settle_seconds=propresenter_config.bible_look_settle_seconds,
+            retry_delay_seconds=propresenter_config.bible_look_retry_delay_seconds,
+            max_attempts=propresenter_config.bible_look_max_attempts,
+            reassert_count=propresenter_config.bible_look_reassert_count,
+        )
         # One aggregated ProPresenter subscription feeds the monitored_* caches
         # so trigger evaluation stops opening an API request per rule per tick.
-        status_stream = context.propresenter.start_status_stream()
+        status_stream = context.propresenter.start_status_stream(bible_guard.observe)
+    resource_sampler = getattr(context, "propresenter_resources", None)
+    if resource_sampler is not None:
+        # The lag tracks ProPresenter's resident size, so the curve has to be
+        # recorded across real services, not reconstructed after one.
+        resource_sampler.start()
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
     midi_receiver = start_midi_receiver(context, loop)
@@ -527,8 +594,14 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
                 if context.config.integrations.visca.enabled and listener is None:
                     listener = await start_visca_listener(context)
     finally:
+        if resource_sampler is not None:
+            resource_sampler.stop()
         if status_stream is not None:
             context.propresenter.stop_status_stream()
+        try:
+            await context.propresenter.client.aclose()
+        except Exception:
+            pass
         for task in input_list_poll_tasks.values():
             task.cancel()
         if input_list_poll_tasks:

@@ -105,6 +105,7 @@ class LocalCameraVideoSource(QObject):
         preferred_width: int = 1920,
         preferred_height: int = 1080,
         preferred_fps: float = 30.0,
+        match_device_format: bool = True,
         stale_after_seconds: float = 1.5,
     ) -> None:
         super().__init__()
@@ -115,6 +116,7 @@ class LocalCameraVideoSource(QObject):
         self.preferred_width = max(320, int(preferred_width))
         self.preferred_height = max(240, int(preferred_height))
         self.preferred_fps = max(1.0, float(preferred_fps))
+        self.match_device_format = bool(match_device_format)
         self.stale_after_seconds = max(0.5, float(stale_after_seconds))
         self.camera: QCamera | None = None
         self.capture_session: QMediaCaptureSession | None = None
@@ -235,9 +237,13 @@ class LocalCameraVideoSource(QObject):
         self.video_sink.videoFrameChanged.connect(self._on_video_frame)
         self.capture_session = QMediaCaptureSession(self)
         self.camera = QCamera(device, self)
-        selected_format = self._select_format(device)
-        if not selected_format.isNull():
-            self.camera.setCameraFormat(selected_format)
+        # Leave the device in whatever format it is already producing. Forcing
+        # one here would reconfigure a card ProPresenter may also be reading,
+        # and make macOS convert frames for one of the two clients.
+        if not self.match_device_format:
+            selected_format = self._select_format(device)
+            if not selected_format.isNull():
+                self.camera.setCameraFormat(selected_format)
         self.camera.errorOccurred.connect(self._on_error)
         self.camera.activeChanged.connect(self._on_active_changed)
         self.capture_session.setCamera(self.camera)

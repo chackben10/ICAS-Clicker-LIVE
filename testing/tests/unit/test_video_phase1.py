@@ -261,3 +261,18 @@ class VideoPhaseOneTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_a_shared_capture_card_keeps_its_own_format() -> None:
+    """ProPresenter may hold the same card; do not reconfigure it underneath.
+
+    A UVC device streams one format for every client. Forcing one here makes
+    macOS convert frames for whichever client lost, and the reconfiguration can
+    disturb the other application's feed. Production Hub already drops frames
+    to preview_fps, so it consumes the device's own format and uses fewer of
+    those frames.
+    """
+
+    from production_hub.core.config.models import VideoConfig
+
+    assert VideoConfig().match_device_capture_format is True

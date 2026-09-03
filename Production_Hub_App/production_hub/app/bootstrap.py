@@ -30,6 +30,8 @@ from production_hub.core.health.monitor import HealthMonitor
 from production_hub.core.health.status_models import IntegrationHealth, STATUS_CONNECTED, STATUS_DISABLED, STATUS_OFFLINE
 from production_hub.core.logging.log_repository import LogRepository
 from production_hub.core.logging.logger import StructuredLogger, configure_logging
+from production_hub.core.metrics.press_to_cue import PressToCueRecorder
+from production_hub.core.metrics.propresenter_resources import ProPresenterResourceSampler
 from production_hub.integrations.midi.models import MidiMapping
 from production_hub.integrations.midi.receiver import MidiReceiver
 from production_hub.integrations.obs.service import ObsService
@@ -68,6 +70,8 @@ class ApplicationContext:
     undo_manager: UndoManager
     video: VideoService
     ptz_automation: PtzAutomationService
+    press_to_cue: PressToCueRecorder
+    propresenter_resources: ProPresenterResourceSampler
 
 
 def _workspace_root() -> Path:
@@ -151,6 +155,11 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
     ptz_automation.start()
     video.add_shutdown_callback(ptz_automation.shutdown)
 
+    # Press-to-cue is always on: the distribution across a real service is the
+    # evidence that a change helped, and it costs one subtraction per press.
+    press_to_cue = PressToCueRecorder(logger)
+    propresenter.press_to_cue = press_to_cue
+    propresenter_resources = ProPresenterResourceSampler(logger)
     context = ApplicationContext(
         paths=paths,
         workspace_root=_workspace_root(),
@@ -172,6 +181,8 @@ def build_context(data_dir: Path | None = None) -> ApplicationContext:
         undo_manager=undo_manager,
         video=video,
         ptz_automation=ptz_automation,
+        press_to_cue=press_to_cue,
+        propresenter_resources=propresenter_resources,
     )
 
     register_action_handlers(context, router)
@@ -535,6 +546,10 @@ def register_action_handlers(context: ApplicationContext, router: ActionRouter) 
 
     async def trigger_macro(action: ActionDefinition, action_context: dict[str, Any]) -> ActionResult:
         macro = str(param(action, action_context, "macro_name", action_context.get("name", "")))
+        if macro == "{{bible_macro}}":
+            # Automations resolve this from the trigger snapshot; endpoints and
+            # MIDI pads have no snapshot, so read the one configured value here.
+            macro = str(context.config.integrations.propresenter.bible_macro_trigger_uuid)
         if macro.startswith("{{"):
             macro = str(action_context.get("name", ""))
         await context.propresenter.trigger_macro(macro)

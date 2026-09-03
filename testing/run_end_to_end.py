@@ -141,6 +141,32 @@ def dependency_preflight(report: RunReport, *, browser: bool) -> bool:
     return ok
 
 
+FAST_PATHS = (
+    "testing/tests/unit",
+    "testing/tests/contracts",
+    "testing/tests/integration",
+)
+
+
+def run_fast(report: RunReport) -> bool:
+    """Iteration lane: the Python suites that actually gate correctness.
+
+    The full quick matrix adds two 213-scenario browser passes and a Swift
+    build.  Those belong once before a release, not between two edits of the
+    same function -- a multi-minute gate on every handback is why single-day
+    work stretched across days.
+    """
+
+    if not dependency_preflight(report, browser=False):
+        return False
+    return command_phase(
+        report,
+        "python-fast",
+        pytest_command(report, "python-fast", list(FAST_PATHS)),
+        environment={"QT_QPA_PLATFORM": "offscreen", "PRODUCTION_HUB_LIVE": "0"},
+    )
+
+
 def run_quick(report: RunReport, *, skip_browser: bool = False, skip_swift: bool = False) -> bool:
     if not dependency_preflight(report, browser=not skip_browser):
         return False
@@ -553,7 +579,7 @@ def latest_suite_result(suite: str) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Production Hub regression, live integration, and benchmark runner")
-    parser.add_argument("--mode", choices=("quick", "full", "soak"))
+    parser.add_argument("--mode", choices=("fast", "quick", "full", "soak"))
     parser.add_argument("--accept-baseline", choices=("deterministic", "production-mac"))
     parser.add_argument("--result", type=Path, help="Result JSON to promote; defaults to the newest suite result")
     parser.add_argument("--soak-minutes", type=float, default=60.0)
@@ -567,6 +593,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--soak-minutes must be positive")
     if args.mode in {"full", "soak"} and (args.skip_browser or args.skip_swift):
         parser.error("full and soak modes cannot skip browser or Swift validation")
+    if args.mode == "fast" and (args.skip_browser or args.skip_swift):
+        parser.error("fast mode already excludes browser and Swift validation")
     return args
 
 
@@ -580,6 +608,11 @@ def main() -> int:
 
     report = RunReport.create(args.mode)
     print(f"Reports: {report.output_dir}", flush=True)
+    if args.mode == "fast":
+        overall_ok = run_fast(report)
+        report.write()
+        print(f"{'PASS' if overall_ok else 'FAIL'}: {report.output_dir}")
+        return 0 if overall_ok else 1
     quick_ok = run_quick(report, skip_browser=args.skip_browser, skip_swift=args.skip_swift)
     overall_ok = quick_ok
     if quick_ok and args.mode in {"full", "soak"}:

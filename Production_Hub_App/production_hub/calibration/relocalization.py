@@ -104,6 +104,7 @@ class AudienceRelocalizer:
         *,
         maximum_width: int = 640,
         maximum_features: int = 8000,
+        live_maximum_features: int = 1200,
     ) -> None:
         if reference_bgr is None or reference_bgr.size == 0:
             raise ValueError("The Audience calibration reference image is unavailable.")
@@ -113,6 +114,13 @@ class AudienceRelocalizer:
         self.review = review
         self.maximum_width = max(640, min(1920, int(maximum_width)))
         self.maximum_features = max(1000, min(20000, int(maximum_features)))
+        # The reference is detected once, masked to the curated markers, so its
+        # budget costs nothing per frame and stays generous. The live frame is
+        # detected unmasked on every pass, and matching is O(reference x live),
+        # so the live budget is the recurring cost and is capped separately.
+        # Capping both would thin the reference landmarks and weaken the
+        # homography, which is the opposite of what this is for.
+        self.live_maximum_features = max(300, min(20000, int(live_maximum_features)))
         self.reference_small, self.reference_scale = _scaled(self.reference, self.maximum_width)
         self.reference_gray = _feature_image(self.reference_small)
         mask = np.zeros(self.reference_gray.shape, dtype=np.uint8)
@@ -128,6 +136,11 @@ class AudienceRelocalizer:
             contrastThreshold=0.018,
             edgeThreshold=12,
         )
+        self.live_detector = cv2.SIFT_create(
+            nfeatures=self.live_maximum_features,
+            contrastThreshold=0.018,
+            edgeThreshold=12,
+        )
         self.reference_keypoints, self.reference_descriptors = self.detector.detectAndCompute(
             self.reference_gray,
             mask,
@@ -139,7 +152,7 @@ class AudienceRelocalizer:
         live = _validated_bgr(live_bgr)
         live_small, live_scale = _scaled(live, self.maximum_width)
         live_gray = _feature_image(live_small)
-        live_keypoints, live_descriptors = self.detector.detectAndCompute(live_gray, None)
+        live_keypoints, live_descriptors = self.live_detector.detectAndCompute(live_gray, None)
         if live_descriptors is None or len(live_keypoints) < 8:
             return _failed_result("The live Audience image has too few visible features.")
         matches = _mutual_ratio_matches(
@@ -616,20 +629,33 @@ def _mutual_ratio_matches(
     *,
     ratio: float,
 ) -> list[cv2.DMatch]:
+    """Ratio-test matches that agree in both directions.
+
+    The reverse pass used to match every live descriptor against the reference,
+    costing as much as the forward pass. Only descriptors that already survived
+    the forward ratio test can appear in the result, so the reverse pass runs
+    over those alone -- typically tens rather than thousands.
+    """
+
     matcher = cv2.BFMatcher(cv2.NORM_L2)
     forward_pairs = matcher.knnMatch(reference_descriptors, live_descriptors, k=2)
-    reverse_pairs = matcher.knnMatch(live_descriptors, reference_descriptors, k=2)
-    reverse_best = {
-        pair[0].queryIdx: pair[0].trainIdx
-        for pair in reverse_pairs
-        if len(pair) == 2 and pair[0].distance < ratio * pair[1].distance
-    }
-    return [
+    survivors = [
         pair[0]
         for pair in forward_pairs
-        if len(pair) == 2
-        and pair[0].distance < ratio * pair[1].distance
-        and reverse_best.get(pair[0].trainIdx) == pair[0].queryIdx
+        if len(pair) == 2 and pair[0].distance < ratio * pair[1].distance
+    ]
+    if not survivors:
+        return []
+
+    candidate_indices = sorted({match.trainIdx for match in survivors})
+    candidates = live_descriptors[candidate_indices]
+    reverse_pairs = matcher.knnMatch(candidates, reference_descriptors, k=2)
+    reverse_best: dict[int, int] = {}
+    for position, pair in enumerate(reverse_pairs):
+        if len(pair) == 2 and pair[0].distance < ratio * pair[1].distance:
+            reverse_best[candidate_indices[position]] = pair[0].trainIdx
+    return [
+        match for match in survivors if reverse_best.get(match.trainIdx) == match.queryIdx
     ]
 
 
@@ -641,9 +667,13 @@ def _scaled(image: np.ndarray, maximum_width: int) -> tuple[np.ndarray, float]:
     return cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), scale
 
 
+# Rebuilt on every frame previously; it holds no per-image state.
+_CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
+
 def _feature_image(image: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    return _CLAHE.apply(gray)
 
 
 def _validated_bgr(image: np.ndarray) -> np.ndarray:

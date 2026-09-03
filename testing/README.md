@@ -21,14 +21,20 @@ failure; a successful fallback build is not counted as a test pass.
 ## Run modes
 
 ```bash
+python3 testing/run_end_to_end.py --mode fast
 python3 testing/run_end_to_end.py --mode quick
 python3 testing/run_end_to_end.py --mode full
 python3 testing/run_end_to_end.py --mode soak
 ```
 
-- `quick` is production-safe. It runs Python unit and contract tests, simulated
-  integrations, offscreen Qt tests, safe browser tests, Swift tests, and stable
-  local benchmarks.
+- `fast` is the iteration lane and the per-handback gate: Python unit, contract,
+  and integration suites, no browser and no Swift, under a minute. Use it between
+  edits.
+- `quick` is production-safe. It runs everything in `fast` plus offscreen Qt
+  tests, two 213-scenario browser passes, Swift tests, and stable local
+  benchmarks. It costs about five minutes, most of it browser, so run it before a
+  release and whenever a change touches a hosted page, a `data-testid`, or the
+  Swift NDI app.
 - `full` includes `quick`, then performs live preflight, restarts ProPresenter
   and launches the current Production Hub source through the stable `Production
   Hub Dev.app` identity, exercises configured integrations, and restores

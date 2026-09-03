@@ -78,12 +78,18 @@ OBS_LOOK_RULES = [
 PAD_NOTES = ("A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#")
 
 
+BIBLE_MODE_PAD_NOTE = 45
+
+
 def build_default_midi_mappings() -> list[MidiMapping]:
     mappings: list[MidiMapping] = []
     for offset, note_name in enumerate(PAD_NOTES):
         mappings.append(MidiMapping.audio_pad(9 + offset, "Major Pads", f"{note_name} Major Pads", channel=-1))
         mappings.append(MidiMapping.audio_pad(21 + offset, "Minor Pads", f"{note_name} Minor Pads", channel=-1))
         mappings.append(MidiMapping.audio_pad(33 + offset, "Neutral Pads", f"{note_name} Neutral Pads", channel=-1))
+    # Bible mode from the pad surface, so the Look is set before the operator
+    # reaches for a verse rather than corrected once one is already on screen.
+    mappings.append(MidiMapping.bible_mode(BIBLE_MODE_PAD_NOTE))
     return mappings
 
 
@@ -151,6 +157,11 @@ def build_default_endpoints() -> list[EndpointDefinition]:
         EndpointDefinition("audio_active", "Active Audio", "/audio/active", [ActionDefinition("propresenter.audio_active")], allowed_methods=["GET"], response=EndpointResponseDefinition("plain_text", "{{text}}", "", "text/plain; charset=utf-8"), behavior_mode="read"),
         EndpointDefinition("next_slide", "Next Slide", "/next", [ActionDefinition("propresenter.next_slide")], response=ok_text),
         EndpointDefinition("previous_slide", "Previous Slide", "/previous", [ActionDefinition("propresenter.previous_slide")], aliases=["/prev"], response=ok_text),
+        # Entering Bible mode is something the operator does through Production
+        # Hub, so the Bible Look is already correct before a dynamic verse
+        # exists. That removes the race the Look-enforcement automation can only
+        # correct after the fact, and needs no observer on ProPresenter's UI.
+        EndpointDefinition("bible_mode", "Bible Mode", "/bible", [ActionDefinition("propresenter.trigger_macro", {"macro_name": "{{bible_macro}}"})], response=ok_text),
         EndpointDefinition("focus_slide", "Focus Slide", "/focus", [ActionDefinition("propresenter.focus_slide", {"index": "{{index}}"})], inputs=[EndpointInputDefinition("index", "Slide index", "integer", required=True, min_value="0")], response=ok_text),
         EndpointDefinition(
             "stream_beginning",

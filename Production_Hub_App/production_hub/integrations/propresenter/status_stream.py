@@ -18,9 +18,13 @@ class ProPresenterStatusStream:
     # ProPresenter getter uses, or the cache answers a different question than
     # the caller asked.  "presentation/current" reports the presentation the
     # operator has selected in the library, which is NOT /presentation/active
-    # (what is live on screen), so it is deliberately not subscribed here.
+    # (what is live on screen).  It is subscribed only because it is the one
+    # push that still names the dynamic Bible presentation when
+    # /presentation/active is null, and it feeds the Bible Look guard alone --
+    # never the active_presentation cache, which once misfired Auto Show.
     PATHS = (
         "look/current",
+        "presentation/current",
         "presentation/slide_index",
         "status/slide",
     )

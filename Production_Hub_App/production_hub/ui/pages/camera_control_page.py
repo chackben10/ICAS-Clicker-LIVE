@@ -67,6 +67,7 @@ from production_hub.calibration.review import (
 from production_hub.calibration.relocalization import RelocalizationState
 from production_hub.calibration.relocalization import qimage_to_bgr
 from production_hub.calibration.store import CalibrationRegistry
+from production_hub.ui.click_to_frame_blender import BlendJob, ClickToFrameBlender
 from production_hub.ui.pages.common import responsive_grid, run_background, scroll_page, title
 from production_hub.tracking.models import (
     NormalizedRect,
@@ -911,6 +912,7 @@ class CameraControlPage(QWidget):
         self._click_composite_relocalization_sequence = -1
         self._click_render_sequence = 0
         self._click_composite_reference_aligned = False
+        self._click_blender = ClickToFrameBlender()
         self._click_current_pose: PtzMotorPose | None = None
         self._click_pose_sequence = 0
         self._click_pose_polling = False
@@ -985,6 +987,17 @@ class CameraControlPage(QWidget):
             self._update_preview_activity(page_visible=False)
             self._update_calibration_activity(page_visible=False)
         super().hideEvent(event)
+
+    def stop_click_to_frame_blender(self) -> None:
+        """Release the composite worker when the application is closing."""
+
+        blender = getattr(self, "_click_blender", None)
+        if blender is not None:
+            blender.stop()
+
+    def closeEvent(self, event) -> None:
+        self.stop_click_to_frame_blender()
+        super().closeEvent(event)
 
     def build(self) -> None:
         root = QVBoxLayout(self)
@@ -2413,6 +2426,10 @@ class CameraControlPage(QWidget):
 
         composite = QImage(base)
         reference_aligned = False
+        # Which Audience frame this composite ends up showing. The worker may
+        # still be blending the newest one, in which case an older frame is
+        # drawn and must be recorded as such so the next tick recomposites.
+        drawn_sequence = packet.sequence
         if (
             live_ready
             and self._click_mosaic_bgr is not None
@@ -2532,21 +2549,36 @@ class CameraControlPage(QWidget):
                 live_x = self._click_live_map_x
                 live_y = self._click_live_map_y
                 alpha = self._click_live_alpha
-                warped = cv2.remap(
-                    live_bgr,
-                    live_x,
-                    live_y,
-                    cv2.INTER_LINEAR,
-                    borderMode=cv2.BORDER_CONSTANT,
+                # The remap and blend run on a worker thread. Draw the newest
+                # blend that matches the current geometry; a preview one tick
+                # behind under load is right, blocking the UI thread is not.
+                blend_geometry = (live_map_key, self._click_mosaic_version)
+                self._click_blender.submit(
+                    BlendJob(
+                        geometry=blend_geometry,
+                        sequence=packet.sequence,
+                        live_bgr=live_bgr,
+                        map_x=live_x,
+                        map_y=live_y,
+                        reference_bgr=self._click_mosaic_bgr,
+                        alpha=alpha,
+                    )
                 )
-                blended = cv2.blendLinear(
-                    warped,
-                    self._click_mosaic_bgr,
-                    alpha,
-                    1.0 - alpha,
-                )
-                composite = self._qimage_from_bgr(blended)
-                reference_aligned = True
+                result = self._click_blender.newest(blend_geometry)
+                if result is not None:
+                    composite = self._qimage_from_bgr(result.image)
+                    reference_aligned = True
+                    drawn_sequence = result.sequence
+                elif (
+                    self._click_composite_image is not None
+                    and self._click_composite_reference_aligned
+                ):
+                    # The worker has not finished a blend for this geometry yet.
+                    # Falling through would draw the unaligned panorama for this
+                    # frame, and alternating between that and the blended view
+                    # is a visible flicker. Hold the last good composite until a
+                    # fresh blend arrives: briefly stale beats visibly wrong.
+                    return QImage(self._click_composite_image), self._click_render_sequence
             except (cv2.error, FloatingPointError, TypeError, ValueError):
                 reference_aligned = False
         painter = QPainter(composite)
@@ -2554,7 +2586,7 @@ class CameraControlPage(QWidget):
         self._paint_current_ptz_footprint(painter, mosaic, composite.size())
         painter.end()
         composite = crop_click_to_frame_image(composite)
-        self._click_composite_packet_sequence = packet.sequence
+        self._click_composite_packet_sequence = drawn_sequence
         self._click_composite_version = self._click_mosaic_version
         self._click_composite_pose_sequence = self._click_pose_sequence
         self._click_composite_relocalization_sequence = (

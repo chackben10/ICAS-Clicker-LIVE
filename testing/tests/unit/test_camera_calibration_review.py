@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -367,10 +368,30 @@ class CameraCalibrationReviewTests(unittest.TestCase):
                 red,
                 frame_rate=30.0,
             )
-            page.click_to_frame_window.refresh_frame()
-            first = page.click_to_frame_window.preview.image
+            # The composite runs on a worker thread, so a published frame
+            # reaches the preview on a later refresh rather than this one.
+            # The Click-to-Frame window polls at 125 ms; this is that poll.
+            def pump_until(predicate, timeout: float = 5.0):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    page._click_composite_last_render_monotonic = 0.0
+                    page.click_to_frame_window.refresh_frame()
+                    image = page.click_to_frame_window.preview.image
+                    if image is not None and predicate(image):
+                        return image
+                    time.sleep(0.02)
+                return None
+
+            row, column = np.unravel_index(
+                np.argmax(page._click_reference_alpha),
+                page._click_reference_alpha.shape,
+            )
+
+            first = pump_until(
+                lambda image: image.pixelColor(int(column), int(row)).red() > 150
+            )
+            self.assertIsNotNone(first, "live Audience frame never reached the composite")
             first_sequence = page.click_to_frame_window.preview.sequence
-            self.assertIsNotNone(first)
 
             green = QImage(1000, 500, QImage.Format.Format_RGB32)
             green.fill(QColor("#32dc32"))
@@ -379,19 +400,15 @@ class CameraCalibrationReviewTests(unittest.TestCase):
                 green,
                 frame_rate=30.0,
             )
-            page._click_composite_last_render_monotonic = 0.0
-            page.click_to_frame_window.refresh_frame()
-            second = page.click_to_frame_window.preview.image
-            self.assertIsNotNone(second)
+            second = pump_until(
+                lambda image: image.pixelColor(int(column), int(row)).green() > 150
+            )
+            self.assertIsNotNone(second, "updated Audience frame never reached the composite")
             self.assertGreater(
                 page.click_to_frame_window.preview.sequence,
                 first_sequence,
             )
 
-            row, column = np.unravel_index(
-                np.argmax(page._click_reference_alpha),
-                page._click_reference_alpha.shape,
-            )
             first_color = first.pixelColor(int(column), int(row))
             second_color = second.pixelColor(int(column), int(row))
             self.assertGreater(second_color.green(), first_color.green() + 100)

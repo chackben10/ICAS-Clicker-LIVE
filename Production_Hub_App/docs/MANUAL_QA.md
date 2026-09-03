@@ -41,6 +41,37 @@
 - Run `/obs/look/refresh` for each seeded look rule.
 - Confirm source visibility matches the seeded show/hide IDs.
 
+## Bible mode
+
+- The **Bible** button on `control.html` (and the iPad page, which embeds it)
+  triggers the Bible Macro and reports Done.
+- `POST /bible` triggers the same macro.
+- MIDI pad note 45 triggers it from the pad surface.
+- With `bible_mode_key_code` set, that physical clicker key triggers it, and
+  the press does not appear in the press-to-cue distribution.
+- Read `bible_detection_lead` from the logs after the first reading. A positive
+  `lead_ms` means the Look is set before the verse renders and the text is
+  correct from the start; a negative one means no Hub-side fix can work and the
+  remaining options are inside ProPresenter.
+- With no operator action at all, a verse cued under a Song Look becomes
+  correct, from both the Malayalam and the English song contexts. Check the
+  verse *text* styling specifically, not just the background: a correct
+  background with song-styled text is the known partial failure.
+- Repeat ten times per context and confirm it corrects every time.
+- Leave a single verse on screen and confirm it still corrects with no further
+  clicking (the confirmation timer, not a later push, does this).
+- Confirm a song whose lyric contains something like "3:16" does not switch the
+  Look mid-song.
+- Confirm the Look is not switched repeatedly once it is correct.
+
+## Press-to-cue
+
+- `GET /admin/performance` reports p50/p95/max after a few physical presses.
+- Latency is measured from the press, so it is far larger than HTTP latency.
+- A press with no resulting slide is counted as `unmatched`, not as a failure.
+- Advancing from ProPresenter's own UI counts as `unsolicited_cues`.
+- ProPresenter's resident size is sampled every 30 seconds while the app runs.
+
 ## Automations
 
 - Bible Look Enforcement triggers only after cooldown.

@@ -193,9 +193,49 @@ class ProPresenterConfig(JsonModel):
     thumbnails: ThumbnailConfig = field(default_factory=ThumbnailConfig)
     bible_macro_trigger_uuid: str = "69293C79-69BB-4061-86E1-76F627CB3085"
     bible_look_name: str = "Bible"
+    # Bible Look correction. Tunable without a rebuild because the behaviour is
+    # timing-sensitive and lives on the production machine, not in tests.
+    # settle: delay before applying the Look. Zero, deliberately -- a verse's
+    #   text styling is baked at render time, so the Look must land before the
+    #   render to help at all, and any delay works against that.
+    # reassert: extra applications after the look already reports correct. Off,
+    #   because a stale-text result is not repaired by re-applying the Look.
+    bible_look_settle_seconds: float = 0.0
+    bible_look_retry_delay_seconds: float = 1.5
+    bible_look_max_attempts: int = 4
+    bible_look_reassert_count: int = 0
     clear_slide_delay_seconds: float = 0.5
+    # Production Hub translates the clicker's key codes into ProPresenter API
+    # triggers. With the defaults below -- keypad + and keypad -, which
+    # ProPresenter does not bind -- this interception is the only thing that
+    # makes the clicker work; turning it off disables the clicker rather than
+    # handing it back to ProPresenter.
+    #
+    # It also means a press advances the *live* presentation, where
+    # ProPresenter's own keyboard handling follows UI focus.
+    #
+    # Requires Input Monitoring. Accessibility is needed only to swallow the
+    # keypress, which matters when the clicker uses keys ProPresenter also acts
+    # on; with keypad +/- it can be left ungranted.
+    clicker_listener_enabled: bool = True
     next_slide_key_code: int = 69
     previous_slide_key_code: int = 78
+    # Without Accessibility the event tap can only listen, not consume, so
+    # ProPresenter also receives the keystroke.
+    #
+    # Whether that double-advances depends entirely on the clicker's key codes.
+    # The defaults above are keypad + (69) and keypad - (78), which ProPresenter
+    # does not bind, so it ignores them and only Production Hub's API trigger
+    # moves the slide. Forwarding is therefore safe, and required -- without it
+    # the clicker would do nothing at all.
+    #
+    # Set this to False only if the clicker is remapped onto keys ProPresenter
+    # itself acts on (arrows, space, page up/down), where forwarding a press
+    # that could not be swallowed would advance two slides.
+    clicker_forward_when_listen_only: bool = True
+    # A third clicker key that enters Bible mode. Disabled by default (0) so no
+    # existing key changes meaning; set it to the key code your clicker sends.
+    bible_mode_key_code: int = 0
 
     def __post_init__(self) -> None:
         self.host = _non_empty(self.host, "propresenter.host")
@@ -330,6 +370,15 @@ class VideoConfig(JsonModel):
     preferred_width: int = 1920
     preferred_height: int = 1080
     preferred_fps: float = 30.0
+    # A capture card can be open in ProPresenter at the same time, and a UVC
+    # device streams one format for all of its clients. Asking for a different
+    # one makes macOS convert for whichever client did not get its way, and the
+    # reconfiguration can disturb the other application's feed. Production Hub
+    # already drops frames to `preview_fps` on its own, so it takes whatever the
+    # device is already producing and uses fewer of those frames instead. The
+    # preferred_* values above remain the fallback when nothing else has the
+    # device open.
+    match_device_capture_format: bool = True
     preview_fps: float = 12.0
     stale_after_seconds: float = 1.5
     recording_fps: float = 10.0

@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from build_native_video import build as build_native_video
+from ensure_codesign_identity import IDENTITY_NAME, signing_identity
 
 
 APP_NAME = "Production Hub"
@@ -243,6 +244,14 @@ def build_app(
         "mido",
         "--collect-all",
         "rtmidi",
+        # The pooled ProPresenter client is httpx; certifi ships its CA bundle
+        # as a data file, which PyInstaller only includes when told to.
+        "--collect-all",
+        "httpx",
+        "--collect-all",
+        "httpcore",
+        "--collect-all",
+        "certifi",
         "--hidden-import",
         "mido.backends.rtmidi",
         "--hidden-import",
@@ -268,8 +277,14 @@ def build_app(
         "--hidden-import",
         "uvicorn.lifespan.on",
     ]
-    if codesign_identity != "-":
-        command.extend(["--codesign-identity", codesign_identity])
+    # Deliberately not passing --codesign-identity to PyInstaller. It signs with
+    # --timestamp, which asks Apple's timestamp authority to co-sign and fails
+    # the whole build when that round-trip is unhappy ("timestamps differ by N
+    # seconds - check your system clock", even with an accurate clock). A secure
+    # timestamp only matters for notarised distribution, so a local identity
+    # gains nothing from the network dependency. finalize_bundle_icon re-signs
+    # the finished bundle with the persistent identity instead -- which it has
+    # to do anyway, because PyInstaller signs before the Info.plist is complete.
     command.append(str(APP_ROOT / "main.py"))
     log("Building Production Hub.app with PyInstaller...")
     run(command, cwd=APP_ROOT, stream_output=True)
@@ -362,10 +377,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--icon-only", action="store_true", help="Only generate assets/ProductionHub.icns from Production_hub.icon.")
     parser.add_argument(
         "--codesign-identity",
-        default=os.environ.get("PRODUCTION_HUB_CODESIGN_IDENTITY", "-"),
+        default=os.environ.get("PRODUCTION_HUB_CODESIGN_IDENTITY", ""),
         help=(
             "Persistent Keychain code-signing identity. Defaults to "
-            "PRODUCTION_HUB_CODESIGN_IDENTITY or ad-hoc signing (-)."
+            "PRODUCTION_HUB_CODESIGN_IDENTITY, then to the local "
+            f"{IDENTITY_NAME!r} identity, then to ad-hoc signing (-)."
         ),
     )
     return parser.parse_args()
@@ -383,12 +399,16 @@ def main() -> int:
         log("Building the in-process NDI receiver bridge…")
         native_video_bridge = build_native_video()
         remote_pages = stage_remote_pages()
-        codesign_identity = str(args.codesign_identity or "-").strip() or "-"
+        # Prefer an explicit identity, then the persistent local one, and only
+        # then ad-hoc.  Ad-hoc signatures name one exact build, so every rebuild
+        # reads as a new application and macOS silently drops its privacy grants.
+        codesign_identity = str(args.codesign_identity or "").strip() or signing_identity()
         if codesign_identity == "-":
             log(
                 "WARNING: Ad-hoc release signing cannot retain macOS privacy permissions "
-                "across rebuilds. Use the stable source-development wrapper or pass "
-                "--codesign-identity for installed releases."
+                "across rebuilds. Create the persistent identity once with "
+                "`python3 Production_Hub_App/scripts/ensure_codesign_identity.py --create`, "
+                "or pass --codesign-identity."
             )
         else:
             log(f"Signing installed releases with persistent identity: {codesign_identity}")

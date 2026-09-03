@@ -105,8 +105,10 @@ class ReliabilityFixTests(unittest.IsolatedAsyncioTestCase):
 
         # /presentation/current is the presentation selected in the library,
         # not the one live on screen, so it must never satisfy a caller asking
-        # for the active presentation.
-        self.assertNotIn("presentation/current", ProPresenterStatusStream.PATHS)
+        # for the active presentation. It is subscribed -- it is the only push
+        # that names a dynamic Bible presentation while /presentation/active is
+        # null, which the Bible Look guard needs -- but it feeds no cache.
+        self.assertIn("presentation/current", ProPresenterStatusStream.PATHS)
         service.client.get_json.return_value = self.bible_presentation()
         stream.callback("presentation/current", {"presentation": {"id": "library-selection"}})
         self.assertEqual(
@@ -235,6 +237,9 @@ class ReliabilityFixTests(unittest.IsolatedAsyncioTestCase):
                         enabled=True,
                         next_slide_key_code=69,
                         previous_slide_key_code=78,
+                        bible_mode_key_code=0,
+                        clicker_listener_enabled=True,
+                        clicker_forward_when_listen_only=False,
                     )
                 )
             ),
@@ -308,6 +313,9 @@ class ReliabilityFixTests(unittest.IsolatedAsyncioTestCase):
                         enabled=True,
                         next_slide_key_code=69,
                         previous_slide_key_code=78,
+                        bible_mode_key_code=0,
+                        clicker_listener_enabled=True,
+                        clicker_forward_when_listen_only=False,
                     )
                 )
             ),

@@ -27,6 +27,9 @@ class RecordedHttpRequest:
     query: str
     headers: dict[str, str]
     body: bytes
+    # Source port of the peer socket. Requests sharing one port arrived on one
+    # kept-alive connection, which is how connection reuse is asserted.
+    client_port: int = 0
 
 
 class ScriptedHttpServer(AbstractContextManager["ScriptedHttpServer"]):
@@ -39,6 +42,11 @@ class ScriptedHttpServer(AbstractContextManager["ScriptedHttpServer"]):
         controller = self
 
         class Handler(BaseHTTPRequestHandler):
+            # ProPresenter's embedded server speaks HTTP/1.1 with keep-alive.
+            # The default here is HTTP/1.0, which closes after every response and
+            # would make a pooled client look identical to an unpooled one.
+            protocol_version = "HTTP/1.1"
+
             def log_message(self, _format: str, *_args: object) -> None:
                 return
 
@@ -92,6 +100,7 @@ class ScriptedHttpServer(AbstractContextManager["ScriptedHttpServer"]):
                     parsed.query,
                     {key.casefold(): value for key, value in handler.headers.items()},
                     body,
+                    int(handler.client_address[1]) if handler.client_address else 0,
                 )
             )
             queue = self._responses.get(parsed.path)
