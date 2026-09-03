@@ -254,8 +254,6 @@ def build_app(
         "--hidden-import",
         "Quartz",
         "--hidden-import",
-        "ApplicationServices",
-        "--hidden-import",
         "CoreML",
         "--hidden-import",
         "Vision",

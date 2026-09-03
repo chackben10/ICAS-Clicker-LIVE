@@ -11,10 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
-from production_hub.app.bible_cue_corrector import (
-    BibleCueCorrector,
-    ProPresenterBibleModeObserver,
-)
 from production_hub.app.clicker_dispatcher import ClickerActionDispatcher
 from production_hub.app.lifecycle import start_clicker_listener
 from production_hub.core.config.defaults import build_default_config
@@ -98,19 +94,26 @@ class ReliabilityFixTests(unittest.IsolatedAsyncioTestCase):
             "look/current",
             {"id": {"uuid": "look-1", "name": "Bible"}},
         )
-        stream.callback("presentation/current", self.bible_presentation())
         stream.callback(
             "status/slide",
             {"current": {"uuid": "cue-1", "text": "John 3:16\rFor God so loved the world"}},
         )
 
         self.assertEqual("Bible", await service.monitored_current_look_name())
+        self.assertEqual("cue-1", (await service.monitored_slide_status())["current"]["uuid"])
+        service.client.get_json.assert_not_awaited()
+
+        # /presentation/current is the presentation selected in the library,
+        # not the one live on screen, so it must never satisfy a caller asking
+        # for the active presentation.
+        self.assertNotIn("presentation/current", ProPresenterStatusStream.PATHS)
+        service.client.get_json.return_value = self.bible_presentation()
+        stream.callback("presentation/current", {"presentation": {"id": "library-selection"}})
         self.assertEqual(
             self.bible_presentation(),
             await service.monitored_active_presentation(),
         )
-        self.assertEqual("cue-1", (await service.monitored_slide_status())["current"]["uuid"])
-        service.client.get_json.assert_not_awaited()
+        service.client.get_json.assert_awaited_once_with("/presentation/active")
         with patch.object(stream, "stop"):
             service.stop_status_stream()
 
@@ -124,230 +127,6 @@ class ReliabilityFixTests(unittest.IsolatedAsyncioTestCase):
                 b'{"url":"/v1/presentation/current","data":{"presentation":{"id":null}}}'
             ),
         )
-
-    @staticmethod
-    def fake_bible_mode_observer_factory(holder: dict):
-        class FakeObserver:
-            def __init__(self, callback, _logger) -> None:
-                self.callback = callback
-                self.started = False
-                self.stopped = False
-                holder["observer"] = self
-
-            def start(self) -> None:
-                self.started = True
-
-            def stop(self) -> None:
-                self.stopped = True
-
-        return FakeObserver
-
-    async def test_bible_mode_entry_applies_macro_before_any_cue_event(self) -> None:
-        holder: dict = {}
-        propresenter = SimpleNamespace(
-            config=SimpleNamespace(
-                bible_macro_trigger_uuid="Bible Macro",
-                bible_look_name="Bible",
-            ),
-            current_look_name=AsyncMock(return_value="Malayalam Song"),
-            trigger_macro=AsyncMock(return_value=True),
-        )
-        logger = SimpleNamespace(info=MagicMock(), warning=MagicMock())
-        corrector = BibleCueCorrector(
-            propresenter,
-            logger,
-            observer_factory=self.fake_bible_mode_observer_factory(holder),
-        )
-        corrector.observe(
-            "look/current",
-            {"id": {"uuid": "look-1", "name": "Bible"}},
-        )
-        corrector.start(asyncio.get_running_loop())
-
-        holder["observer"].callback(True)
-        await asyncio.sleep(0.01)
-
-        self.assertTrue(holder["observer"].started)
-        propresenter.current_look_name.assert_awaited_once()
-        propresenter.trigger_macro.assert_awaited_once_with("Bible Macro")
-        logger.info.assert_called_once()
-        corrector.stop()
-        self.assertTrue(holder["observer"].stopped)
-
-    async def test_bible_mode_entry_verifies_unknown_look_once(self) -> None:
-        holder: dict = {}
-        propresenter = SimpleNamespace(
-            config=SimpleNamespace(
-                bible_macro_trigger_uuid="Bible Macro",
-                bible_look_name="Bible",
-            ),
-            current_look_name=AsyncMock(return_value="Malayalam Song"),
-            trigger_macro=AsyncMock(return_value=True),
-        )
-        corrector = BibleCueCorrector(
-            propresenter,
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-            observer_factory=self.fake_bible_mode_observer_factory(holder),
-        )
-        corrector.start(asyncio.get_running_loop())
-
-        holder["observer"].callback(True)
-        await asyncio.sleep(0.01)
-
-        propresenter.current_look_name.assert_awaited_once()
-        propresenter.trigger_macro.assert_awaited_once_with("Bible Macro")
-        corrector.stop()
-
-    async def test_bible_mode_leaves_existing_bible_look_untouched(self) -> None:
-        holder: dict = {}
-        propresenter = SimpleNamespace(
-            config=SimpleNamespace(
-                bible_macro_trigger_uuid="Bible Macro",
-                bible_look_name="Bible",
-            ),
-            current_look_name=AsyncMock(return_value="Bible"),
-            trigger_macro=AsyncMock(return_value=True),
-        )
-        corrector = BibleCueCorrector(
-            propresenter,
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-            observer_factory=self.fake_bible_mode_observer_factory(holder),
-        )
-        corrector.observe(
-            "look/current",
-            {"id": {"uuid": "look-2", "name": "Bible"}},
-        )
-        corrector.start(asyncio.get_running_loop())
-
-        holder["observer"].callback(True)
-        await asyncio.sleep(0.01)
-
-        propresenter.current_look_name.assert_awaited_once()
-        propresenter.trigger_macro.assert_not_awaited()
-        corrector.stop()
-
-    async def test_post_cue_status_events_never_switch_looks_or_post_keys(self) -> None:
-        holder: dict = {}
-        propresenter = SimpleNamespace(
-            config=SimpleNamespace(
-                bible_macro_trigger_uuid="Bible Macro",
-                bible_look_name="Bible",
-            ),
-            current_look_name=AsyncMock(return_value="Malayalam Song"),
-            trigger_macro=AsyncMock(return_value=True),
-        )
-        corrector = BibleCueCorrector(
-            propresenter,
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-            observer_factory=self.fake_bible_mode_observer_factory(holder),
-        )
-        corrector.observe(
-            "look/current",
-            {"id": {"uuid": "look-1", "name": "Malayalam Song"}},
-        )
-        corrector.start(asyncio.get_running_loop())
-
-        corrector.observe("presentation/current", self.bible_presentation())
-        corrector.observe(
-            "status/slide",
-            {"current": {"uuid": "cue-16", "text": "John 3:16"}},
-        )
-        await asyncio.sleep(0.01)
-
-        propresenter.trigger_macro.assert_not_awaited()
-        corrector.stop()
-
-    def test_native_bible_mode_observer_emits_only_value_transitions(self) -> None:
-        values: list[bool] = []
-        observer = ProPresenterBibleModeObserver(
-            values.append,
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-        )
-        api = SimpleNamespace(kAXValueAttribute="value")
-        with patch.object(
-            ProPresenterBibleModeObserver,
-            "_attribute_result",
-            side_effect=[(0, 1), (0, 1), (0, 0), (0, 1)],
-        ):
-            self.assertTrue(observer._publish_value(api, object()))
-            self.assertTrue(observer._publish_value(api, object()))
-            self.assertTrue(observer._publish_value(api, object()))
-            self.assertTrue(observer._publish_value(api, object()))
-
-        self.assertEqual([True, False, True], values)
-
-    def test_native_bible_mode_observer_rejects_invalid_control_handle(self) -> None:
-        observer = ProPresenterBibleModeObserver(
-            MagicMock(),
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-        )
-        api = SimpleNamespace(kAXValueAttribute="value")
-        with patch.object(
-            ProPresenterBibleModeObserver,
-            "_attribute_result",
-            return_value=(-25202, None),
-        ):
-            self.assertFalse(observer._publish_value(api, object()))
-
-        observer.callback.assert_not_called()
-
-    def test_native_bible_mode_observer_refreshes_replaced_toolbar_radio(
-        self,
-    ) -> None:
-        observer = ProPresenterBibleModeObserver(
-            MagicMock(),
-            SimpleNamespace(info=MagicMock(), warning=MagicMock()),
-        )
-        api = SimpleNamespace()
-        application = object()
-        replacement = object()
-        with patch.object(
-            ProPresenterBibleModeObserver,
-            "_find_bible_radio",
-            return_value=replacement,
-        ) as find_radio, patch.object(
-            observer,
-            "_publish_value",
-            return_value=True,
-        ) as publish:
-            self.assertIs(
-                replacement,
-                observer._refresh_and_publish(api, application),
-            )
-
-        find_radio.assert_called_once_with(api, application)
-        publish.assert_called_once_with(api, replacement)
-
-    def test_native_bible_mode_observer_wraps_retained_ax_callback(self) -> None:
-        def callback(_observer, _element, _notification, _context) -> None:
-            return None
-
-        wrapped = MagicMock()
-        decorator = MagicMock(return_value=wrapped)
-        objc = SimpleNamespace(callbackFor=MagicMock(return_value=decorator))
-        api = SimpleNamespace(AXObserverCreate=object())
-        wrapped = ProPresenterBibleModeObserver._native_callback(
-            objc,
-            api,
-            callback,
-        )
-
-        objc.callbackFor.assert_called_once_with(api.AXObserverCreate)
-        decorator.assert_called_once_with(callback)
-        self.assertIs(wrapped, decorator.return_value)
-
-    def test_native_bible_mode_observer_uses_bounded_semantic_poll_when_needed(
-        self,
-    ) -> None:
-        api = SimpleNamespace(kAXErrorNotificationUnsupported=-25207)
-
-        self.assertTrue(
-            ProPresenterBibleModeObserver._notification_is_unsupported(api, -25207)
-        )
-        self.assertFalse(
-            ProPresenterBibleModeObserver._notification_is_unsupported(api, -25204)
-        )
-        self.assertEqual(0.5, ProPresenterBibleModeObserver.SEMANTIC_POLL_SECONDS)
 
     async def test_stale_status_stream_cache_falls_back_to_one_shared_get(self) -> None:
         service = ProPresenterService(build_default_config().integrations.propresenter)

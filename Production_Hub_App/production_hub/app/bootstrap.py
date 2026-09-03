@@ -341,7 +341,7 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
     defaults = {item.key: item for item in build_default_automations()}
     repaired = []
     for automation in automations:
-        if automation.key in {"obs_connection_watchdog", "bible_look_enforcement"}:
+        if automation.key == "obs_connection_watchdog":
             continue
         default = defaults.get(automation.key)
         if default is None:
@@ -356,11 +356,14 @@ def ensure_builtin_automation_steps(automations: list[Any]) -> list[Any]:
             automation.interval_seconds = default.interval_seconds
         if automation.key == "slide_label_audio_sync" and automation.interval_seconds <= 0:
             automation.interval_seconds = default.interval_seconds
-        if (
-            automation.key == AUTO_SHOW_BIBLE_AUTOMATION_KEY
-            and automation.trigger != default.trigger
-        ):
+        if automation.key in {
+            "bible_look_enforcement",
+            AUTO_SHOW_BIBLE_AUTOMATION_KEY,
+        } and automation.trigger != default.trigger:
             automation.trigger = default.trigger
+        if automation.key == "bible_look_enforcement" and automation.trigger == default.trigger:
+            automation.conditions = [dict(condition) for condition in default.conditions]
+            automation.rules = dict(default.rules)
         if not automation.conditions and default.conditions:
             automation.conditions = [dict(condition) for condition in default.conditions]
             automation.rules = dict(default.rules)

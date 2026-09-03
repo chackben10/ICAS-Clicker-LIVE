@@ -10,7 +10,6 @@ from typing import Any
 
 from production_hub.api.server import create_app
 from production_hub.app.bootstrap import ApplicationContext
-from production_hub.app.bible_cue_corrector import BibleCueCorrector
 from production_hub.app.clicker_dispatcher import ClickerActionDispatcher
 from production_hub.core.automation.evaluator import evaluate_rule_tree
 from production_hub.core.automation.triggers import AutomationTriggerMonitor
@@ -460,17 +459,11 @@ async def _run_due_automations(
 async def _background_services_main(context: ApplicationContext, stop_event: threading.Event) -> None:
     register_automation_handlers(context)
     loop = asyncio.get_running_loop()
-    bible_corrector = BibleCueCorrector(context.propresenter, context.logger)
     status_stream = None
     if context.config.integrations.propresenter.enabled:
-        status_stream = context.propresenter.start_status_stream(
-            lambda path, data: loop.call_soon_threadsafe(
-                bible_corrector.observe,
-                path,
-                data,
-            )
-        )
-        bible_corrector.start(loop)
+        # One aggregated ProPresenter subscription feeds the monitored_* caches
+        # so trigger evaluation stops opening an API request per rule per tick.
+        status_stream = context.propresenter.start_status_stream()
     listener = await start_visca_listener(context)
     clicker_listener = start_clicker_listener(context, loop)
     midi_receiver = start_midi_receiver(context, loop)
@@ -534,7 +527,6 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
                 if context.config.integrations.visca.enabled and listener is None:
                     listener = await start_visca_listener(context)
     finally:
-        bible_corrector.stop()
         if status_stream is not None:
             context.propresenter.stop_status_stream()
         for task in input_list_poll_tasks.values():

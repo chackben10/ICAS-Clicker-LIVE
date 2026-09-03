@@ -56,7 +56,6 @@ class ProPresenterService:
         def ingest(path: str, data: Any) -> None:
             cache_keys = {
                 "look/current": "current_look_payload",
-                "presentation/current": "active_presentation",
                 "presentation/slide_index": "slide_index",
                 "status/slide": "slide_status",
             }
@@ -84,10 +83,13 @@ class ProPresenterService:
             self._status_stream.stop()
             self._status_stream = None
 
-    def _monitor_max_age(self) -> float | None:
-        # ProPresenter 21 occasionally omits live updates for dynamic Bible
-        # presentations.  Keep the stream as the fast path, but let one shared
-        # GET refresh a quiet cache instead of trusting stale initial data.
+    def _monitor_max_age(self, *, stream_fed: bool = True) -> float | None:
+        # Stream-fed keys can tolerate a slightly longer window because the
+        # subscription pushes every change.  Keys the stream does not feed
+        # (active_presentation) keep the short window so a quiet cache is
+        # refreshed by one shared GET rather than going stale.
+        if not stream_fed:
+            return self._monitor_cache_seconds
         return (
             self._stream_cache_seconds
             if self.status_stream_connected
@@ -120,7 +122,7 @@ class ProPresenterService:
     async def monitored_active_presentation(self) -> dict[str, Any]:
         cached = self._cached_monitor_value(
             "active_presentation",
-            max_age=self._monitor_max_age(),
+            max_age=self._monitor_max_age(stream_fed=False),
         )
         return cached if isinstance(cached, dict) else await self.active_presentation()
 

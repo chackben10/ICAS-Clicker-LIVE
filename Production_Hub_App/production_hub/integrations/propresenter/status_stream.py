@@ -14,9 +14,13 @@ StatusUpdateCallback = Callable[[str, Any], None]
 class ProPresenterStatusStream:
     """Own one official aggregated status subscription instead of repeated polls."""
 
+    # Every subscribed path must map onto the same endpoint the direct
+    # ProPresenter getter uses, or the cache answers a different question than
+    # the caller asked.  "presentation/current" reports the presentation the
+    # operator has selected in the library, which is NOT /presentation/active
+    # (what is live on screen), so it is deliberately not subscribed here.
     PATHS = (
         "look/current",
-        "presentation/current",
         "presentation/slide_index",
         "status/slide",
     )
