@@ -127,7 +127,7 @@ class BibleLookGuard:
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         reassert_count: int = DEFAULT_REASSERT_COUNT,
         schedule: Callable[[float, Callable[[], None]], None] | None = None,
-        rerender: Callable[[], None] | None = None,
+        rerender: Callable[[str], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.bible_look_name = str(bible_look_name or "").strip()
@@ -157,6 +157,7 @@ class BibleLookGuard:
         self._settling = False
         self._gave_up = False
         self._last_reference = ""
+        self._last_cue_text = ""
         # The cue currently on screen. A push repeating it is not a slide
         # change and must not prompt another correction.
         self._last_cue_signature = ""
@@ -167,6 +168,10 @@ class BibleLookGuard:
         # verse was generated wrong and only a regeneration will fix it.
         self._needs_rerender = False
         self._rerendered = False
+        # Bumped whenever an episode ends. A retry timer scheduled by an older
+        # episode is stale: the look has since been corrected, and firing it
+        # would re-apply the macro over whatever the operator chose next.
+        self._episode = 0
         # When each detector first saw this reading. The gap between them says
         # whether the Look can be set before the verse renders, which is the
         # only way stale baked text is avoidable. Logged once per reading.
@@ -202,6 +207,10 @@ class BibleLookGuard:
                 self._look_known = True
                 if self._current_look == self.bible_look_name:
                     self._look_was_correct = True
+                    # The correction landed. Close the episode here rather than
+                    # in _evaluate, which a look change no longer reaches, so
+                    # its retry timers cannot fire over a later look choice.
+                    self._reset_episode_locked()
                     if self._needs_rerender and not self._rerendered:
                         self._rerendered = True
                         rerender_now = True
@@ -219,7 +228,9 @@ class BibleLookGuard:
                     self._last_cue_signature = signature
                     content_changed = True
                 if self._scripture_cue:
-                    self._last_reference = re.split(r"[\r\n]", cue_text(data), maxsplit=1)[0].strip()
+                    full = cue_text(data)
+                    self._last_cue_text = full
+                    self._last_reference = re.split(r"[\r\n]", full, maxsplit=1)[0].strip()
                     if self._cue_seen_at is None:
                         self._cue_seen_at = self.clock()
             else:
@@ -235,14 +246,22 @@ class BibleLookGuard:
                     "Re-triggering the verse so ProPresenter rebuilds it under the Bible look",
                     reference=self._last_reference,
                 )
-            self.rerender()
+            self.rerender(self._last_cue_text)
         if not content_changed:
             return False
         return self._evaluate()
 
-    def verify(self) -> bool:
-        """Re-check after a correction, and fire again if it did not take."""
+    def verify(self, episode: int | None = None) -> bool:
+        """Re-check after a correction, and fire again if it did not take.
 
+        A timer from a finished episode is ignored: the look was corrected, the
+        episode closed, and re-firing now would override a later choice.
+        """
+
+        if episode is not None:
+            with self._lock:
+                if episode != self._episode:
+                    return False
         return self._evaluate()
 
     @property
@@ -323,10 +342,11 @@ class BibleLookGuard:
                 self._look_was_correct = True
             if correct and self._reasserts >= self.reassert_count:
                 return False
-            if self._look_was_correct and not correct:
-                # The macro already took for this reading and the operator has
-                # since chosen a different look. That is their call to make.
-                return False
+            # Deliberately no "already corrected once" suppression here. The
+            # look can revert between verses -- ProPresenter re-applies it on
+            # trigger -- so every slide change has to be checked on its own
+            # merits. Not fighting the operator comes from only evaluating on a
+            # slide change at all, not from giving up after the first success.
             if self._last_fired_at is None:
                 # settle_seconds is 0 by default and should stay there; it
                 # exists only so the delay can be reintroduced from config if
@@ -334,7 +354,8 @@ class BibleLookGuard:
                 if not self._settling and self.settle_seconds > 0:
                     self._settling = True
                     if self.schedule is not None:
-                        self.schedule(self.settle_seconds, self.verify)
+                        episode = self._episode
+                        self.schedule(self.settle_seconds, lambda e=episode: self.verify(e))
                         return False
                     # With no scheduler the settle cannot be awaited; apply now
                     # rather than never.
@@ -360,6 +381,7 @@ class BibleLookGuard:
                 self._attempts += 1
                 action = "apply"
             attempt = self._attempts
+            episode_token = self._episode
             current_look = self._current_look
             reference = self._last_reference
 
@@ -380,10 +402,11 @@ class BibleLookGuard:
         # Confirm rather than assume, so a trigger that never took effect is
         # retried instead of silently trusted.
         if self.schedule is not None:
-            self.schedule(self.retry_delay_seconds, self.verify)
+            self.schedule(self.retry_delay_seconds, lambda e=episode_token: self.verify(e))
         return True
 
     def _reset_episode_locked(self) -> None:
+        self._episode += 1
         self._attempts = 0
         self._reasserts = 0
         self._last_fired_at = None

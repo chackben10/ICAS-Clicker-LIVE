@@ -514,7 +514,13 @@ class TestRegeneratingTheVerse:
     def harness(self, **kwargs):
         h = Harness(**kwargs)
         h.rerenders = 0
-        h.guard.rerender = lambda: setattr(h, "rerenders", h.rerenders + 1)
+        h.rerender_texts = []
+
+        def _rr(cue_text=""):
+            h.rerenders += 1
+            h.rerender_texts.append(cue_text)
+
+        h.guard.rerender = _rr
         return h
 
     def test_a_verse_caught_under_the_wrong_look_is_regenerated(self) -> None:
@@ -524,6 +530,9 @@ class TestRegeneratingTheVerse:
         assert h.fired == 1 and h.rerenders == 0
         h.guard.observe("look/current", {"id": {"name": "Bible"}})
         assert h.rerenders == 1
+        # The observed cue text is handed over, because /status/slide comes
+        # back empty during exactly the transition this runs in.
+        assert h.rerender_texts[0].startswith("John 3:16")
 
     def test_a_verse_already_under_the_bible_look_is_left_alone(self) -> None:
         """Normal verse-to-verse clicking must never re-trigger anything."""

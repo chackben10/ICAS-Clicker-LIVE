@@ -115,7 +115,7 @@ class ProPresenterService:
         self._status_stream.start()
         return self._status_stream
 
-    async def rerender_active_slide(self) -> str:
+    async def rerender_active_slide(self, cue_text: str = "") -> str:
         """Re-trigger the verse that is on screen, so ProPresenter rebuilds it.
 
         A verse generated while a Song look was active is authored against the
@@ -131,14 +131,19 @@ class ProPresenterService:
         Returns a short reason string; "" means it re-triggered.
         """
 
+        wanted = str(cue_text or "").strip()
         try:
-            live = await self.client.get_json("/status/slide")
+            if not wanted:
+                # Only re-read when the caller has nothing. /status/slide comes
+                # back empty during a transition, which is exactly when this
+                # runs, so the observed text is the reliable source.
+                live = await self.client.get_json("/status/slide")
+                current = live.get("current") if isinstance(live, dict) else None
+                wanted = str((current or {}).get("text") or "").strip()
             passage = await self.client.get_json("/presentation/active")
         except Exception as exc:
             return f"read failed: {exc}"
 
-        current = live.get("current") if isinstance(live, dict) else None
-        wanted = str((current or {}).get("text") or "").strip()
         if not wanted:
             return "no live cue text"
 
