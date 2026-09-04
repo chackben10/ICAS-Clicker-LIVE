@@ -499,3 +499,61 @@ class TestItDoesNotFightTheOperator:
             harness.clock.now += 3.0
             harness.guard.observe("status/slide", VERSE_CUE)
         assert harness.fired == 1
+
+
+class TestRegeneratingTheVerse:
+    """Restyling cannot restore a reference that was never placed.
+
+    A verse generated under a Song look has no reference in the slide at all --
+    status/slide still carries the text, but nothing rendered it. Changing the
+    look afterwards restyles what is there; only regenerating the cue puts the
+    reference back. So once the look has been corrected, the verse that was
+    already on screen is re-triggered exactly once.
+    """
+
+    def harness(self, **kwargs):
+        h = Harness(**kwargs)
+        h.rerenders = 0
+        h.guard.rerender = lambda: setattr(h, "rerenders", h.rerenders + 1)
+        return h
+
+    def test_a_verse_caught_under_the_wrong_look_is_regenerated(self) -> None:
+        h = self.harness()
+        h.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        h.guard.observe("status/slide", VERSE_CUE)
+        assert h.fired == 1 and h.rerenders == 0
+        h.guard.observe("look/current", {"id": {"name": "Bible"}})
+        assert h.rerenders == 1
+
+    def test_a_verse_already_under_the_bible_look_is_left_alone(self) -> None:
+        """Normal verse-to-verse clicking must never re-trigger anything."""
+
+        h = self.harness()
+        h.guard.observe("look/current", {"id": {"name": "Bible"}})
+        h.guard.observe("status/slide", VERSE_CUE)
+        h.run_timers(until=20.0)
+        assert h.fired == 0 and h.rerenders == 0
+
+    def test_it_regenerates_only_once_per_reading(self) -> None:
+        h = self.harness()
+        h.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        h.guard.observe("status/slide", VERSE_CUE)
+        for _ in range(3):
+            h.clock.now += 2.0
+            h.guard.observe("look/current", {"id": {"name": "Bible"}})
+        assert h.rerenders == 1
+
+    def test_a_later_reading_is_regenerated_again(self) -> None:
+        h = self.harness()
+        h.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        h.guard.observe("status/slide", VERSE_CUE)
+        h.guard.observe("look/current", {"id": {"name": "Bible"}})
+        assert h.rerenders == 1
+
+        h.guard.observe("presentation/current", SONG)
+        h.guard.observe("status/slide", LYRIC_CUE)
+        h.clock.now += 60.0
+        h.guard.observe("look/current", {"id": {"name": "English Song"}})
+        h.guard.observe("status/slide", {"current": {"uuid": "cue-9", "text": "Mark 3:2\rbody"}})
+        h.guard.observe("look/current", {"id": {"name": "Bible"}})
+        assert h.rerenders == 2

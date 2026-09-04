@@ -128,3 +128,57 @@ async def test_status_stream_push_stops_the_clock() -> None:
         assert captured  # the caller's callback still runs
     finally:
         service.stop_status_stream()
+
+
+class TestRerenderIndexRecovery:
+    """A dynamic Bible presentation reports no slide index, so the index of the
+    live verse is recovered by matching its text against the passage. A wrong
+    match would jump the reading, so an ambiguous one does nothing."""
+
+    def service(self):
+        from production_hub.core.config.models import ProPresenterConfig
+        from production_hub.integrations.propresenter.service import ProPresenterService
+        return ProPresenterService(ProPresenterConfig(host="127.0.0.1", port=1))
+
+    def passage(self, *texts):
+        return {"presentation": {"groups": [{"slides": [{"text": t} for t in texts]}]}}
+
+    @pytest.mark.asyncio
+    async def test_it_retriggers_the_verse_that_is_live(self) -> None:
+        from unittest.mock import AsyncMock
+        service = self.service()
+        service.client.get_json = AsyncMock(side_effect=[
+            {"current": {"text": "Mark 3:2\rSome of them were looking"}},
+            self.passage("Mark 3:1\rAnother time", "Mark 3:2\rSome of them were looking", "Mark 3:3\rJesus said"),
+        ])
+        service.client.trigger = AsyncMock(return_value=True)
+
+        assert await service.rerender_active_slide() == ""
+        service.client.trigger.assert_awaited_once_with("/presentation/active/1/trigger")
+
+    @pytest.mark.asyncio
+    async def test_an_ambiguous_match_refuses_rather_than_guessing(self) -> None:
+        from unittest.mock import AsyncMock
+        service = self.service()
+        service.client.get_json = AsyncMock(side_effect=[
+            {"current": {"text": "repeated"}},
+            self.passage("repeated", "other", "repeated"),
+        ])
+        service.client.trigger = AsyncMock()
+
+        reason = await service.rerender_active_slide()
+        assert "refusing to guess" in reason
+        service.client.trigger.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_match_does_nothing(self) -> None:
+        from unittest.mock import AsyncMock
+        service = self.service()
+        service.client.get_json = AsyncMock(side_effect=[
+            {"current": {"text": "a verse"}},
+            self.passage("something else"),
+        ])
+        service.client.trigger = AsyncMock()
+
+        assert "not found" in await service.rerender_active_slide()
+        service.client.trigger.assert_not_awaited()

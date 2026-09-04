@@ -115,6 +115,50 @@ class ProPresenterService:
         self._status_stream.start()
         return self._status_stream
 
+    async def rerender_active_slide(self) -> str:
+        """Re-trigger the verse that is on screen, so ProPresenter rebuilds it.
+
+        A verse generated while a Song look was active is authored against the
+        wrong theme, and changing the look afterwards restyles the text but
+        cannot restore the reference -- it was never put in the slide. Only a
+        regeneration fixes it, and re-triggering the same cue is a regeneration.
+
+        A dynamic Bible presentation reports no slide index, so the index is
+        recovered by matching the live cue's text against the passage. The match
+        must be unique: with a repeated verse, or no match at all, this does
+        nothing rather than risk jumping the reading to the wrong place.
+
+        Returns a short reason string; "" means it re-triggered.
+        """
+
+        try:
+            live = await self.client.get_json("/status/slide")
+            passage = await self.client.get_json("/presentation/active")
+        except Exception as exc:
+            return f"read failed: {exc}"
+
+        current = live.get("current") if isinstance(live, dict) else None
+        wanted = str((current or {}).get("text") or "").strip()
+        if not wanted:
+            return "no live cue text"
+
+        presentation = passage.get("presentation") if isinstance(passage, dict) else None
+        groups = (presentation or {}).get("groups") or []
+        matches: list[int] = []
+        index = 0
+        for group in groups:
+            for slide in (group.get("slides") or []) if isinstance(group, dict) else []:
+                if str(slide.get("text") or "").strip() == wanted:
+                    matches.append(index)
+                index += 1
+        if not matches:
+            return "live cue not found in the active presentation"
+        if len(matches) > 1:
+            return f"live cue text appears {len(matches)} times; refusing to guess"
+
+        await self.client.trigger(f"/presentation/active/{matches[0]}/trigger")
+        return ""
+
     async def prime_status_state(self) -> None:
         """Read the values the subscription will never push on its own.
 

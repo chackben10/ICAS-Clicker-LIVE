@@ -127,6 +127,7 @@ class BibleLookGuard:
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         reassert_count: int = DEFAULT_REASSERT_COUNT,
         schedule: Callable[[float, Callable[[], None]], None] | None = None,
+        rerender: Callable[[], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.bible_look_name = str(bible_look_name or "").strip()
@@ -140,6 +141,10 @@ class BibleLookGuard:
         # the correction took even when no further pushes arrive -- the operator
         # may leave one verse on screen.
         self.schedule = schedule
+        # Called once per reading, after the look has been corrected, when the
+        # verse on screen was generated under the wrong look and therefore has
+        # no reference in it. Re-triggering the cue regenerates it.
+        self.rerender = rerender
         self.clock = clock
         self._lock = threading.Lock()
         self._current_look = ""
@@ -158,6 +163,10 @@ class BibleLookGuard:
         # Set once the Bible look has actually been observed during this
         # reading. After that the operator owns the look.
         self._look_was_correct = False
+        # True when the reading was first seen under a non-Bible look: that
+        # verse was generated wrong and only a regeneration will fix it.
+        self._needs_rerender = False
+        self._rerendered = False
         # When each detector first saw this reading. The gap between them says
         # whether the Look can be set before the verse renders, which is the
         # only way stale baked text is avoidable. Logged once per reading.
@@ -177,6 +186,7 @@ class BibleLookGuard:
         """
 
         content_changed = False
+        rerender_now = False
         with self._lock:
             if path == "look/current":
                 if not isinstance(data, dict):
@@ -192,6 +202,9 @@ class BibleLookGuard:
                 self._look_known = True
                 if self._current_look == self.bible_look_name:
                     self._look_was_correct = True
+                    if self._needs_rerender and not self._rerendered:
+                        self._rerendered = True
+                        rerender_now = True
             elif path == "presentation/current":
                 was = self._bible_presentation
                 self._bible_presentation = looks_like_bible_presentation(data)
@@ -212,6 +225,17 @@ class BibleLookGuard:
             else:
                 return False
         self._log_detection_lead()
+        if rerender_now and self.rerender is not None:
+            # The look is now Bible, but the verse on screen was generated
+            # before that, so its reference was never placed. Only a
+            # regeneration restores it; restyling cannot.
+            if self.logger is not None:
+                self.logger.info(
+                    "bible_slide_rerender",
+                    "Re-triggering the verse so ProPresenter rebuilds it under the Bible look",
+                    reference=self._last_reference,
+                )
+            self.rerender()
         if not content_changed:
             return False
         return self._evaluate()
@@ -277,6 +301,8 @@ class BibleLookGuard:
                 # The reading ended; the next one starts fresh.
                 self._look_was_correct = False
                 self._last_cue_signature = ""
+                self._needs_rerender = False
+                self._rerendered = False
                 self._reset_episode_locked()
                 return False
             # Until a look/current push has arrived the current look is unknown
@@ -288,6 +314,11 @@ class BibleLookGuard:
 
             now = self.clock()
             correct = self._current_look == self.bible_look_name
+            if not correct and not self._look_was_correct:
+                # The reading is on screen under the wrong look, so this verse
+                # was generated without its reference. Note it now; the
+                # regeneration happens once the look is actually Bible.
+                self._needs_rerender = True
             if correct:
                 self._look_was_correct = True
             if correct and self._reasserts >= self.reassert_count:
