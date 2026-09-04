@@ -1089,15 +1089,6 @@ Clears ProPresenter Announcements and sets OBS scene to <b>ProPresenter Input</b
 </button>
 </div>
 
-<div class="preset-card">
-<button class="preset-main" id="btnBibleMode" data-testid="btnBibleMode" type="button">
-<div class="preset-title">Bible</div>
-<div class="preset-sub">
-Triggers the Bible Macro so the <b>Bible</b> Look is set before the first verse is cued.
-</div>
-</button>
-</div>
-
 <div class="preset-card has-selector" id="cardTestimonies">
 <button class="preset-main" id="btnTestimonies" data-testid="btnTestimonies" type="button">
 <div class="preset-title">Testimonies</div>
@@ -1302,8 +1293,7 @@ audioClear: `${base}/audio/clear`,
 audioActive: `${base}/audio/active`,
 autoShow: `${base}/auto-show`,
 clickerPresentationActivation: `${base}/clicker-presentation-activation`,
-presentationFocusTime: `${base}/presentation-focus-time`,
-bible: `${base}/bible`
+presentationFocusTime: `${base}/presentation-focus-time`
 };
 }
 
@@ -1404,7 +1394,6 @@ const btnStreamBeginning = document.getElementById("btnStreamBeginning");
 const btnCamera = document.getElementById("btnCamera");
 const btnServiceLogo = document.getElementById("btnServiceLogo");
 const btnShowSlides = document.getElementById("btnShowSlides");
-const btnBibleMode = document.getElementById("btnBibleMode");
 const btnTestimonies = document.getElementById("btnTestimonies");
 const btnEndingStream = document.getElementById("btnEndingStream");
 const btnSetMacro = document.getElementById("btnSetMacro");
@@ -1465,7 +1454,6 @@ btnStreamBeginning,
 btnCamera,
 btnServiceLogo,
 btnShowSlides,
-btnBibleMode,
 btnTestimonies,
 btnEndingStream,
 btnCameraClearSlide,
@@ -2091,29 +2079,6 @@ handler(e);
 }
 
 // ====== Actions ======
-async function runBibleMode() {
-const ok = await testBackend();
-
-if (!ok) {
-setLastAction("Failed (backend offline)");
-return;
-}
-
-const { bible } = endpoints();
-
-setLastAction("Running: Bible");
-
-try {
-const res = await fetch(bible, { method: "POST" });
-
-if (!res.ok) throw new Error("Bad response");
-
-setLastAction("Done: Bible");
-} catch {
-setLastAction("Failed: Bible");
-}
-}
-
 async function runPreset(presetName) {
 const ok = await testBackend();
 
@@ -2375,7 +2340,6 @@ attachTapHandler(btnStreamBeginning, () => runPreset("stream_beginning"));
 attachTapHandler(btnCamera, () => runPreset("camera"));
 attachTapHandler(btnServiceLogo, () => runPreset("service_logo"));
 attachTapHandler(btnShowSlides, () => runPreset("show_slides"));
-attachTapHandler(btnBibleMode, () => runBibleMode());
 attachTapHandler(btnTestimonies, () => runPreset("testimonies"));
 attachTapHandler(btnEndingStream, () => runPreset("ending_stream"));
 attachTapHandler(btnSetMacro, () => runMacro());
