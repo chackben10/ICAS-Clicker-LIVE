@@ -513,36 +513,11 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
             # timer and belongs on this loop.
             loop.call_soon_threadsafe(loop.call_later, delay, callback)
 
-        def _rerender_bible_slide(cue_text: str = "") -> None:
-            # Runs on the stream's reader thread; the trigger is async.
-            asyncio.run_coroutine_threadsafe(
-                _rerender_and_log(cue_text),
-                loop,
-            )
-
-        async def _rerender_and_log(cue_text: str = "") -> None:
-            try:
-                reason = await context.propresenter.rerender_active_slide(cue_text)
-            except Exception as exc:
-                context.logger.warning(
-                    "bible_slide_rerender_failed",
-                    "Could not re-trigger the verse",
-                    error=str(exc),
-                )
-                return
-            if reason:
-                context.logger.warning(
-                    "bible_slide_rerender_skipped",
-                    "Did not re-trigger the verse",
-                    reason=reason,
-                )
-
         bible_guard = BibleLookGuard(
             propresenter_config.bible_look_name,
             _fire_bible_macro,
             logger=context.logger,
             schedule=_schedule_bible_verify,
-            rerender=_rerender_bible_slide,
             settle_seconds=propresenter_config.bible_look_settle_seconds,
             retry_delay_seconds=propresenter_config.bible_look_retry_delay_seconds,
             max_attempts=propresenter_config.bible_look_max_attempts,
