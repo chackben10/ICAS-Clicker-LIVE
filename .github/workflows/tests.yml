@@ -48,6 +48,13 @@ jobs:
           cache: pip
       - name: Install application and browser dependencies
         run: |
+          # The browser tests import testing.harness.inventory, which reaches
+          # production_hub.app.bootstrap and so loads PySide6. Qt needs these
+          # system libraries even headless, and `playwright install --with-deps`
+          # supplies browser dependencies only -- without them pytest-qt fails
+          # at configure time with "libEGL.so.1: cannot open shared object file".
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxkbcommon0 libpulse0
           python -m pip install --upgrade pip
           python -m pip install -r Production_Hub_App/requirements.txt
           python -m pip install -r testing/requirements.txt
@@ -56,6 +63,7 @@ jobs:
         env:
           PRODUCTION_HUB_LIVE: "0"
           PRODUCTION_HUB_DEPLOYED_SMOKE: "1"
+          QT_QPA_PLATFORM: offscreen
           PRODUCTION_HUB_BROWSER_OUTPUT: testing/benchmarks/outputs/ci-browser-${{ matrix.engine }}/screenshots
           PRODUCTION_HUB_BROWSER_METRICS: testing/benchmarks/outputs/ci-browser-${{ matrix.engine }}/metrics.json
         run: >-
