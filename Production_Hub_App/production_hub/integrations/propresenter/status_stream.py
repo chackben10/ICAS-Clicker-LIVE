@@ -37,12 +37,19 @@ class ProPresenterStatusStream:
         logger: Any | None = None,
         timeout_seconds: float = 12.0,
         reconnect_seconds: float = 2.0,
+        on_connect: Callable[[], None] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.callback = callback
         self.logger = logger
         self.timeout_seconds = max(5.0, float(timeout_seconds))
         self.reconnect_seconds = max(0.1, float(reconnect_seconds))
+        # The subscription reports changes only -- nothing is sent for state
+        # that was already true when it connected. A caller that tracks state
+        # from these pushes alone is blind to whatever was on screen at
+        # connect, and blind again after every reconnect, so it is told when
+        # to go and read the current values for itself.
+        self.on_connect = on_connect
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._response: BinaryIO | None = None
@@ -98,6 +105,11 @@ class ProPresenterStatusStream:
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                     self._response = response
                     self.connected = True
+                    if self.on_connect is not None:
+                        try:
+                            self.on_connect()
+                        except Exception:
+                            pass
                     if self.logger is not None:
                         self.logger.info(
                             "propresenter_status_stream_connected",

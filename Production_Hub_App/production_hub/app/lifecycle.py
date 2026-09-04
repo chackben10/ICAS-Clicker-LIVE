@@ -523,9 +523,22 @@ async def _background_services_main(context: ApplicationContext, stop_event: thr
             max_attempts=propresenter_config.bible_look_max_attempts,
             reassert_count=propresenter_config.bible_look_reassert_count,
         )
+        def _prime_status_state() -> None:
+            # Runs on the stream's reader thread whenever it (re)connects.
+            # /status/updates never pushes state that was already true, so the
+            # current look and presentation are read once here; without it the
+            # guard cannot see a reading that was already on screen.
+            asyncio.run_coroutine_threadsafe(
+                context.propresenter.prime_status_state(),
+                loop,
+            )
+
         # One aggregated ProPresenter subscription feeds the monitored_* caches
         # so trigger evaluation stops opening an API request per rule per tick.
-        status_stream = context.propresenter.start_status_stream(bible_guard.observe)
+        status_stream = context.propresenter.start_status_stream(
+            bible_guard.observe,
+            on_connect=_prime_status_state,
+        )
     resource_sampler = getattr(context, "propresenter_resources", None)
     if resource_sampler is not None:
         # The lag tracks ProPresenter's resident size, so the curve has to be

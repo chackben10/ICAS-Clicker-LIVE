@@ -382,3 +382,61 @@ class TestDetectionLead:
         harness.clock.now += 0.25
         harness.guard.observe("status/slide", VERSE_CUE)
         assert len(harness.logger.find("bible_detection_lead")) == 2
+
+
+def test_state_already_true_at_connect_is_primed_not_missed() -> None:
+    """/status/updates pushes changes only, never current state.
+
+    A Bible reading already on screen when the stream connects -- at startup,
+    or after any reconnect -- produces no push. Tracking state from pushes
+    alone therefore leaves the guard blind to it, which is exactly what
+    happened in production: the look was switched to a Song look under a live
+    Bible presentation and the guard never fired.
+    """
+
+    from unittest.mock import AsyncMock
+    import asyncio
+
+    from production_hub.core.config.models import ProPresenterConfig
+    from production_hub.integrations.propresenter.service import ProPresenterService
+
+    service = ProPresenterService(ProPresenterConfig(host="127.0.0.1", port=1))
+    seen: list[tuple[str, object]] = []
+    service.start_status_stream(lambda path, data: seen.append((path, data)))
+    try:
+        service.client.get_json = AsyncMock(
+            side_effect=[
+                {"id": {"name": "Malayalam Song"}},
+                BIBLE,
+                VERSE_CUE,
+            ]
+        )
+        asyncio.run(service.prime_status_state())
+    finally:
+        service.stop_status_stream()
+
+    paths = [path for path, _ in seen]
+    assert paths == ["look/current", "presentation/current", "status/slide"]
+
+
+def test_priming_survives_an_unreadable_path() -> None:
+    """One failed read must not stop the others; a later push supplies it."""
+
+    from unittest.mock import AsyncMock
+    import asyncio
+
+    from production_hub.core.config.models import ProPresenterConfig
+    from production_hub.integrations.propresenter.service import ProPresenterService
+
+    service = ProPresenterService(ProPresenterConfig(host="127.0.0.1", port=1))
+    seen: list[str] = []
+    service.start_status_stream(lambda path, data: seen.append(path))
+    try:
+        service.client.get_json = AsyncMock(
+            side_effect=[{"id": {"name": "Bible"}}, OSError("refused"), VERSE_CUE]
+        )
+        asyncio.run(service.prime_status_state())
+    finally:
+        service.stop_status_stream()
+
+    assert seen == ["look/current", "status/slide"]

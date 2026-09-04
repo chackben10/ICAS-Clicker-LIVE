@@ -29,6 +29,7 @@ class ProPresenterService:
         self._monitor_cache_seconds = 0.45
         self._stream_cache_seconds = 1.5
         self._status_stream: ProPresenterStatusStream | None = None
+        self._status_ingest = None
         # Set by the application so the stream can stop the press-to-cue clock.
         self.press_to_cue: Any | None = None
 
@@ -79,7 +80,7 @@ class ProPresenterService:
     def status_stream_connected(self) -> bool:
         return bool(self._status_stream and self._status_stream.connected)
 
-    def start_status_stream(self, callback=None) -> ProPresenterStatusStream:
+    def start_status_stream(self, callback=None, on_connect=None) -> ProPresenterStatusStream:
         if self._status_stream is not None:
             return self._status_stream
 
@@ -104,13 +105,38 @@ class ProPresenterService:
             if callback is not None:
                 callback(path, data)
 
+        self._status_ingest = ingest
         self._status_stream = ProPresenterStatusStream(
             self.config.base_url,
             ingest,
             timeout_seconds=max(12.0, self.config.request_timeout_seconds),
+            on_connect=on_connect,
         )
         self._status_stream.start()
         return self._status_stream
+
+    async def prime_status_state(self) -> None:
+        """Read the values the subscription will never push on its own.
+
+        `/status/updates` only reports changes. A reading already on screen when
+        the stream connects -- at startup, or after any reconnect -- produces no
+        push at all, so anything tracking state from pushes alone never learns
+        it. Reading the three paths once closes that gap.
+        """
+
+        if self._status_ingest is None:
+            return
+        for path, reader in (
+            ("look/current", lambda: self.client.get_json("/look/current")),
+            ("presentation/current", lambda: self.client.get_json("/presentation/current")),
+            ("status/slide", lambda: self.client.get_json("/status/slide")),
+        ):
+            try:
+                self._status_ingest(path, await reader())
+            except Exception:
+                # A path that cannot be read is not fatal; the next real push
+                # will supply it.
+                continue
 
     def stop_status_stream(self) -> None:
         if self._status_stream is not None:
