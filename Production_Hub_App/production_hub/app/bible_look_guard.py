@@ -152,6 +152,12 @@ class BibleLookGuard:
         self._settling = False
         self._gave_up = False
         self._last_reference = ""
+        # The cue currently on screen. A push repeating it is not a slide
+        # change and must not prompt another correction.
+        self._last_cue_signature = ""
+        # Set once the Bible look has actually been observed during this
+        # reading. After that the operator owns the look.
+        self._look_was_correct = False
         # When each detector first saw this reading. The gap between them says
         # whether the Look can be set before the verse renders, which is the
         # only way stale baked text is avoidable. Logged once per reading.
@@ -162,8 +168,15 @@ class BibleLookGuard:
     # -- observation ------------------------------------------------------
 
     def observe(self, path: str, data: Any) -> bool:
-        """Handle one status push. Returns True when the macro was fired."""
+        """Handle one status push. Returns True when the macro was fired.
 
+        Only a change of slide prompts a check. A look change records the new
+        look and stops there: an operator switching looks while a verse is on
+        screen is a deliberate act, and correcting it would be Production Hub
+        overruling the person running the service.
+        """
+
+        content_changed = False
         with self._lock:
             if path == "look/current":
                 if not isinstance(data, dict):
@@ -172,13 +185,26 @@ class BibleLookGuard:
                 self._current_look = (
                     str(identifier.get("name") or "").strip() if isinstance(identifier, dict) else ""
                 )
+                # The first sighting of the look is initial state, not an
+                # operator action, so it may prompt a check. Every later look
+                # change is a deliberate choice and must not.
+                content_changed = not self._look_known
                 self._look_known = True
+                if self._current_look == self.bible_look_name:
+                    self._look_was_correct = True
             elif path == "presentation/current":
+                was = self._bible_presentation
                 self._bible_presentation = looks_like_bible_presentation(data)
+                content_changed = self._bible_presentation and not was
                 if self._bible_presentation and self._presentation_seen_at is None:
                     self._presentation_seen_at = self.clock()
             elif path == "status/slide":
                 self._scripture_cue = looks_like_scripture_cue(data)
+                current = data.get("current") if isinstance(data, dict) else None
+                signature = str((current or {}).get("uuid") or "") if isinstance(current, dict) else ""
+                if signature and signature != self._last_cue_signature:
+                    self._last_cue_signature = signature
+                    content_changed = True
                 if self._scripture_cue:
                     self._last_reference = re.split(r"[\r\n]", cue_text(data), maxsplit=1)[0].strip()
                     if self._cue_seen_at is None:
@@ -186,6 +212,8 @@ class BibleLookGuard:
             else:
                 return False
         self._log_detection_lead()
+        if not content_changed:
+            return False
         return self._evaluate()
 
     def verify(self) -> bool:
@@ -246,7 +274,9 @@ class BibleLookGuard:
         reference = ""
         with self._lock:
             if not self._bible_active_locked():
-                # The reading ended; the next miss starts a fresh episode.
+                # The reading ended; the next one starts fresh.
+                self._look_was_correct = False
+                self._last_cue_signature = ""
                 self._reset_episode_locked()
                 return False
             # Until a look/current push has arrived the current look is unknown
@@ -258,7 +288,13 @@ class BibleLookGuard:
 
             now = self.clock()
             correct = self._current_look == self.bible_look_name
+            if correct:
+                self._look_was_correct = True
             if correct and self._reasserts >= self.reassert_count:
+                return False
+            if self._look_was_correct and not correct:
+                # The macro already took for this reading and the operator has
+                # since chosen a different look. That is their call to make.
                 return False
             if self._last_fired_at is None:
                 # settle_seconds is 0 by default and should stay there; it

@@ -440,3 +440,62 @@ def test_priming_survives_an_unreadable_path() -> None:
         service.stop_status_stream()
 
     assert seen == ["look/current", "status/slide"]
+
+
+class TestItDoesNotFightTheOperator:
+    """Reported from production: switching the look while a verse was on
+    screen snapped it straight back to Bible.
+
+    The rule is that a *slide change* prompts the check. A look change is a
+    deliberate act by the person running the service, and correcting it is
+    Production Hub overruling them.
+    """
+
+    def live_reading(self) -> Harness:
+        harness = Harness()
+        harness.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        harness.guard.observe("presentation/current", BIBLE)
+        harness.guard.observe("look/current", {"id": {"name": "Bible"}})
+        harness.fired = 0
+        return harness
+
+    def test_switching_look_on_a_live_verse_is_left_alone(self) -> None:
+        harness = self.live_reading()
+        harness.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        harness.run_timers(until=30.0)
+        assert harness.fired == 0
+
+    def test_a_look_change_with_no_slide_change_never_fires(self) -> None:
+        harness = Harness()
+        harness.guard.observe("presentation/current", BIBLE)
+        harness.guard.observe("look/current", {"id": {"name": "Bible"}})
+        harness.fired = 0
+        for name in ("Malayalam Song", "English Song", "Presentation Slides"):
+            harness.clock.now += 2.0
+            harness.guard.observe("look/current", {"id": {"name": name}})
+        harness.run_timers(until=60.0)
+        assert harness.fired == 0
+
+    def test_the_next_verse_is_still_corrected(self) -> None:
+        """Not fighting the operator must not mean giving up on the reading."""
+
+        harness = self.live_reading()
+        harness.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        assert harness.fired == 0
+
+        # The reading ends, then a later one starts under the wrong look.
+        harness.guard.observe("presentation/current", SONG)
+        harness.guard.observe("status/slide", LYRIC_CUE)
+        harness.clock.now += 30.0
+        harness.guard.observe("presentation/current", BIBLE)
+        assert harness.fired == 1
+
+    def test_a_repeated_cue_uuid_is_not_a_slide_change(self) -> None:
+        harness = Harness()
+        harness.guard.observe("look/current", {"id": {"name": "Malayalam Song"}})
+        harness.guard.observe("status/slide", VERSE_CUE)
+        assert harness.fired == 1
+        for _ in range(5):
+            harness.clock.now += 3.0
+            harness.guard.observe("status/slide", VERSE_CUE)
+        assert harness.fired == 1
