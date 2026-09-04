@@ -566,3 +566,35 @@ class TestRegeneratingTheVerse:
         h.guard.observe("status/slide", {"current": {"uuid": "cue-9", "text": "Mark 3:2\rbody"}})
         h.guard.observe("look/current", {"id": {"name": "Bible"}})
         assert h.rerenders == 2
+
+
+def test_a_relook_of_the_same_verse_is_not_a_slide_change() -> None:
+    """Reported from production: the look would not stay on a song look.
+
+    ProPresenter re-emits the live slide with a new cue UUID every time the
+    look changes. Keying "did the slide change" on that UUID turned the
+    operator's own look change into a new slide, and the correction fired
+    straight back at them -- three times in twenty seconds, each a fresh
+    episode. The cue text survives a re-render, so it is the key.
+    """
+
+    fired: list = []
+    clock = Clock()
+    guard = BibleLookGuard("Bible", lambda: fired.append(1), clock=clock)
+
+    guard.observe("look/current", {"id": {"name": "English Song"}})
+    guard.observe("status/slide", {"current": {"uuid": "cue-a", "text": "John 1:3\rThrough him"}})
+    assert len(fired) == 1
+
+    # The operator sets a song look; ProPresenter re-emits the same verse under
+    # a new UUID. That is not a new slide and must not be corrected.
+    for uuid in ("cue-b", "cue-c", "cue-d"):
+        clock.now += 8.0
+        guard.observe("look/current", {"id": {"name": "English Song"}})
+        guard.observe("status/slide", {"current": {"uuid": uuid, "text": "John 1:3\rThrough him"}})
+    assert len(fired) == 1
+
+    # A genuinely different verse still is.
+    clock.now += 8.0
+    guard.observe("status/slide", {"current": {"uuid": "cue-e", "text": "John 1:4\rIn him was life"}})
+    assert len(fired) == 2

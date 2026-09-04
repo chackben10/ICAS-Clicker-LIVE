@@ -222,8 +222,13 @@ class BibleLookGuard:
                     self._presentation_seen_at = self.clock()
             elif path == "status/slide":
                 self._scripture_cue = looks_like_scripture_cue(data)
-                current = data.get("current") if isinstance(data, dict) else None
-                signature = str((current or {}).get("uuid") or "") if isinstance(current, dict) else ""
+                # Keyed on the cue's text, not its UUID. ProPresenter re-emits
+                # the slide with a fresh UUID whenever the look changes, so a
+                # UUID key turns the operator's own look change into a "new
+                # slide" and the correction fires straight back at them. The
+                # text is stable across a re-render and changes when the verse
+                # does, which is the question actually being asked.
+                signature = " ".join(cue_text(data).split())
                 if signature and signature != self._last_cue_signature:
                     self._last_cue_signature = signature
                     content_changed = True

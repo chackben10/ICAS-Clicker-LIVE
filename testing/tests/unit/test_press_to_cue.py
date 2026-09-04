@@ -172,13 +172,32 @@ class TestRerenderIndexRecovery:
 
     @pytest.mark.asyncio
     async def test_no_match_does_nothing(self) -> None:
+        """It retries once, because the look change is still settling, then
+        gives up rather than moving the reading somewhere unasked for."""
+
         from unittest.mock import AsyncMock
         service = self.service()
         service.client.get_json = AsyncMock(side_effect=[
             {"current": {"text": "a verse"}},
+            self.passage("something else"),
             self.passage("something else"),
         ])
         service.client.trigger = AsyncMock()
 
         assert "not found" in await service.rerender_active_slide()
         service.client.trigger.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_it_retries_once_while_the_look_change_settles(self) -> None:
+        """The first read can land before /presentation/active catches up."""
+
+        from unittest.mock import AsyncMock
+        service = self.service()
+        service.client.get_json = AsyncMock(side_effect=[
+            self.passage(),                       # not there yet
+            self.passage("Mark 3:2\rSome of them"),  # arrived
+        ])
+        service.client.trigger = AsyncMock(return_value=True)
+
+        assert await service.rerender_active_slide("Mark 3:2\rSome of them") == ""
+        service.client.trigger.assert_awaited_once_with("/presentation/active/0/trigger")

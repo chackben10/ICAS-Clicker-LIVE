@@ -140,22 +140,24 @@ class ProPresenterService:
                 live = await self.client.get_json("/status/slide")
                 current = live.get("current") if isinstance(live, dict) else None
                 wanted = str((current or {}).get("text") or "").strip()
-            passage = await self.client.get_json("/presentation/active")
+            if not wanted:
+                return "no live cue text"
+
+            # The look change that prompted this is still settling, so the
+            # first read can arrive before /presentation/active reflects the
+            # reading. One short retry covers that without waiting on a verse
+            # that genuinely is not there.
+            matches: list[int] = []
+            for attempt in range(2):
+                if attempt:
+                    await asyncio.sleep(0.4)
+                passage = await self.client.get_json("/presentation/active")
+                matches = self._slide_indexes_matching(passage, wanted)
+                if matches:
+                    break
         except Exception as exc:
             return f"read failed: {exc}"
 
-        if not wanted:
-            return "no live cue text"
-
-        presentation = passage.get("presentation") if isinstance(passage, dict) else None
-        groups = (presentation or {}).get("groups") or []
-        matches: list[int] = []
-        index = 0
-        for group in groups:
-            for slide in (group.get("slides") or []) if isinstance(group, dict) else []:
-                if str(slide.get("text") or "").strip() == wanted:
-                    matches.append(index)
-                index += 1
         if not matches:
             return "live cue not found in the active presentation"
         if len(matches) > 1:
@@ -163,6 +165,20 @@ class ProPresenterService:
 
         await self.client.trigger(f"/presentation/active/{matches[0]}/trigger")
         return ""
+
+    @staticmethod
+    def _slide_indexes_matching(passage: Any, wanted: str) -> list[int]:
+        presentation = passage.get("presentation") if isinstance(passage, dict) else None
+        groups = (presentation or {}).get("groups") or []
+        matches: list[int] = []
+        index = 0
+        for group in groups:
+            slides = (group.get("slides") or []) if isinstance(group, dict) else []
+            for slide in slides:
+                if " ".join(str(slide.get("text") or "").split()) == " ".join(wanted.split()):
+                    matches.append(index)
+                index += 1
+        return matches
 
     async def prime_status_state(self) -> None:
         """Read the values the subscription will never push on its own.
