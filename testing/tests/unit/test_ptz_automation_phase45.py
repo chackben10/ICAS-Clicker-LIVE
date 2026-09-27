@@ -106,10 +106,18 @@ class _Geometry:
 
     def __init__(self) -> None:
         self.frame_heights: list[float] = []
+        self.frame_widths: list[float | None] = []
         self.relative_footprints: list[float] = []
 
-    def pose_for_target(self, _target, *, desired_frame_height: float) -> PtzMotorPose:
+    def pose_for_target(
+        self,
+        _target,
+        *,
+        desired_frame_height: float,
+        desired_frame_width: float | None = None,
+    ) -> PtzMotorPose:
         self.frame_heights.append(desired_frame_height)
+        self.frame_widths.append(desired_frame_width)
         return PtzMotorPose(45000, 34500, 3000)
 
     def ptz_rect_to_reference(self, bounds, _pose):
@@ -209,6 +217,32 @@ def _snapshot(source: VideoSourceKey, *subjects: TrackedSubject) -> TrackingSnap
         subjects=tuple(subjects),
         last_analysis_monotonic=time.monotonic(),
     )
+
+
+def _panorama_geometry() -> PtzGeometryModel:
+    def transform_for(center_x: float, center_y: float, footprint: float):
+        return (
+            (footprint, 0.0, (center_x - footprint / 2.0) * 1600.0),
+            (0.0, footprint, (center_y - footprint / 2.0) * 900.0),
+            (0.0, 0.0, 1.0),
+        )
+
+    anchors = tuple(
+        CalibrationPoseAnchor(
+            name=f"{x}-{y}@{zoom}",
+            center_x=x,
+            center_y=y,
+            footprint_width=footprint,
+            footprint_height=footprint,
+            motor=PtzMotorPose(round(46000 - x * 9000), round(32000 + y * 5200), zoom),
+            ptz_size=(1600, 900),
+            audience_size=(1600, 900),
+            ptz_to_audience=transform_for(x, y, footprint),
+        )
+        for zoom, footprint in ((1500, 0.62), (3500, 0.11))
+        for x, y in ((0.30, 0.35), (0.70, 0.35), (0.30, 0.65), (0.70, 0.65))
+    )
+    return PtzGeometryModel(Path("/approved/panorama.json"), "now", anchors)
 
 
 class PtzAutomationPhase45Tests(unittest.TestCase):
@@ -344,7 +378,7 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
             ),
         )
         for subjects, podium in good_samples:
-            target, desired = _adaptive_ptz_composition(
+            target, desired, _width = _adaptive_ptz_composition(
                 config,
                 subjects,
                 podium=podium,
@@ -357,7 +391,7 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
 
         # IMG_2422 after fingertip extrapolation: tilt upward and widen enough
         # to establish useful safety space above the clipped gesture.
-        target, desired = _adaptive_ptz_composition(
+        target, desired, _width = _adaptive_ptz_composition(
             config,
             [NormalizedRect(0.3390, 0.0, 0.4149, 0.9810)],
             podium=True,
@@ -484,7 +518,7 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
         self.assertEqual(current.zoom, decision.desired_pose.zoom)
 
     def test_clear_off_podium_subject_does_not_run_away_to_stage_wide(self) -> None:
-        target, desired = _adaptive_ptz_composition(
+        target, desired, _width = _adaptive_ptz_composition(
             CameraTrackingConfig(enabled=True).automation,
             [NormalizedRect(0.45, 0.12, 0.10, 0.36)],
             podium=False,
@@ -828,6 +862,61 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
         self.assertAlmostEqual(0.50, projected.center[0], places=4)
         self.assertAlmostEqual(0.50, projected.center[1], places=4)
 
+    def test_reference_rect_to_ptz_image_inverts_the_forward_projection(self) -> None:
+        def transform_for(center_x: float, center_y: float):
+            return (
+                (0.5, 0.0, (center_x - 0.25) * 1000.0),
+                (0.0, 0.5, (center_y - 0.25) * 500.0),
+                (0.0, 0.0, 1.0),
+            )
+
+        anchors = tuple(
+            CalibrationPoseAnchor(
+                name=f"{x}-{y}",
+                center_x=x,
+                center_y=y,
+                footprint_width=0.50,
+                footprint_height=0.50,
+                motor=PtzMotorPose(round(42000 + x * 5000), round(33000 + y * 4000), 2000),
+                ptz_size=(1000, 500),
+                audience_size=(1000, 500),
+                ptz_to_audience=transform_for(x, y),
+            )
+            for x, y in ((0.30, 0.30), (0.70, 0.30), (0.30, 0.70), (0.70, 0.70))
+        )
+        geometry = PtzGeometryModel(Path("/approved/map.json"), "now", anchors)
+        pose = PtzMotorPose(44500, 35000, 2000)
+
+        image = NormalizedRect(0.30, 0.25, 0.20, 0.40)
+        reference = geometry.ptz_rect_to_reference(image, pose)
+        recovered = geometry.reference_rect_to_ptz_image(reference, pose)
+        for expected, actual in (
+            (image.x, recovered.x),
+            (image.y, recovered.y),
+            (image.width, recovered.width),
+            (image.height, recovered.height),
+        ):
+            self.assertAlmostEqual(expected, actual, places=9)
+
+    def test_reference_rect_to_ptz_image_keeps_off_frame_people_off_frame(self) -> None:
+        """The distance outside the frame is the measurement that matters.
+
+        Clamping an off-edge person to a sliver at the boundary would tell the
+        composition the group already fits, which is exactly the widening it
+        needs to do.
+        """
+
+        geometry = _panorama_geometry()
+        pose = PtzMotorPose(44500, 35000, 2400)
+        view = geometry.reference_polygon_for_pose(pose)
+        right_edge = max(x for x, _y in view)
+        beyond = NormalizedRect(right_edge + 0.05, 0.40, 0.03, 0.10)
+
+        projected = geometry.reference_rect_to_ptz_image(beyond, pose)
+
+        self.assertGreater(projected.x, 1.0)
+        self.assertGreater(projected.width, 0.0)
+
     def test_guarded_controller_sends_only_bounded_absolute_steps_after_arm(self) -> None:
         subject = TrackedSubject(
             1,
@@ -1071,3 +1160,53 @@ class PtzAutomationPhase45Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_snapshot_counts_people_once_and_keeps_live_audience_boxes() -> None:
+    from unittest.mock import Mock
+    from production_hub.tracking.target_lock import SubjectLockObservation
+
+    now = time.monotonic()
+    people = tuple(
+        TrackedSubject(i+1, NormalizedRect(x, .20, .12, .50), .9, True, 6, now)
+        for i, x in enumerate((.30, .55))
+    )
+    audience = _snapshot(VideoSourceKey.AUDIENCE, *people)
+    ptz = _snapshot(VideoSourceKey.PTZ, *people)
+    config = CameraTrackingConfig(enabled=True)
+    config.automation.mode = 'subject'
+    service = PtzAutomationService(
+        _Video(audience, ptz), _Panasonic(), config, Path('/tmp'),
+        geometry_loader=lambda _root: _Geometry(),
+    )
+    assert service.arm()[0]
+    service._subject_lock.update = Mock(return_value=SubjectLockObservation(
+        audience=audience, ptz=ptz, initialized=True, lock_count=2,
+        matched_lock_count=2, ptz_matches=2, audience_matches=2,
+    ))
+    try:
+        service._cycle(now)
+        snapshot = service.snapshot()
+        assert snapshot.locked_subject_count == snapshot.matched_subject_count == 2
+        assert snapshot.locked_audience_subjects == people
+        assert snapshot.copy().locked_audience_subjects == people
+    finally:
+        service.disarm()
+
+
+def test_group_zoom_waits_out_transient_small_boxes_but_widens_immediately() -> None:
+    actual = PtzMotorPose(43000, 33500, 3000)
+    service = PtzAutomationService(
+        _Video(_snapshot(VideoSourceKey.AUDIENCE), _snapshot(VideoSourceKey.PTZ)),
+        _Panasonic(), CameraTrackingConfig(), Path('/tmp'),
+    )
+    small = PtzMotorPose(43010, 33510, 3400)
+    wide = PtzMotorPose(43020, 33520, 2800)
+    assert service._guard_group_zoom_in(actual, actual, 10).zoom == 3000
+    assert service._guard_group_zoom_in(actual, small, 10.5).zoom == 3000
+    assert service._guard_group_zoom_in(actual, small, 11.5).zoom == 3000
+    # Pan/tilt remain free to follow; only tightening waits for stable size.
+    assert service._guard_group_zoom_in(actual, small, 11.75).pan == small.pan
+    assert service._guard_group_zoom_in(actual, wide, 12) == wide
+    assert service._guard_group_zoom_in(actual, small, 13).zoom == 3000
+    assert service._guard_group_zoom_in(actual, small, 15.25).zoom == 3400

@@ -307,6 +307,26 @@ class PtzGeometryModel:
         return min(values), max(values)
 
     @property
+    def reference_view_aspect(self) -> float:
+        """Width/height of the PTZ view measured in reference coordinates.
+
+        Not the sensor's 16:9. The reference canvas is itself normalized to the
+        unit square, so when both images share an aspect ratio this is 1.0: a
+        view covering 30% of the reference height also covers 30% of its width.
+        Taking it from the sweep keeps the horizontal framing budget honest for
+        a reference image of any shape.
+        """
+
+        ratios = [
+            item.footprint_width / item.footprint_height
+            for item in self.anchors
+            if item.footprint_height > 0 and item.footprint_width > 0
+        ]
+        if not ratios:
+            return 1.0
+        return float(np.median(np.asarray(ratios, dtype=np.float64)))
+
+    @property
     def motor_bounds(self) -> tuple[tuple[int, int], tuple[int, int]]:
         pans = [item.motor.pan for item in self.anchors]
         tilts = [item.motor.tilt for item in self.anchors]
@@ -330,6 +350,7 @@ class PtzGeometryModel:
         target: NormalizedRect,
         *,
         desired_frame_height: float,
+        desired_frame_width: float | None = None,
     ) -> PtzMotorPose:
         bounds = target
         center_x, center_y = bounds.center
@@ -351,7 +372,7 @@ class PtzGeometryModel:
             tilt = self._motor_plane_value(self._tilt_plane, center_x, center_y)
         required_footprint = max(
             bounds.height / max(0.10, float(desired_frame_height)),
-            bounds.width / max(0.10, float(desired_frame_height) * 16.0 / 9.0),
+            self._width_footprint(bounds, desired_frame_height, desired_frame_width),
         )
         zoom = self._zoom_for_footprint(required_footprint)
         pan_bounds, tilt_bounds = self._extended_motor_bounds()
@@ -360,6 +381,27 @@ class PtzGeometryModel:
             tilt=max(tilt_bounds[0], min(tilt_bounds[1], round(tilt))),
             zoom=max(self.minimum_zoom, min(self.maximum_zoom, round(zoom))),
         )
+
+    def _width_footprint(
+        self,
+        bounds: NormalizedRect,
+        desired_frame_height: float,
+        desired_frame_width: float | None,
+    ) -> float:
+        """The footprint the target's WIDTH requires.
+
+        Callers that do not state a horizontal budget keep the historical
+        behaviour, which treats the frame as 16/9 times wider than the desired
+        height and so effectively never binds. That is wrong for a row of
+        people -- they run out of frame sideways first -- but single-subject
+        framing was tuned against it, and every shape a lone body makes is
+        bounded by its height anyway.
+        """
+
+        if desired_frame_width is None:
+            return bounds.width / max(0.10, float(desired_frame_height) * 16.0 / 9.0)
+        budget = max(0.10, float(desired_frame_width)) * max(0.05, self.reference_view_aspect)
+        return bounds.width / budget
 
     def zoom_for_relative_footprint(
         self,
@@ -407,6 +449,50 @@ class PtzGeometryModel:
                 )
             )
         return _bounds(points)
+
+    def reference_rect_to_ptz_image(
+        self,
+        bounds: NormalizedRect,
+        current_pose: PtzMotorPose,
+    ) -> NormalizedRect:
+        """Exact inverse of `ptz_rect_to_reference`.
+
+        Deliberately NOT clamped to the image. A locked person who has stepped
+        out of the PTZ frame projects to a rectangle outside [0, 1], and that
+        is the whole point: the composition can then measure how far outside
+        they are and widen by exactly enough to bring them back.
+        """
+
+        anchor, center_x, center_y, scale = self._pose_projection(current_pose)
+        if abs(scale) < 1e-9:
+            raise ValueError("The PTZ pose projection is singular.")
+        try:
+            inverse = np.linalg.inv(
+                np.asarray(anchor.ptz_to_audience, dtype=np.float64)
+            )
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("The calibration transform cannot be inverted.") from exc
+        points = []
+        for x, y in (
+            (bounds.x, bounds.y),
+            (bounds.x + bounds.width, bounds.y),
+            (bounds.x + bounds.width, bounds.y + bounds.height),
+            (bounds.x, bounds.y + bounds.height),
+        ):
+            audience_x = anchor.center_x + (x - center_x) / scale
+            audience_y = anchor.center_y + (y - center_y) / scale
+            projected = _project(
+                inverse,
+                audience_x * anchor.audience_size[0],
+                audience_y * anchor.audience_size[1],
+            )
+            points.append(
+                (
+                    projected[0] / anchor.ptz_size[0],
+                    projected[1] / anchor.ptz_size[1],
+                )
+            )
+        return _unclamped_bounds(points)
 
     def reference_polygon_for_pose(
         self,
@@ -717,6 +803,21 @@ def _bounds(points: Sequence[tuple[float, float]]) -> NormalizedRect:
         max(xs) - min(xs),
         max(ys) - min(ys),
     ).clamped()
+
+
+def _unclamped_bounds(points: Sequence[tuple[float, float]]) -> NormalizedRect:
+    """Like `_bounds`, but keeps coordinates outside the image.
+
+    `_bounds` clamps, which is correct where it is used: a detection projected
+    into the reference canvas cannot fall outside it. Projecting the other way
+    is different -- a locked person can genuinely be off the side of the PTZ
+    frame, and clamping that to a zero-width sliver at the edge would hide
+    exactly the distance the composition needs to measure.
+    """
+
+    xs = [item[0] for item in points]
+    ys = [item[1] for item in points]
+    return NormalizedRect(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
 
 
 def _convex_hull(points: Iterable[tuple[float, float]]) -> tuple[tuple[float, float], ...]:

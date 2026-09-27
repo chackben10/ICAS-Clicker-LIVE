@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable
 
 from production_hub.calibration.relocalization import RelocalizationSnapshot
+from production_hub.tracking import appearance
 from production_hub.tracking.models import (
     NormalizedRect,
     SubjectReferenceTarget,
@@ -28,6 +29,7 @@ class SubjectLockObservation:
     matched_lock_count: int = 0
     audience_matches: int = 0
     audience_coasts: int = 0
+    held_locks: int = 0
     ptz_matches: int = 0
     reference_targets: tuple[SubjectReferenceTarget, ...] = ()
 
@@ -37,6 +39,9 @@ class _LockedSubject:
     lock_id: int
     reference_bounds: NormalizedRect
     last_seen_monotonic: float
+    # The last raw observation, before smoothing. Composition needs the
+    # smoothed path; matching needs this one. See `_match_prediction`.
+    observed_bounds: NormalizedRect | None = None
     velocity_x: float = 0.0
     velocity_y: float = 0.0
     ptz_track_id: int | None = None
@@ -45,6 +50,8 @@ class _LockedSubject:
     pending_audience_frames: int = 0
     audience_offset_x: float = 0.0
     audience_offset_y: float = 0.0
+    # Running clothing-colour signature while matched in the PTZ view.
+    appearance: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,15 +66,35 @@ class SubjectTargetLock:
     Apple Vision's per-camera association IDs are deliberately short lived.
     They are useful hints, but cannot define automation identity: a brief edge
     clipping can destroy one ID and a newcomer can receive the next. This lock
-    is created exactly once from the stable people visible in the PTZ image
-    after arming. Later observations may update those logical subjects, but
-    can never add another one.
+    is created from the stable people visible in the PTZ image after arming.
+
+    People do not all become stable detections on the same frame, so the roster
+    stays open for a short formation window and then closes for good: after it
+    expires no later arrival can join, however long the camera runs. A locked
+    person who has been absent from both cameras for the retirement timeout is
+    dropped, because holding a place for somebody who has left keeps the camera
+    off the people who are still there. The last remaining lock is never
+    retired -- that case is a detector failure to wait out, not an empty stage.
     """
 
-    def __init__(self, *, maximum_match_distance: float = 0.30) -> None:
+    def __init__(
+        self,
+        *,
+        maximum_match_distance: float = 0.30,
+        maximum_locked_subjects: int = 3,
+        formation_grace_seconds: float = 1.5,
+        retire_seconds: float = 8.0,
+        hold_seconds: float = 1.0,
+    ) -> None:
         self.maximum_match_distance = max(0.08, min(0.60, float(maximum_match_distance)))
+        self.maximum_locked_subjects = max(1, min(5, int(maximum_locked_subjects)))
+        self.formation_grace_seconds = max(0.0, min(6.0, float(formation_grace_seconds)))
+        self.retire_seconds = max(2.0, min(60.0, float(retire_seconds)))
+        self.hold_seconds = max(0.0, min(4.0, float(hold_seconds)))
         self._locks: list[_LockedSubject] = []
         self._next_lock_id = 1
+        self._formation_deadline = 0.0
+        self._single = _SingleSubjectMemory()
 
     @property
     def initialized(self) -> bool:
@@ -80,6 +107,8 @@ class SubjectTargetLock:
     def reset(self) -> None:
         self._locks.clear()
         self._next_lock_id = 1
+        self._formation_deadline = 0.0
+        self._single = _SingleSubjectMemory()
 
     def update(
         self,
@@ -106,20 +135,14 @@ class SubjectTargetLock:
                 if item.subject.age_frames >= minimum_age_frames
             ]
             # Stable left-to-right ordering gives logical lock IDs deterministic
-            # meaning for diagnostics and multi-person regression tests.
-            for candidate in sorted(
-                stable,
-                key=lambda item: (item.reference_bounds.center[0], item.subject.track_id),
-            ):
-                self._locks.append(
-                    _LockedSubject(
-                        lock_id=self._next_lock_id,
-                        reference_bounds=candidate.reference_bounds,
-                        last_seen_monotonic=now,
-                        ptz_track_id=candidate.subject.track_id,
-                    )
-                )
-                self._next_lock_id += 1
+            # meaning for diagnostics and multi-person regression tests. Later
+            # arrivals during the formation window take the next free ID rather
+            # than renumbering, because a lock ID that moved under a settled
+            # group would restart the framing dwell for everybody.
+            for candidate in self._formation_order(stable):
+                self._append_lock(candidate, now)
+            if self._locks:
+                self._formation_deadline = now + self.formation_grace_seconds
 
         if not self._locks:
             return SubjectLockObservation(
@@ -132,6 +155,20 @@ class SubjectTargetLock:
         # Match both views against the same pre-update prediction so neither
         # camera wins simply because it happened to be processed first.
         ptz_matches = self._match(ptz_candidates, source="ptz", now=now)
+        added = self._admit_late_arrivals(
+            ptz_candidates,
+            ptz_matches,
+            minimum_age_frames=minimum_age_frames,
+            now=now,
+        )
+        if added:
+            # Give the new locks their own match pass so they contribute a
+            # target on the very frame they join.
+            ptz_matches = self._match(ptz_candidates, source="ptz", now=now)
+        if len(self._locks) == 1:
+            self._single.observe(self._locks[0], ptz_candidates, ptz_matches, now)
+            if self._locks[0].lock_id in ptz_matches:
+                self._single.note_walk("ptz", ptz_matches[self._locks[0].lock_id], now)
         audience_matches = self._match_audience(
             audience_candidates,
             ptz_matches,
@@ -153,8 +190,24 @@ class SubjectTargetLock:
             if audience_match is not None:
                 locked.audience_track_id = audience_match.subject.track_id
 
+        # Retirement runs on post-update freshness: a lock that just matched
+        # has only now had its timestamp advanced.
+        retired = self._retire_absent_locks(now)
+        if retired:
+            ptz_matches = {
+                lock_id: candidate
+                for lock_id, candidate in ptz_matches.items()
+                if lock_id not in retired
+            }
+            audience_matches = {
+                lock_id: candidate
+                for lock_id, candidate in audience_matches.items()
+                if lock_id not in retired
+            }
+
         reference_targets: list[SubjectReferenceTarget] = []
         audience_coasts = 0
+        held = 0
         for locked in self._locks:
             ptz_match = ptz_matches.get(locked.lock_id)
             audience_match = audience_matches.get(locked.lock_id)
@@ -172,8 +225,18 @@ class SubjectTargetLock:
                         bounds=locked.reference_bounds,
                         confidence=selected.subject.confidence,
                         source="ptz" if ptz_match is not None else "audience",
+                        velocity_x=locked.velocity_x,
+                        observed_x=(locked.observed_bounds or locked.reference_bounds).center[0],
+                        observed_at=locked.last_seen_monotonic,
+                        observed_top=(locked.observed_bounds or locked.reference_bounds).y,
+                        observed_bottom=(lambda b: b.y + b.height)(locked.observed_bounds or locked.reference_bounds),
                     )
                 )
+                continue
+            hold = self._recent_hold_target(locked, now)
+            if hold is not None:
+                reference_targets.append(hold)
+                held += 1
                 continue
             coast = _audience_coast_target(locked, now)
             if coast is not None:
@@ -186,13 +249,177 @@ class SubjectTargetLock:
             initialized=True,
             lock_count=len(self._locks),
             matched_lock_count=(
-                len(set(ptz_matches) | set(audience_matches)) + audience_coasts
+                len(set(ptz_matches) | set(audience_matches))
+                + audience_coasts
+                + held
             ),
             audience_matches=len(audience_matches),
             audience_coasts=audience_coasts,
+            held_locks=held,
             ptz_matches=len(ptz_matches),
             reference_targets=tuple(reference_targets),
         )
+
+    def _recent_hold_target(
+        self,
+        locked: _LockedSubject,
+        now: float,
+    ) -> SubjectReferenceTarget | None:
+        """Keep a briefly-missed group member in the composition.
+
+        Apple Vision drops a stationary person for a frame or two routinely.
+        Without a hold the group envelope collapses onto whoever was still
+        detected, the camera starts correcting toward them, and it lurches back
+        when the missing person returns -- several times a minute.
+
+        This is deliberately unavailable to a single locked subject. One person
+        missing is the lost-subject case, which has its own tuned hold-and-wait
+        behaviour, and feeding it a stale rectangle would drive the camera from
+        an observation that no longer exists.
+        """
+
+        if len(self._locks) <= 1 or self.hold_seconds <= 0:
+            return None
+        elapsed = now - locked.last_seen_monotonic
+        if elapsed <= 0 or elapsed > self.hold_seconds:
+            return None
+        return SubjectReferenceTarget(
+            lock_id=locked.lock_id,
+            bounds=_predicted_bounds(locked, now),
+            confidence=max(0.20, 0.60 - elapsed * 0.30),
+            source="hold",
+        )
+
+    def _formation_order(
+        self,
+        candidates: list[_ReferenceCandidate],
+    ) -> list[_ReferenceCandidate]:
+        """Left to right, and never more people than the operator wants framed.
+
+        Over the cap the most confident, most central people win: a shot of
+        four is a stage-wide shot, not the group the operator pointed at.
+        """
+
+        if len(candidates) > self.maximum_locked_subjects:
+            candidates = sorted(
+                candidates,
+                key=lambda item: (
+                    -item.subject.confidence,
+                    abs(item.reference_bounds.center[0] - 0.5),
+                ),
+            )[: self.maximum_locked_subjects]
+        return sorted(
+            candidates,
+            key=lambda item: (item.reference_bounds.center[0], item.subject.track_id),
+        )
+
+    def _append_lock(self, candidate: _ReferenceCandidate, now: float) -> None:
+        self._locks.append(
+            _LockedSubject(
+                lock_id=self._next_lock_id,
+                reference_bounds=candidate.reference_bounds,
+                last_seen_monotonic=now,
+                observed_bounds=candidate.reference_bounds,
+                ptz_track_id=candidate.subject.track_id,
+            )
+        )
+        self._next_lock_id += 1
+
+    def _admit_late_arrivals(
+        self,
+        candidates: list[_ReferenceCandidate],
+        ptz_matches: dict[int, _ReferenceCandidate],
+        *,
+        minimum_age_frames: int,
+        now: float,
+    ) -> int:
+        """Finish forming the roster from the frames just after arming.
+
+        Apple Vision does not promote everybody to a stable track on the same
+        frame, so the person standing beside the speaker can be missing from
+        the single frame that used to define the roster for the whole service.
+        Only candidates that failed to match an existing lock are considered,
+        which is what keeps a subject returning from a dropout out of this path.
+        """
+
+        if now > self._formation_deadline:
+            return 0
+        if len(self._locks) >= self.maximum_locked_subjects:
+            return 0
+        matched = {candidate.subject.track_id for candidate in ptz_matches.values()}
+        arrivals = [
+            candidate
+            for candidate in candidates
+            if candidate.subject.track_id not in matched
+            and candidate.subject.age_frames >= minimum_age_frames
+            and not self._overlaps_existing_lock(candidate, now)
+        ]
+        room = self.maximum_locked_subjects - len(self._locks)
+        for candidate in self._formation_order(arrivals)[:room]:
+            self._append_lock(candidate, now)
+        return min(len(arrivals), room)
+
+    def _overlaps_existing_lock(
+        self,
+        candidate: _ReferenceCandidate,
+        now: float,
+    ) -> bool:
+        # A candidate sitting on top of a lock that simply missed its match this
+        # frame is that lock, not a new person. The test is physical overlap,
+        # deliberately not the match gate: that gate is wide enough to span the
+        # distance between two people standing side by side, so reusing it here
+        # would reject exactly the late arrivals this path exists to admit.
+        for locked in self._locks:
+            predicted = _predicted_bounds(locked, now)
+            if predicted.intersection_over_union(candidate.reference_bounds) >= 0.25:
+                return True
+            body_width = max(0.02, candidate.reference_bounds.width * 0.5)
+            if _anchor_distance(predicted, candidate.reference_bounds) <= body_width:
+                return True
+        return False
+
+    def _retire_absent_locks(self, now: float) -> set[int]:
+        if len(self._locks) <= 1:
+            return set()
+        newest = max(item.last_seen_monotonic for item in self._locks)
+        retired = {
+            locked.lock_id
+            for locked in self._locks
+            if now - locked.last_seen_monotonic > self.retire_seconds
+            and locked.last_seen_monotonic < newest
+        }
+        if not retired:
+            return set()
+        self._locks = [item for item in self._locks if item.lock_id not in retired]
+        return retired
+
+    def _contested_candidates(
+        self,
+        candidates: list[_ReferenceCandidate],
+        now: float,
+    ) -> list[bool]:
+        """Flag detections that more than one lock could plausibly claim.
+
+        A remembered Apple Vision ID is good evidence right up until two people
+        meet, which is exactly when Vision is most likely to renew or exchange
+        it. Treating it as evidence there lets a scrambled ID outvote the
+        motion of both people and swap the pair permanently. Where the geometry
+        is ambiguous, only the geometry gets a say.
+        """
+
+        if len(self._locks) < 2:
+            return [False] * len(candidates)
+        predictions = [_match_prediction(locked, now) for locked in self._locks]
+        flags: list[bool] = []
+        for candidate in candidates:
+            close = sum(
+                1
+                for prediction in predictions
+                if _anchor_distance(prediction, candidate.reference_bounds)
+                <= _CONTESTED_DISTANCE
+            )
+            flags.append(close > 1)
+        return flags
 
     def _match_audience(
         self,
@@ -212,6 +439,7 @@ class SubjectTargetLock:
 
         matches: dict[int, _ReferenceCandidate] = {}
         used_candidates: set[int] = set()
+        single = len(self._locks) == 1
         for locked in self._locks:
             ptz_match = ptz_matches.get(locked.lock_id)
             remembered_index = next(
@@ -229,13 +457,29 @@ class SubjectTargetLock:
                     if not _cross_view_compatible(ptz_match, candidate):
                         self._clear_audience_binding(locked)
                         continue
+                    closer = (
+                        _closer_detection_elsewhere(locked, ptz_match, candidate, candidates, used_candidates)
+                        if single else None
+                    )
+                    if closer is not None:
+                        # The PTZ has the subject; another wide detection is
+                        # clearly nearer that spot than the remembered ID. The
+                        # detector moved that ID to someone passing: rebind to
+                        # the nearer one now, while the PTZ can vouch for it.
+                        remembered_index = closer
+                        candidate = candidates[closer]
+                        locked.audience_track_id = candidate.subject.track_id
+                        locked.pending_audience_track_id = None
+                        locked.pending_audience_frames = 0
                     self._learn_audience_offset(locked, ptz_match, candidate)
                 adjusted = _offset_candidate(
                     candidate,
                     locked.audience_offset_x,
                     locked.audience_offset_y,
                 )
-                if not _audience_motion_plausible(locked, adjusted, now):
+                if single and ptz_match is None and self._single.instant_reversal("audience", adjusted, now):
+                    continue
+                if not _audience_motion_plausible(locked, adjusted, now, single=len(self._locks) == 1):
                     # Detector IDs occasionally jump to another person after
                     # an occlusion. Treat that as a lost observation, never as
                     # permission to drive the camera across the room.
@@ -258,12 +502,18 @@ class SubjectTargetLock:
                 for index, candidate in enumerate(candidates):
                     if index in used_candidates:
                         continue
+                    if single and self._single.audience_companion(candidate.subject.track_id, now):
+                        # Seen alongside the subject: whoever carries this ID
+                        # is someone else, however close they have come.
+                        continue
                     adjusted = _offset_candidate(
                         candidate,
                         locked.audience_offset_x,
                         locked.audience_offset_y,
                     )
-                    if not _audience_motion_plausible(locked, adjusted, now):
+                    if single and self._single.instant_reversal("audience", adjusted, now):
+                        continue
+                    if not _audience_motion_plausible(locked, adjusted, now, single=len(self._locks) == 1):
                         continue
                     if _area_log_error(
                         predicted,
@@ -335,6 +585,9 @@ class SubjectTargetLock:
                 locked.audience_offset_x,
                 locked.audience_offset_y,
             )
+        if single and self._locks and self._locks[0].lock_id in matches:
+            self._single.note_audience(matches[self._locks[0].lock_id].subject.track_id, candidates, now)
+            self._single.note_walk("audience", matches[self._locks[0].lock_id], now)
         return matches
 
     @staticmethod
@@ -372,18 +625,49 @@ class SubjectTargetLock:
     ) -> dict[int, _ReferenceCandidate]:
         pairs: list[tuple[float, int, int]] = []
         single_lock = len(self._locks) == 1
+        contested = self._contested_candidates(candidates, now)
         for locked in self._locks:
-            predicted = _predicted_bounds(locked, now)
+            predicted = _match_prediction(locked, now)
             elapsed = max(0.0, now - locked.last_seen_monotonic)
             remembered_id = (
                 locked.ptz_track_id if source == "ptz" else locked.audience_track_id
             )
             for candidate_index, candidate in enumerate(candidates):
+                if (
+                    single_lock
+                    and source == "ptz"
+                    and self._single.rejects(locked, candidate, now)
+                ):
+                    continue
+                if single_lock and source == "ptz" and self._single.instant_reversal("ptz", candidate, now):
+                    continue
+                if (
+                    single_lock
+                    and source == "ptz"
+                    and not _audience_motion_plausible(locked, candidate, now, single=True)
+                ):
+                    # One missed frame is not a licence to jump: when a
+                    # wider shot brings someone else in just as the subject
+                    # blinks out of detection, that person is too far from
+                    # where the subject could have got to.
+                    continue
                 distance = min(
                     predicted.center_distance(candidate.reference_bounds),
                     locked.reference_bounds.center_distance(candidate.reference_bounds),
                 )
-                same_source_id = candidate.subject.track_id == remembered_id
+                same_source_id = (
+                    candidate.subject.track_id == remembered_id
+                    and not contested[candidate_index]
+                    and not (
+                        single_lock
+                        and len(candidates) > 1
+                        and _reverses_walk(locked, candidate, now)
+                        and any(
+                            other is not candidate and not _reverses_walk(locked, other, now)
+                            for other in candidates
+                        )
+                    )
+                )
                 # Grow the reacquisition gate slowly through detector dropouts,
                 # while retaining a finite bound that rejects unrelated people.
                 maximum = min(
@@ -409,16 +693,10 @@ class SubjectTargetLock:
                 )
                 pairs.append((score, locked.lock_id, candidate_index))
 
-        selected_locks: set[int] = set()
-        selected_candidates: set[int] = set()
-        matches: dict[int, _ReferenceCandidate] = {}
-        for _score, lock_id, candidate_index in sorted(pairs):
-            if lock_id in selected_locks or candidate_index in selected_candidates:
-                continue
-            selected_locks.add(lock_id)
-            selected_candidates.add(candidate_index)
-            matches[lock_id] = candidates[candidate_index]
-        return matches
+        return {
+            lock_id: candidates[candidate_index]
+            for lock_id, candidate_index in _best_assignment(pairs).items()
+        }
 
     @staticmethod
     def _update_motion(
@@ -427,7 +705,11 @@ class SubjectTargetLock:
         now: float,
     ) -> None:
         elapsed = max(1e-3, now - locked.last_seen_monotonic)
-        old_x, old_y = locked.reference_bounds.center
+        # Measure speed between raw observations. Differencing the smoothed
+        # path against a new observation understates a walking subject's speed,
+        # because the smoothed point is itself still catching up.
+        previous = locked.observed_bounds or locked.reference_bounds
+        old_x, old_y = previous.center
         new_x, new_y = observed.center
         measured_x = max(-0.20, min(0.20, (new_x - old_x) / elapsed))
         measured_y = max(-0.20, min(0.20, (new_y - old_y) / elapsed))
@@ -438,6 +720,7 @@ class SubjectTargetLock:
             locked.reference_bounds,
             observed,
         )
+        locked.observed_bounds = observed
         locked.last_seen_monotonic = now
 
     @staticmethod
@@ -491,6 +774,227 @@ class SubjectTargetLock:
         return candidates
 
 
+# --- single-subject reacquisition -------------------------------------------
+#
+# The operator's rule: once armed, follow that one person the whole time,
+# including off the stage, and never move to someone else on your own. The
+# match gate below is deliberately wide (sermon-zoom geometry is only
+# approximate), so while the one locked person is out of sight these checks
+# keep a different person from inheriting the lock:
+#
+#   companion  someone the PTZ saw at the same time as the subject is, by
+#              definition, not the subject (the next reader walking up while
+#              the last one leaves, 2026-09-20 132:40);
+#   behind     a person who walked off one way does not reappear behind the
+#              point where they vanished within a couple of seconds (the next
+#              speaker at the lectern after the preacher left right,
+#              2026-09-13 120:19);
+#   reversal   a detection by the exit that heads straight back onto the
+#              stage within seconds of the subject leaving is somebody coming
+#              in, not the subject turning on the spot;
+#   appearance a detection whose clothing colours clearly differ from the
+#              subject's is somebody else, however long the subject has been
+#              gone (pink sari vs black jacket; blue shirt vs black vest).
+#              Identically dressed people cannot be told apart this way.
+#
+# All three only reject; while the subject is matched nothing changes, and
+# group locks (more than one person) are untouched.
+_LOST_SECONDS = 0.35
+_COMPANION_MEMORY_SECONDS = 20.0
+_COMPANION_DUPLICATE_IOU = 0.30
+_DEPARTURE_SPEED = 0.025
+_BEHIND_SECONDS = 2.5
+_REVERSAL_SECONDS = 3.0
+_REVERSAL_EVIDENCE_SECONDS = 0.3
+# Median colour distance (tracking/appearance.py) above which a candidate is
+# not the lost subject. Our streams: one person over time 0.10-0.21 median;
+# different outfits 0.45-0.90 median.
+_DIFFERENT_APPEARANCE = 0.42
+# Reference widths/s: an established walk, and how long after last seeing the
+# walker an instant reversal at that pace is refused (then the lost-subject
+# rules above take over).
+_WALKING_SPEED = 0.04
+_INSTANT_REVERSAL_SECONDS = 1.0
+_SWAP_PACE_RATIO = 0.8
+_NEIGHBOUR_DISTANCE = 0.10  # someone this close in the wide camera (feet, not the pews below) could take the ID
+_NEIGHBOUR_SECONDS = 1.5
+_APPEARANCE_HISTORY = 6
+
+
+@dataclass(slots=True)
+class _SingleSubjectMemory:
+    companions: dict[int, float] = field(default_factory=dict)
+    # track id -> (first seen, first x, last seen, last x) in reference space
+    tracks: dict[int, tuple[float, float, float, float]] = field(default_factory=dict)
+    # (time, x, velocity_x) of the last observation before the subject was lost
+    departure: tuple[float, float, float] | None = None
+    looks: dict[int, list[tuple[float, ...]]] = field(default_factory=dict)
+    # Wide-camera detector IDs seen at the same time as the subject: someone else.
+    audience_companions: dict[int, float] = field(default_factory=dict)
+    # Per camera: (time, x, velocity) of the subject as that camera last saw them walk.
+    walks: dict[str, tuple[float, float, float]] = field(default_factory=dict)
+    # When the wide camera last saw someone else close to the subject.
+    neighbour_at: float = -1e9
+
+    def note_walk(self, source: str, match: _ReferenceCandidate, now: float) -> None:
+        x = match.reference_bounds.center[0]
+        walk = self.walks.get(source)
+        if walk is None or now - walk[0] > 1.0:
+            self.walks[source] = (now, x, 0.0)
+            return
+        seen, last_x, velocity = walk
+        measured = (x - last_x) / max(1e-3, now - seen)
+        weight = 1.0 - 0.5 ** ((now - seen) / 0.25)  # half per 0.25 s, at any rate
+        self.walks[source] = (now, x, velocity + (measured - velocity) * weight)
+
+    def instant_reversal(self, source: str, candidate: _ReferenceCandidate, now: float) -> bool:
+        """A walker this camera saw turning straight back at walking pace.
+
+        People slow before they turn back. A detection that has them
+        reversing at walking pace the instant they are next seen is a
+        detector ID that moved to someone else as they passed.
+        """
+
+        walk = self.walks.get(source)
+        if walk is None or now - self.neighbour_at > _NEIGHBOUR_SECONDS:
+            # An ID can only move to someone else if someone else is there;
+            # alone, an apparent reversal is the PTZ mapping jittering in a pan.
+            return False
+        seen, last_x, velocity = walk
+        if now - seen > _INSTANT_REVERSAL_SECONDS or abs(velocity) < _WALKING_SPEED:
+            return False
+        implied = (candidate.reference_bounds.center[0] - last_x) / max(1e-3, now - seen)
+        # A real turn starts slowly; a swapped ID is at once moving at the
+        # other person's full pace.
+        return implied * velocity < 0.0 and abs(implied) > max(_WALKING_SPEED, _SWAP_PACE_RATIO * abs(velocity))
+
+    def note_audience(self, matched_id: int, candidates: list, now: float) -> None:
+        matched = next((c for c in candidates if c.subject.track_id == matched_id), None)
+        if matched is None:
+            return
+        for candidate in candidates:
+            if candidate.subject.track_id == matched_id:
+                continue
+            if candidate.reference_bounds.intersection_over_union(matched.reference_bounds) >= _COMPANION_DUPLICATE_IOU:
+                continue  # a second box on the subject, not another person
+            self.audience_companions[candidate.subject.track_id] = now
+            if _anchor_distance(candidate.reference_bounds, matched.reference_bounds) <= _NEIGHBOUR_DISTANCE:
+                self.neighbour_at = now
+        self.audience_companions = {
+            track: seen for track, seen in self.audience_companions.items()
+            if now - seen <= _COMPANION_MEMORY_SECONDS
+        }
+
+    def audience_companion(self, track_id: int, now: float) -> bool:
+        seen = self.audience_companions.get(track_id)
+        return seen is not None and now - seen <= _COMPANION_MEMORY_SECONDS
+
+    def observe(
+        self,
+        locked: _LockedSubject,
+        candidates: list[_ReferenceCandidate],
+        matches: dict[int, _ReferenceCandidate],
+        now: float,
+    ) -> None:
+        for candidate in candidates:
+            track = candidate.subject.track_id
+            x = candidate.reference_bounds.center[0]
+            first = self.tracks.get(track)
+            if first is not None and now - first[2] > _LOST_SECONDS:
+                # The detector reused an ID after a gap: whoever carries it
+                # now starts a fresh history.
+                first = None
+                self.looks.pop(track, None)
+            self.tracks[track] = (first[0], first[1], now, x) if first else (now, x, now, x)
+            if candidate.subject.appearance:
+                history = self.looks.setdefault(track, [])
+                history.append(candidate.subject.appearance)
+                del history[:-_APPEARANCE_HISTORY]
+        self.tracks = {
+            track: entry for track, entry in self.tracks.items() if now - entry[2] <= _COMPANION_MEMORY_SECONDS
+        }
+        self.looks = {track: looks for track, looks in self.looks.items() if track in self.tracks}
+        match = matches.get(locked.lock_id)
+        if match is not None:
+            self.departure = None
+            if match.subject.appearance:
+                locked.appearance = appearance.blend(
+                    locked.appearance,
+                    match.subject.appearance,
+                    0.5 if not locked.appearance else 0.15,
+                )
+            for candidate in candidates:
+                if candidate.subject.track_id == match.subject.track_id:
+                    continue
+                duplicate = (
+                    candidate.reference_bounds.intersection_over_union(match.reference_bounds)
+                    >= _COMPANION_DUPLICATE_IOU
+                )
+                if not duplicate:
+                    self.companions[candidate.subject.track_id] = now
+            return
+        if self.departure is None and now - locked.last_seen_monotonic >= _LOST_SECONDS:
+            basis = locked.observed_bounds or locked.reference_bounds
+            self.departure = (locked.last_seen_monotonic, basis.center[0], locked.velocity_x)
+
+    def rejects(self, locked: _LockedSubject, candidate: _ReferenceCandidate, now: float) -> bool:
+        if now - locked.last_seen_monotonic < _LOST_SECONDS:
+            return False
+        track = candidate.subject.track_id
+        seen_together = self.companions.get(track)
+        if seen_together is not None and now - seen_together <= _COMPANION_MEMORY_SECONDS:
+            return True
+        entry = self.tracks.get(track)
+        if entry is not None and now - entry[2] > _LOST_SECONDS:
+            # A detector ID reused after a gap: its history belongs to
+            # whoever carried it before (often the subject), not this person.
+            entry = None
+        current = [candidate.subject.appearance] if candidate.subject.appearance else []
+        if locked.appearance:
+            history = (self.looks.get(track, []) + current) if entry is not None else current
+            distances = sorted(
+                value
+                for value in (appearance.distance(locked.appearance, look) for look in history)
+                if value is not None
+            )
+            if distances and distances[len(distances) // 2] > _DIFFERENT_APPEARANCE:
+                return True
+        if self.departure is None:
+            return False
+        left_at, exit_x, velocity = self.departure
+        if abs(velocity) < _DEPARTURE_SPEED:
+            return False
+        heading = 1.0 if velocity > 0 else -1.0
+        since = now - left_at
+        width = (locked.observed_bounds or locked.reference_bounds).width
+        x = candidate.reference_bounds.center[0]
+        if since <= _BEHIND_SECONDS and (x - exit_x) * heading < -max(0.02, 0.6 * width):
+            return True
+        if since <= _REVERSAL_SECONDS:
+            if entry is None or entry[2] - entry[0] < _REVERSAL_EVIDENCE_SECONDS:
+                # Not enough of this detection yet to tell its direction.
+                return True
+            if (entry[3] - entry[1]) * heading < -0.01:
+                return True
+        return False
+
+
+def _reverses_walk(locked: _LockedSubject, candidate: _ReferenceCandidate, now: float) -> bool:
+    """Would this detection mean a walking subject turned straight back?
+
+    Detector trackers swap IDs when two people pass: the ID then carries on
+    with the other person, in the opposite direction. A walker rarely turns
+    back the instant someone else appears.
+    """
+
+    if abs(locked.velocity_x) < _DEPARTURE_SPEED:
+        return False
+    basis = locked.observed_bounds or locked.reference_bounds
+    elapsed = max(1e-3, now - locked.last_seen_monotonic)
+    implied = (candidate.reference_bounds.center[0] - basis.center[0]) / elapsed
+    return implied * locked.velocity_x < 0.0 and abs(implied) > _DEPARTURE_SPEED
+
+
 def _currently_observed(
     subjects: Iterable[TrackedSubject],
     analysis_monotonic: float,
@@ -508,6 +1012,105 @@ def _currently_observed(
         for item in values
         if observed_at - item.last_seen_monotonic <= 0.08
     )
+
+
+_CONTESTED_DISTANCE = 0.12
+
+
+def _best_assignment(pairs: list[tuple[float, int, int]]) -> dict[int, int]:
+    """Lowest total cost pairing of locks to candidates.
+
+    Greedy assignment takes each best pair in turn, which can spend the only
+    good candidate on the lock that happens to sort first and leave a second
+    lock to take something implausible. The numbers here are tiny -- at most a
+    handful of locks against a handful of detections -- so the exact answer is
+    affordable, with a greedy fallback if a crowded wide view ever makes the
+    search large.
+    """
+
+    if not pairs:
+        return {}
+    options: dict[int, list[tuple[float, int]]] = {}
+    for score, lock_id, candidate_index in sorted(pairs):
+        options.setdefault(lock_id, []).append((score, candidate_index))
+    lock_ids = sorted(options)
+    # With N locks, at most N-1 better candidates can be occupied by another
+    # lock. Keep N choices so trimming cannot reduce the number of matches.
+    trimmed = {lock_id: options[lock_id][:len(lock_ids)] for lock_id in lock_ids}
+    combinations = 1
+    for lock_id in lock_ids:
+        combinations *= len(trimmed[lock_id]) + 1
+    if len(lock_ids) > 5 or combinations > 4096:
+        return _greedy_assignment(pairs)
+
+    best: tuple[float, dict[int, int]] | None = None
+
+    def search(index: int, used: set[int], cost: float, chosen: dict[int, int]) -> None:
+        nonlocal best
+        # First retain as many gated identities as possible, then minimize
+        # their total cost. An unmatched person must not be a free alternative
+        # to a valid positive-cost match. Scores can also be negative, so a
+        # partial cost cannot safely prune a branch.
+        if best is not None and len(chosen) + len(lock_ids) - index < len(best[1]):
+            return
+        if index == len(lock_ids):
+            if chosen and (
+                best is None
+                or len(chosen) > len(best[1])
+                or (len(chosen) == len(best[1]) and cost < best[0])
+            ):
+                best = (cost, dict(chosen))
+            return
+        lock_id = lock_ids[index]
+        for score, candidate_index in trimmed[lock_id]:
+            if candidate_index in used:
+                continue
+            chosen[lock_id] = candidate_index
+            used.add(candidate_index)
+            search(index + 1, used, cost + score, chosen)
+            used.discard(candidate_index)
+            chosen.pop(lock_id, None)
+        # A lock with no free candidate simply goes unmatched this frame.
+        search(index + 1, used, cost, chosen)
+
+    search(0, set(), 0.0, {})
+    return {} if best is None else best[1]
+
+
+def _greedy_assignment(pairs: list[tuple[float, int, int]]) -> dict[int, int]:
+    selected_locks: set[int] = set()
+    selected_candidates: set[int] = set()
+    matches: dict[int, int] = {}
+    for _score, lock_id, candidate_index in sorted(pairs):
+        if lock_id in selected_locks or candidate_index in selected_candidates:
+            continue
+        selected_locks.add(lock_id)
+        selected_candidates.add(candidate_index)
+        matches[lock_id] = candidate_index
+    return matches
+
+
+def _match_prediction(locked: _LockedSubject, now: float) -> NormalizedRect:
+    """Where this lock's person should be now, for matching purposes only.
+
+    `reference_bounds` is deliberately smoothed so composition does not jitter,
+    which means it trails a walking subject. Extrapolating from that lagging
+    point puts the prediction short of where the person actually is -- and when
+    two people cross, "short" lands squarely on the one coming the other way,
+    so the locks swap. Predicting from the last raw observation instead keeps
+    the smoothing where it belongs without paying for it in identity.
+    """
+
+    basis = locked.observed_bounds
+    if basis is None:
+        return _predicted_bounds(locked, now)
+    elapsed = min(2.0, max(0.0, now - locked.last_seen_monotonic))
+    return NormalizedRect(
+        basis.x + locked.velocity_x * elapsed,
+        basis.y + locked.velocity_y * elapsed,
+        basis.width,
+        basis.height,
+    ).clamped()
 
 
 def _predicted_bounds(locked: _LockedSubject, now: float) -> NormalizedRect:
@@ -564,6 +1167,37 @@ def _anchor_distance(left: NormalizedRect, right: NormalizedRect) -> float:
     return math.hypot(left_x - right_x, left_y - right_y)
 
 
+def _closer_detection_elsewhere(
+    locked: _LockedSubject,
+    ptz: _ReferenceCandidate,
+    remembered: _ReferenceCandidate,
+    candidates: list[_ReferenceCandidate],
+    used: set[int],
+) -> int | None:
+    """Index of a wide detection clearly nearer the PTZ's subject than the remembered one."""
+
+    def gap(candidate: _ReferenceCandidate) -> float:
+        adjusted = _offset_candidate(candidate, locked.audience_offset_x, locked.audience_offset_y)
+        return _anchor_distance(ptz.reference_bounds, adjusted.reference_bounds)
+
+    remembered_gap = gap(remembered)
+    if remembered_gap <= _REBIND_MIN_GAP:
+        return None
+    nearer = [
+        (gap(candidate), index)
+        for index, candidate in enumerate(candidates)
+        if index not in used
+        and candidate is not remembered
+        and _cross_view_compatible(ptz, candidate)
+        and gap(candidate) + _REBIND_MARGIN < remembered_gap
+    ]
+    return min(nearer)[1] if nearer else None
+
+
+_REBIND_MIN_GAP = 0.04  # the remembered wide ID sits at least this far from where the PTZ has the subject
+_REBIND_MARGIN = 0.03  # ...and another detection is this much nearer
+
+
 def _cross_view_compatible(
     ptz: _ReferenceCandidate,
     audience: _ReferenceCandidate,
@@ -595,14 +1229,24 @@ def _audience_motion_plausible(
     locked: _LockedSubject,
     candidate: _ReferenceCandidate,
     now: float,
+    *,
+    single: bool = False,
 ) -> bool:
     elapsed = max(0.0, now - locked.last_seen_monotonic)
     predicted = _predicted_bounds(locked, now)
     # At the normal 4 fps cadence this admits purposeful walking but rejects
     # the large single-frame jumps produced when a wide-view detector ID is
-    # reassigned to somebody in the congregation.
-    maximum = min(0.18, 0.045 + elapsed * 0.10)
+    # reassigned to somebody in the congregation. A lone locked subject may
+    # also run or turn back (~3 m/s off the smoothed prediction): with nobody
+    # else locked, following them matters more, and the area, two-frame, and
+    # identity checks still apply.
+    growth, ceiling = (SINGLE_AUDIENCE_DRIFT_PER_SECOND, SINGLE_AUDIENCE_DRIFT_MAX) if single else (0.10, 0.18)
+    maximum = min(ceiling, 0.045 + elapsed * growth)
     return _anchor_distance(predicted, candidate.reference_bounds) <= maximum
+
+
+SINGLE_AUDIENCE_DRIFT_PER_SECOND = 0.18
+SINGLE_AUDIENCE_DRIFT_MAX = 0.30
 
 
 def _area_log_error(left: NormalizedRect, right: NormalizedRect) -> float:

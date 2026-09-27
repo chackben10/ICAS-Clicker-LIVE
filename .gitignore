@@ -10,3 +10,6 @@ playwright-report/
 testing/.venv/
 testing/benchmarks/outputs/*
 !testing/benchmarks/outputs/.gitkeep
+
+# Stage-realism rendered assets: derived from this Mac's calibration and church streams (real people); rebuild with testing/stage_realism/tools/.
+testing/stage_realism/assets/

@@ -1,0 +1,589 @@
+{
+ "build": "Installed Production Hub.app (built 2026-09-03 22:16, 143 modules)",
+ "recorded": "2026-09-23 11:19:15",
+ "results": {
+  "check:empty_stage_sweep": {
+   "passed": false,
+   "failed": [
+    "empty_stage_sweep"
+   ]
+  },
+  "double_duet_one_steps_away|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "double_duet_one_steps_away|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "double_preacher_and_translator|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "double_preacher_and_translator|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "double_swap_places|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "double_swap_places|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "double_walk_apart_and_regroup|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "double_walk_apart_and_regroup|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "moment:sermon0913_preacher_walks_off_right": {
+   "passed": false,
+   "failed": [
+    "never_switches"
+   ]
+  },
+  "moment:youth0920_reader_walks_off_left": {
+   "passed": true,
+   "failed": []
+  },
+  "moment:youth0920_speaker_walks_off_left": {
+   "passed": false,
+   "failed": [
+    "never_switches"
+   ]
+  },
+  "rendered_double_duet_one_dashes_off|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_double_duet_one_dashes_off|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_double_lookalikes_swap_places|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "rendered_double_lookalikes_swap_places|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "rendered_double_preacher_and_translator|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_double_preacher_and_translator|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_double_scatter_opposite_ways|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_double_scatter_opposite_ways|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_adult_walks_off_right_brisk|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_adult_walks_off_right_brisk|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_behind_lectern_then_dash|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_behind_lectern_then_dash|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_beside_lectern_sway|fast_motor": {
+   "passed": false,
+   "failed": [
+    "settles"
+   ]
+  },
+  "rendered_single_beside_lectern_sway|measured_motor": {
+   "passed": false,
+   "failed": [
+    "settles"
+   ]
+  },
+  "rendered_single_dash_and_stop|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_single_dash_and_stop|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_single_lookalike_crosses_behind|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "rendered_single_lookalike_crosses_behind|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "rendered_single_preacher_darts|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_single_preacher_darts|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_single_preacher_leaves_next_speaker_arrives|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_preacher_leaves_next_speaker_arrives|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_preacher_paces_brisk|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_preacher_paces_brisk|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_preacher_paces_normal|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_preacher_paces_normal|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_reader_walks_off_twin_enters_normal|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_reader_walks_off_twin_enters_normal|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_reader_walks_off_twin_enters|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_reader_walks_off_twin_enters|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "rendered_single_sprint_across_stage|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_sprint_across_stage|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_steps_down_to_floor|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame"
+   ]
+  },
+  "rendered_single_steps_down_to_floor|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame"
+   ]
+  },
+  "rendered_single_stop_start_bursts|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_single_stop_start_bursts|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_triple_lookalikes_cross|fast_motor": {
+   "passed": false,
+   "failed": [
+    "keeps_up"
+   ]
+  },
+  "rendered_triple_lookalikes_cross|measured_motor": {
+   "passed": false,
+   "failed": [
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_triple_middle_dashes_out|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_triple_middle_dashes_out|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "rendered_triple_scatter_and_regroup|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_triple_scatter_and_regroup|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "rendered_triple_shoulder_to_shoulder|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "rendered_triple_shoulder_to_shoulder|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_bends_at_lectern|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_bends_at_lectern|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_direction_reversal|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_direction_reversal|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_lectern_sermon_sway|fast_motor": {
+   "passed": false,
+   "failed": [
+    "settles"
+   ]
+  },
+  "single_lectern_sermon_sway|measured_motor": {
+   "passed": false,
+   "failed": [
+    "settles"
+   ]
+  },
+  "single_preacher_hurries_short_bursts|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_preacher_hurries_short_bursts|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_preacher_paces_brisk|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "single_preacher_paces_brisk|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "single_preacher_paces_normal|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "single_preacher_paces_normal|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "single_reader_walks_off_left_measured_speed|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "single_reader_walks_off_left_measured_speed|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "single_someone_crosses_behind|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_someone_crosses_behind|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_speaker_walks_off_left_normal|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "single_speaker_walks_off_left_normal|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "right_person"
+   ]
+  },
+  "single_speaker_walks_off_right_brisk|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_speaker_walks_off_right_brisk|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_steps_down_to_floor|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_steps_down_to_floor|measured_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "single_walks_turned_away|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_walks_turned_away|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up"
+   ]
+  },
+  "single_worship_leader_arms_raised|fast_motor": {
+   "passed": false,
+   "failed": [
+    "keeps_up"
+   ]
+  },
+  "single_worship_leader_arms_raised|measured_motor": {
+   "passed": false,
+   "failed": [
+    "keeps_up"
+   ]
+  },
+  "triple_one_walks_off|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "triple_one_walks_off|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "triple_spread_and_regroup|fast_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "triple_spread_and_regroup|measured_motor": {
+   "passed": false,
+   "failed": [
+    "head_in_frame",
+    "keeps_up",
+    "settles"
+   ]
+  },
+  "triple_trio_singing|fast_motor": {
+   "passed": true,
+   "failed": []
+  },
+  "triple_trio_singing|measured_motor": {
+   "passed": true,
+   "failed": []
+  }
+ }
+}

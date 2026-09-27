@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import monotonic
 
+from production_hub.tracking import appearance
 from production_hub.tracking.models import NormalizedRect, PersonCandidate, TrackedSubject
+
+# Colour distance above which a lone-track handoff is refused. Well above the
+# same-person spread in our streams (median 0.10-0.21) so ordinary turning and
+# motion blur never split a track.
+HANDOFF_DIFFERENT_APPEARANCE = 0.65
 
 
 @dataclass(slots=True)
@@ -15,6 +21,11 @@ class _Track:
     last_seen_monotonic: float
     age_frames: int = 1
     missed_frames: int = 0
+    # Blended over the track, for handoff decisions; the latest raw signature
+    # is what subjects report, so a reused ID never carries the previous
+    # person's colours into the identity lock.
+    appearance: tuple[float, ...] = ()
+    latest_appearance: tuple[float, ...] = ()
 
 
 class SubjectAssociator:
@@ -48,7 +59,7 @@ class SubjectAssociator:
     ) -> tuple[TrackedSubject, ...]:
         observed_at = float(observed_monotonic or monotonic())
         normalized = [
-            PersonCandidate(item.bounds.clamped(), max(0.0, min(1.0, item.confidence)))
+            PersonCandidate(item.bounds.clamped(), max(0.0, min(1.0, item.confidence)), item.appearance)
             for item in candidates
             if item.bounds.clamped().area > 0
         ]
@@ -65,6 +76,14 @@ class SubjectAssociator:
                 )
                 if iou < self.minimum_iou and distance > maximum_distance:
                     continue
+                if (
+                    single_subject_handoff
+                    and iou < self.minimum_iou
+                    and _clearly_different(track.appearance, candidate.appearance)
+                ):
+                    # The lone-track handoff bridges a detector gap; it must
+                    # not hand the last speaker's identity to the next one.
+                    continue
                 proximity = max(0.0, 1.0 - distance / maximum_distance)
                 pair_scores.append((iou * 0.8 + proximity * 0.2, track_id, candidate_index))
 
@@ -77,6 +96,8 @@ class SubjectAssociator:
             candidate = normalized[candidate_index]
             track.bounds = _smoothed_bounds(track.bounds, candidate.bounds)
             track.confidence = _lerp(track.confidence, candidate.confidence, 0.45)
+            track.appearance = appearance.blend(track.appearance, candidate.appearance, 0.3)
+            track.latest_appearance = candidate.appearance
             track.last_seen_monotonic = observed_at
             track.age_frames += 1
             track.missed_frames = 0
@@ -101,6 +122,8 @@ class SubjectAssociator:
                 confidence=candidate.confidence,
                 first_seen_monotonic=observed_at,
                 last_seen_monotonic=observed_at,
+                appearance=candidate.appearance,
+                latest_appearance=candidate.appearance,
             )
 
         return self.visible_subjects()
@@ -115,6 +138,7 @@ class SubjectAssociator:
                 selected=track.track_id in self._selected_ids,
                 age_frames=track.age_frames,
                 last_seen_monotonic=track.last_seen_monotonic,
+                appearance=track.latest_appearance,
             )
             for track in self._tracks.values()
             # Apple Vision can omit an otherwise stable person for an isolated
@@ -163,6 +187,11 @@ class SubjectAssociator:
         self._tracks.clear()
         self._selected_ids.clear()
         self._next_id = 1
+
+
+def _clearly_different(left: tuple[float, ...], right: tuple[float, ...]) -> bool:
+    measured = appearance.distance(left, right)
+    return measured is not None and measured > HANDOFF_DIFFERENT_APPEARANCE
 
 
 def _lerp(start: float, end: float, alpha: float) -> float:

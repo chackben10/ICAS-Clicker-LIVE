@@ -1,0 +1,7126 @@
+{
+  "scenarios": {
+    "arms_spread_wide": {
+      "armed": true,
+      "name": "arms_spread_wide",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35021,
+            2847
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35021,
+            2813
+          ],
+          "ptzDetections": [
+            [
+              0.0848,
+              0.1483,
+              0.8304,
+              0.704
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.2912,
+            0.5392,
+            0.0975,
+            0.0835
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "audience_handoff": {
+      "armed": true,
+      "name": "audience_handoff",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.2671,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42921,
+            34954,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.2745,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42890,
+            34937,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.2848,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42849,
+            34918,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            52,
+            50,
+            48
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.2961,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42797,
+            34898,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42913,
+            34964,
+            2740
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            53,
+            52,
+            47
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3078,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42735,
+            34878,
+            2619
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42874,
+            34952,
+            2726
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            53,
+            52,
+            47
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3198,
+            0.448,
+            0.1459,
+            0.257
+          ],
+          "targetIds": [
+            "locked:1"
+          ],
+          "trackingSource": "audience_handoff"
+        },
+        {
+          "automationState": "armed_waiting",
+          "decisionState": "waiting",
+          "desiredPose": null,
+          "podiumFraming": false,
+          "pose": [
+            42834,
+            34940,
+            2712
+          ],
+          "ptzDetections": [
+            [
+              0.8417,
+              0.1412,
+              0.1583,
+              0.7906
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": null,
+          "targetIds": [],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42850,
+            34940,
+            2653
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42834,
+            34940,
+            2712
+          ],
+          "ptzDetections": [
+            [
+              0.8417,
+              0.1412,
+              0.1583,
+              0.7906
+            ]
+          ],
+          "speeds": [
+            54,
+            50,
+            50
+          ],
+          "step": 12,
+          "targetBounds": [
+            0.3918,
+            0.5122,
+            0.0232,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42831,
+            34940,
+            2653
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42781,
+            34940,
+            2712
+          ],
+          "ptzDetections": [
+            [
+              0.7952,
+              0.1412,
+              0.2048,
+              0.7906
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 13,
+          "targetBounds": [
+            0.3918,
+            0.5122,
+            0.0291,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42793,
+            34940,
+            2712
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42661,
+            34940,
+            2712
+          ],
+          "ptzDetections": [
+            [
+              0.6897,
+              0.1412,
+              0.2688,
+              0.7906
+            ]
+          ],
+          "speeds": [
+            64,
+            50,
+            50
+          ],
+          "step": 14,
+          "targetBounds": [
+            0.3918,
+            0.5122,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "detector_dropout": {
+      "armed": true,
+      "name": "detector_dropout",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_waiting",
+          "decisionState": "waiting",
+          "desiredPose": null,
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": null,
+          "targetIds": [],
+          "trackingSource": "holding"
+        },
+        {
+          "automationState": "armed_waiting",
+          "decisionState": "waiting",
+          "desiredPose": null,
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": null,
+          "targetIds": [],
+          "trackingSource": "holding"
+        },
+        {
+          "automationState": "armed_waiting",
+          "decisionState": "waiting",
+          "desiredPose": null,
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": null,
+          "targetIds": [],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "distant_small_subject": {
+      "armed": true,
+      "name": "distant_small_subject",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2683
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2022
+          ],
+          "ptzDetections": [
+            [
+              0.4456,
+              0.3401,
+              0.1087,
+              0.3198
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.3092,
+            0.4937,
+            0.0615,
+            0.1526
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2683
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2022
+          ],
+          "ptzDetections": [
+            [
+              0.4456,
+              0.3401,
+              0.1087,
+              0.3198
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.3092,
+            0.4937,
+            0.0615,
+            0.1526
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2683
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2022
+          ],
+          "ptzDetections": [
+            [
+              0.4456,
+              0.3401,
+              0.1087,
+              0.3198
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.3092,
+            0.4937,
+            0.0615,
+            0.1526
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2683
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2022
+          ],
+          "ptzDetections": [
+            [
+              0.4456,
+              0.3401,
+              0.1087,
+              0.3198
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.3092,
+            0.4937,
+            0.0615,
+            0.1526
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2684
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2031
+          ],
+          "ptzDetections": [
+            [
+              0.445,
+              0.3382,
+              0.11,
+              0.3236
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            55
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.3093,
+            0.4938,
+            0.0613,
+            0.1524
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2687
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2054
+          ],
+          "ptzDetections": [
+            [
+              0.4433,
+              0.3332,
+              0.1134,
+              0.3335
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            57
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.3096,
+            0.494,
+            0.0609,
+            0.152
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2691
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2086
+          ],
+          "ptzDetections": [
+            [
+              0.4409,
+              0.3261,
+              0.1183,
+              0.3478
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            58
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.3099,
+            0.4943,
+            0.0603,
+            0.1514
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2696
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2123
+          ],
+          "ptzDetections": [
+            [
+              0.4379,
+              0.3174,
+              0.1241,
+              0.3651
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            58
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.3102,
+            0.4947,
+            0.0596,
+            0.1507
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2700
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2160
+          ],
+          "ptzDetections": [
+            [
+              0.4348,
+              0.3084,
+              0.1303,
+              0.3833
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            58
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3105,
+            0.495,
+            0.0589,
+            0.15
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2704
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2196
+          ],
+          "ptzDetections": [
+            [
+              0.4317,
+              0.2991,
+              0.1366,
+              0.4018
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            58
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3108,
+            0.4953,
+            0.0583,
+            0.1494
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2708
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2233
+          ],
+          "ptzDetections": [
+            [
+              0.4283,
+              0.2891,
+              0.1434,
+              0.4218
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            57
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3111,
+            0.4956,
+            0.0578,
+            0.1489
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2712
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2265
+          ],
+          "ptzDetections": [
+            [
+              0.4252,
+              0.2801,
+              0.1496,
+              0.4399
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            57
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3114,
+            0.4958,
+            0.0573,
+            0.1484
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2715
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2298
+          ],
+          "ptzDetections": [
+            [
+              0.4219,
+              0.2703,
+              0.1562,
+              0.4593
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            57
+          ],
+          "step": 12,
+          "targetBounds": [
+            0.3116,
+            0.4961,
+            0.0568,
+            0.1479
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2718
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2330
+          ],
+          "ptzDetections": [
+            [
+              0.4186,
+              0.2605,
+              0.1629,
+              0.479
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            56
+          ],
+          "step": 13,
+          "targetBounds": [
+            0.3118,
+            0.4963,
+            0.0563,
+            0.1474
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "edge_clipped": {
+      "armed": true,
+      "name": "edge_clipped",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42946,
+            34964,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.8237,
+              0.0851,
+              0.1763,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            54,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.376,
+            0.517,
+            0.0243,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42930,
+            34964,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42887,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.7748,
+              0.0851,
+              0.2252,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.376,
+            0.517,
+            0.0301,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42902,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42768,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.6651,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            64,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.376,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42902,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42582,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4935,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.376,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            54,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42409,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42409,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.334,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.379,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42409,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42409,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.334,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            46,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.379,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42462,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42462,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3829,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3731,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "hold_at_reference_scale": {
+      "armed": true,
+      "name": "hold_at_reference_scale",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "leaning_over_lectern": {
+      "armed": true,
+      "name": "leaning_over_lectern",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35099,
+            3055
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35099,
+            3021
+          ],
+          "ptzDetections": [
+            [
+              0.085,
+              0.2159,
+              0.83,
+              0.5691
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.2978,
+            0.561,
+            0.0843,
+            0.07
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "podium_speaker": {
+      "armed": true,
+      "name": "podium_speaker",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            41500,
+            34964,
+            2749
+          ],
+          "podiumFraming": true,
+          "pose": [
+            41500,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.48,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "raised_hand": {
+      "armed": true,
+      "name": "raised_hand",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35157,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3008,
+              0.0,
+              0.3984,
+              0.9149
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.313,
+            0.5098,
+            0.054,
+            0.1133
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35157,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3008,
+              0.0,
+              0.3984,
+              0.9149
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.313,
+            0.5098,
+            0.054,
+            0.1133
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35157,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3008,
+              0.0,
+              0.3984,
+              0.9149
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.313,
+            0.5098,
+            0.054,
+            0.1133
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35157,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3008,
+              0.0,
+              0.3984,
+              0.9149
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.313,
+            0.5098,
+            0.054,
+            0.1133
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35157,
+            2681
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2740
+          ],
+          "ptzDetections": [
+            [
+              0.3032,
+              0.0,
+              0.3937,
+              0.9101
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.313,
+            0.509,
+            0.0541,
+            0.1146
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35156,
+            2672
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2731
+          ],
+          "ptzDetections": [
+            [
+              0.3055,
+              0.0,
+              0.3891,
+              0.9053
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3129,
+            0.5083,
+            0.0542,
+            0.116
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35156,
+            2662
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.308,
+              0.0,
+              0.384,
+              0.9
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3129,
+            0.5075,
+            0.0543,
+            0.1175
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35156,
+            2653
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2712
+          ],
+          "ptzDetections": [
+            [
+              0.3103,
+              0.0,
+              0.3795,
+              0.8953
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3128,
+            0.5068,
+            0.0543,
+            0.1189
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35156,
+            2644
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2703
+          ],
+          "ptzDetections": [
+            [
+              0.3125,
+              0.0,
+              0.375,
+              0.8907
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 12,
+          "targetBounds": [
+            0.3128,
+            0.506,
+            0.0544,
+            0.1203
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35155,
+            2635
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2694
+          ],
+          "ptzDetections": [
+            [
+              0.3147,
+              0.0,
+              0.3706,
+              0.8861
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            48
+          ],
+          "step": 13,
+          "targetBounds": [
+            0.3128,
+            0.5052,
+            0.0545,
+            0.1217
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "recenter_off_center": {
+      "armed": true,
+      "name": "recenter_off_center",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43028,
+            35184,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.7324,
+              0.417,
+              0.2676,
+              0.583
+            ]
+          ],
+          "speeds": [
+            54,
+            46,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.3593,
+            0.5486,
+            0.0409,
+            0.0817
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43018,
+            35184,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42887,
+            34988,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.6835,
+              0.3787,
+              0.2822,
+              0.6213
+            ]
+          ],
+          "speeds": [
+            59,
+            44,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.359,
+            0.548,
+            0.0471,
+            0.0869
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43020,
+            35202,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42768,
+            35025,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.5738,
+              0.3197,
+              0.2822,
+              0.6803
+            ]
+          ],
+          "speeds": [
+            57,
+            45,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.365,
+            0.557,
+            0.04,
+            0.085
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43026,
+            35210,
+            2690
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42675,
+            35056,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.488,
+              0.2702,
+              0.2822,
+              0.7298
+            ]
+          ],
+          "speeds": [
+            52,
+            45,
+            48
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.365,
+            0.557,
+            0.04,
+            0.091
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43031,
+            35218,
+            2681
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42648,
+            35086,
+            2740
+          ],
+          "ptzDetections": [
+            [
+              0.4635,
+              0.2256,
+              0.2789,
+              0.7744
+            ]
+          ],
+          "speeds": [
+            50,
+            46,
+            48
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.365,
+            0.557,
+            0.0401,
+            0.0975
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43018,
+            35111,
+            2672
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42648,
+            35111,
+            2731
+          ],
+          "ptzDetections": [
+            [
+              0.464,
+              0.1898,
+              0.2756,
+              0.8102
+            ]
+          ],
+          "speeds": [
+            50,
+            47,
+            48
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.3649,
+            0.5467,
+            0.0402,
+            0.103
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42648,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4644,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            53,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42608,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4289,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42608,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4289,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42608,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4289,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42608,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4289,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43024,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42608,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4289,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            52,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3649,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42582,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42582,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4058,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 12,
+          "targetBounds": [
+            0.3597,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42582,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42582,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4058,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 13,
+          "targetBounds": [
+            0.3597,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42582,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42582,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4058,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 14,
+          "targetBounds": [
+            0.3597,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42582,
+            35129,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42582,
+            35129,
+            2721
+          ],
+          "ptzDetections": [
+            [
+              0.4058,
+              0.1662,
+              0.272,
+              0.8
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 15,
+          "targetBounds": [
+            0.3597,
+            0.5486,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "tighten_to_reference_scale": {
+      "armed": true,
+      "name": "tighten_to_reference_scale",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2743
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2641
+          ],
+          "ptzDetections": [
+            [
+              0.3775,
+              0.1399,
+              0.2449,
+              0.7203
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.3195,
+            0.5165,
+            0.0409,
+            0.1069
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2743
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2641
+          ],
+          "ptzDetections": [
+            [
+              0.3775,
+              0.1399,
+              0.2449,
+              0.7203
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.3195,
+            0.5165,
+            0.0409,
+            0.1069
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2743
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2641
+          ],
+          "ptzDetections": [
+            [
+              0.3775,
+              0.1399,
+              0.2449,
+              0.7203
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.3195,
+            0.5165,
+            0.0409,
+            0.1069
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2743
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2641
+          ],
+          "ptzDetections": [
+            [
+              0.3775,
+              0.1399,
+              0.2449,
+              0.7203
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.3195,
+            0.5165,
+            0.0409,
+            0.1069
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2743
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2650
+          ],
+          "ptzDetections": [
+            [
+              0.3761,
+              0.1356,
+              0.2478,
+              0.7288
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            53
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.3196,
+            0.5166,
+            0.0409,
+            0.1069
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2744
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2664
+          ],
+          "ptzDetections": [
+            [
+              0.3738,
+              0.1288,
+              0.2524,
+              0.7424
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            53
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.3196,
+            0.5166,
+            0.0407,
+            0.1067
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2745
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2678
+          ],
+          "ptzDetections": [
+            [
+              0.3715,
+              0.1219,
+              0.2571,
+              0.7561
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.3197,
+            0.5167,
+            0.0406,
+            0.1066
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2745
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2687
+          ],
+          "ptzDetections": [
+            [
+              0.3699,
+              0.1175,
+              0.2601,
+              0.7651
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.3197,
+            0.5167,
+            0.0405,
+            0.1065
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2746
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2696
+          ],
+          "ptzDetections": [
+            [
+              0.3684,
+              0.1129,
+              0.2632,
+              0.7742
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3198,
+            0.5168,
+            0.0405,
+            0.1065
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2705
+          ],
+          "ptzDetections": [
+            [
+              0.3668,
+              0.1083,
+              0.2663,
+              0.7834
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            52
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3198,
+            0.5168,
+            0.0404,
+            0.1064
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2714
+          ],
+          "ptzDetections": [
+            [
+              0.3652,
+              0.1037,
+              0.2695,
+              0.7927
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3198,
+            0.5168,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            34964,
+            2747
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            34964,
+            2714
+          ],
+          "ptzDetections": [
+            [
+              0.3652,
+              0.1037,
+              0.2695,
+              0.7927
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3198,
+            0.5168,
+            0.0403,
+            0.1063
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "upper_body_only": {
+      "armed": true,
+      "name": "upper_body_only",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35081,
+            3205
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35081,
+            3205
+          ],
+          "ptzDetections": [
+            [
+              0.1982,
+              0.085,
+              0.6037,
+              0.8301
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.3183,
+            0.5633,
+            0.0433,
+            0.0583
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "walk_across_stage": {
+      "armed": true,
+      "name": "walk_across_stage",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43660,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43660,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.24,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43660,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43660,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.24,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43660,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43660,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.3589,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.24,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43570,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43660,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4419,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            54,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.25,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43480,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43607,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.476,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.26,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43390,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43488,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4493,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            56,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.27,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43182,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43408,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4585,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            57,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.28,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43174,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43315,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4557,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            56,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.29,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43163,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43236,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4659,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            57,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.3,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43147,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43143,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4631,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            56,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.31,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43126,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            43063,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4723,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            58,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.32,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43100,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42957,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4576,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            55,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.33,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43068,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42891,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4797,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 12,
+          "targetBounds": [
+            0.34,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            43031,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42771,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4521,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            54,
+            50,
+            50
+          ],
+          "step": 13,
+          "targetBounds": [
+            0.35,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42987,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42718,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4862,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            59,
+            50,
+            50
+          ],
+          "step": 14,
+          "targetBounds": [
+            0.36,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42936,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42599,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4594,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            55,
+            50,
+            50
+          ],
+          "step": 15,
+          "targetBounds": [
+            0.37,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42878,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42532,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4806,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            58,
+            50,
+            50
+          ],
+          "step": 16,
+          "targetBounds": [
+            0.38,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42813,
+            34964,
+            2749
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42426,
+            34964,
+            2749
+          ],
+          "ptzDetections": [
+            [
+              0.4659,
+              0.0851,
+              0.2822,
+              0.8299
+            ]
+          ],
+          "speeds": [
+            56,
+            50,
+            50
+          ],
+          "step": 17,
+          "targetBounds": [
+            0.39,
+            0.517,
+            0.04,
+            0.106
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    },
+    "wide_gesture": {
+      "armed": true,
+      "name": "wide_gesture",
+      "steps": [
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 0,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 1,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 2,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 3,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 4,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 5,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 6,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 7,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 8,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 9,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 10,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        },
+        {
+          "automationState": "armed_tracking",
+          "decisionState": "ready",
+          "desiredPose": [
+            42940,
+            35089,
+            2972
+          ],
+          "podiumFraming": false,
+          "pose": [
+            42940,
+            35089,
+            2939
+          ],
+          "ptzDetections": [
+            [
+              0.0847,
+              0.2228,
+              0.8305,
+              0.5537
+            ]
+          ],
+          "speeds": [
+            50,
+            50,
+            50
+          ],
+          "step": 11,
+          "targetBounds": [
+            0.293,
+            0.5561,
+            0.0939,
+            0.0759
+          ],
+          "targetIds": [
+            "ptz:1"
+          ],
+          "trackingSource": "ptz"
+        }
+      ]
+    }
+  },
+  "version": 1
+}

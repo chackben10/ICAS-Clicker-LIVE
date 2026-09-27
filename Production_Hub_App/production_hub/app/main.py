@@ -50,6 +50,10 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run(args: argparse.Namespace) -> int:
     context = build_context(args.data_dir)
+    # Release and Dev alike follow the saved "Improved subject tracking"
+    # setting (on by default), so the operator can fall back mid-service.
+    context.ptz_automation.follow_tracking_setting = True
+    context.ptz_automation.apply_tracking_setting()
     if args.host:
         context.config.api.bind_host = args.host
     if args.port:

@@ -23,9 +23,12 @@ These instructions apply to every change in this repository.
 
 ## Staging before production
 
-- `Production Hub Dev` is the staging application. Run it with
-  `python3 Production_Hub_App/main.py`; it loads the live source tree under its
-  own bundle identity (`org.icas.productionhub.dev`) and its own privacy grants.
+- `Production Hub Dev` is the staging application. Open it from Applications
+  (installed by `Production_Hub_App/scripts/install_dev_app.py`), or run
+  `/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 Production_Hub_App/main.py`
+  (a bare `python3` may be a Python without the requirements). It loads the
+  live source tree under its own bundle identity (`org.icas.productionhub.dev`)
+  and its own privacy grants.
 - Exercise every change there, against the real cameras, ProPresenter, and NDI
   sources, before it goes anywhere near the installed release.
 - The installed `/Applications/Production Hub.app` is production. Do not

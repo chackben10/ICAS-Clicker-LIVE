@@ -1,0 +1,1029 @@
+{
+ "schema": 1,
+ "generated_at": "2026-09-23T04:11:43+00:00",
+ "calibration": {
+  "created_at": "2026-08-11T23:54:36.069992+00:00",
+  "anchors": [
+   {
+    "name": "reference",
+    "center_x": 0.510330756715051,
+    "center_y": 0.1663825077383437,
+    "footprint_width": 0.43786820653650504,
+    "footprint_height": 0.4643654565150977,
+    "motor": {
+     "pan": 43713,
+     "tilt": 33946,
+     "zoom": 2238
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.46506416817250723,
+      0.1313740072917678,
+      552.2594677983658
+     ],
+     [
+      0.017703997406530277,
+      0.5023948634743922,
+      -92.12229596167802
+     ],
+     [
+      1.9523773983800674e-05,
+      0.0001350626143619906,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "structural-wide",
+    "center_x": 0.5107083364860892,
+    "center_y": 0.16242482695461036,
+    "footprint_width": 0.7728891604010966,
+    "footprint_height": 0.6285323849063847,
+    "motor": {
+     "pan": 43713,
+     "tilt": 33946,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.7865749278123112,
+      0.12239910200136803,
+      205.67774001292406
+     ],
+     [
+      -0.006341335172448209,
+      0.6566453036790051,
+      -164.7945537586904
+     ],
+     [
+      8.099884882470307e-06,
+      7.30883434308709e-05,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "upper-left",
+    "center_x": 0.6948839758505317,
+    "center_y": 0.19963736088988537,
+    "footprint_width": 0.8510837271038022,
+    "footprint_height": 0.8998028117115175,
+    "motor": {
+     "pan": 41664,
+     "tilt": 33945,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.6873718704215384,
+      0.170815760199702,
+      647.1435705689734
+     ],
+     [
+      0.05716915700614662,
+      0.8594987133304279,
+      -292.8855381524132
+     ],
+     [
+      -7.17649092080615e-05,
+      0.00021791911067295093,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "upper-right",
+    "center_x": 0.3177114607414673,
+    "center_y": 0.16700804397753555,
+    "footprint_width": 0.8911223362596014,
+    "footprint_height": 0.7936701929853681,
+    "motor": {
+     "pan": 45760,
+     "tilt": 33945,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      1.0729608399015333,
+      0.29309392669416373,
+      -420.9221502489675
+     ],
+     [
+      0.0038867821229617385,
+      0.9197679014704185,
+      -273.5011567399961
+     ],
+     [
+      0.00014723023251080245,
+      0.00021604553267403045,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "middle-right",
+    "center_x": 0.33219447430089594,
+    "center_y": 0.29587358877531794,
+    "footprint_width": 0.8823976383945847,
+    "footprint_height": 0.700631852555506,
+    "motor": {
+     "pan": 45760,
+     "tilt": 34969,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      1.0593901571007442,
+      0.23929873938605095,
+      -364.89536334008426
+     ],
+     [
+      -0.0002739660751817528,
+      0.7829420250433861,
+      -31.075357474558402
+     ],
+     [
+      0.00017059828473692173,
+      0.00011343629206684361,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "middle-center",
+    "center_x": 0.5071369656796115,
+    "center_y": 0.3375396603161513,
+    "footprint_width": 0.7546841196702688,
+    "footprint_height": 0.7535975889884677,
+    "motor": {
+     "pan": 43712,
+     "tilt": 34969,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.794024716372799,
+      0.15535933755899978,
+      234.01389018788456
+     ],
+     [
+      0.027201703494872498,
+      0.8533343923454976,
+      -82.51076206847144
+     ],
+     [
+      2.337517749689436e-05,
+      0.0001609332233411861,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "middle-left",
+    "center_x": 0.6965031275680474,
+    "center_y": 0.31020171067096924,
+    "footprint_width": 0.8495703933021355,
+    "footprint_height": 0.6678091634421036,
+    "motor": {
+     "pan": 41664,
+     "tilt": 34969,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.46582981223845427,
+      -0.029511858392430243,
+      687.5515655195649
+     ],
+     [
+      -0.032021842161068036,
+      0.44939650550047944,
+      68.35238419502042
+     ],
+     [
+      -0.00015815567032821345,
+      -2.137390537424257e-05,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "lower-left",
+    "center_x": 0.6973941484413271,
+    "center_y": 0.4250929830816758,
+    "footprint_width": 0.8904987117255816,
+    "footprint_height": 0.6994263250465667,
+    "motor": {
+     "pan": 41664,
+     "tilt": 35993,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.43035043034710546,
+      -0.09849055792846197,
+      713.3559159290056
+     ],
+     [
+      -0.01664190214992002,
+      0.38717664642346117,
+      174.90463328187755
+     ],
+     [
+      -0.0001601669260915986,
+      -8.271098615892939e-05,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "lower-center",
+    "center_x": 0.5230224378653107,
+    "center_y": 0.4115419742405518,
+    "footprint_width": 0.7593751322719069,
+    "footprint_height": 0.5687316622853109,
+    "motor": {
+     "pan": 43712,
+     "tilt": 35993,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.5548378259127547,
+      -0.026202665855909142,
+      370.0727696879586
+     ],
+     [
+      -0.034366306055710685,
+      0.4250181527021365,
+      196.76635744771679
+     ],
+     [
+      -7.284418238886884e-05,
+      -8.37426514480944e-05,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "lower-right",
+    "center_x": 0.35110522003335004,
+    "center_y": 0.41644795525347306,
+    "footprint_width": 0.9130370952664213,
+    "footprint_height": 0.7384905792706714,
+    "motor": {
+     "pan": 45760,
+     "tilt": 35993,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      1.141166436528527,
+      0.10419827255901587,
+      -345.7986327760362
+     ],
+     [
+      0.03831995743020414,
+      0.6079391837032616,
+      172.66855737252175
+     ],
+     [
+      0.0002741814782358539,
+      -0.00012518975078777434,
+      1.0
+     ]
+    ]
+   },
+   {
+    "name": "foreground-center",
+    "center_x": 0.5262418698624632,
+    "center_y": 0.4423200758214122,
+    "footprint_width": 0.7679304196796061,
+    "footprint_height": 0.59178317932694,
+    "motor": {
+     "pan": 43712,
+     "tilt": 36249,
+     "zoom": 1365
+    },
+    "ptz_size": [
+     1920,
+     1080
+    ],
+    "audience_size": [
+     1920,
+     1080
+    ],
+    "ptz_to_audience": [
+     [
+      0.4996107240704972,
+      -0.08082096957949864,
+      420.6105776490486
+     ],
+     [
+      -0.045592947821962396,
+      0.38939233680176955,
+      238.4913579550617
+     ],
+     [
+      -8.999945254748312e-05,
+      -0.0001218717705370147,
+      1.0
+     ]
+    ]
+   }
+  ]
+ },
+ "tracking_config": {
+  "analysis_fps": 4.0,
+  "analyze_audience": true,
+  "analyze_ptz": true,
+  "audience_region_filter_enabled": true,
+  "audience_region_kinds": [
+   "stage",
+   "front_stage",
+   "altar",
+   "podium"
+  ],
+  "body_pose_envelope_enabled": true,
+  "enabled": true,
+  "maximum_analysis_width": 960,
+  "maximum_center_distance": 0.18,
+  "maximum_missed_frames": 4,
+  "minimum_confidence": 0.25,
+  "minimum_match_iou": 0.12,
+  "minimum_pose_joint_confidence": 0.2,
+  "relocalization_enabled": true,
+  "relocalization_fps": 0.5,
+  "relocalization_maximum_width": 640,
+  "relocalization_stale_seconds": 4.0,
+  "scene_regions": [
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#25d0c8",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-full-stage-v1",
+    "kind": "stage",
+    "name": "Full Stage",
+    "points": [
+     {
+      "x": 0.31573802541544477,
+      "y": 0.22608695652173913
+     },
+     {
+      "x": 0.32160312805474095,
+      "y": 0.05217391304347826
+     },
+     {
+      "x": 0.34310850439882695,
+      "y": 0.04
+     },
+     {
+      "x": 0.37438905180840665,
+      "y": 0.020869565217391306
+     },
+     {
+      "x": 0.6197458455522972,
+      "y": 0.017391304347826087
+     },
+     {
+      "x": 0.6480938416422287,
+      "y": 0.04521739130434783
+     },
+     {
+      "x": 0.7409579667644184,
+      "y": 0.07478260869565218
+     },
+     {
+      "x": 0.7741935483870968,
+      "y": 0.22260869565217392
+     },
+     {
+      "x": 0.5747800586510264,
+      "y": 0.22956521739130434
+     },
+     {
+      "x": 0.42424242424242425,
+      "y": 0.22782608695652173
+     },
+     {
+      "x": 0.31378299120234604,
+      "y": 0.22608695652173913
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#16a6c7",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-main-stage-deck-v1",
+    "kind": "stage",
+    "name": "Main Stage Deck",
+    "points": [
+     {
+      "x": 0.31085043988269795,
+      "y": 0.22434782608695653
+     },
+     {
+      "x": 0.3655913978494624,
+      "y": 0.16521739130434782
+     },
+     {
+      "x": 0.6236559139784946,
+      "y": 0.17391304347826086
+     },
+     {
+      "x": 0.6363636363636364,
+      "y": 0.18782608695652173
+     },
+     {
+      "x": 0.7262952101661779,
+      "y": 0.18434782608695652
+     },
+     {
+      "x": 0.772238514173998,
+      "y": 0.22782608695652173
+     },
+     {
+      "x": 0.5718475073313783,
+      "y": 0.22956521739130434
+     },
+     {
+      "x": 0.5650048875855328,
+      "y": 0.21043478260869566
+     },
+     {
+      "x": 0.4281524926686217,
+      "y": 0.21217391304347827
+     },
+     {
+      "x": 0.42717497556207235,
+      "y": 0.22260869565217392
+     },
+     {
+      "x": 0.3098729227761486,
+      "y": 0.22608695652173913
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#ffb020",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-front-stage-v1",
+    "kind": "front_stage",
+    "name": "Front of Stage",
+    "points": [
+     {
+      "x": 0.7732160312805474,
+      "y": 0.22434782608695653
+     },
+     {
+      "x": 0.31085043988269795,
+      "y": 0.22434782608695653
+     },
+     {
+      "x": 0.3098729227761486,
+      "y": 0.19478260869565217
+     },
+     {
+      "x": 0.25219941348973607,
+      "y": 0.19304347826086957
+     },
+     {
+      "x": 0.18572825024437928,
+      "y": 0.2539130434782609
+     },
+     {
+      "x": 0.4359726295210166,
+      "y": 0.28347826086956524
+     },
+     {
+      "x": 0.4389051808406647,
+      "y": 0.3565217391304348
+     },
+     {
+      "x": 0.5483870967741935,
+      "y": 0.3565217391304348
+     },
+     {
+      "x": 0.5513196480938416,
+      "y": 0.271304347826087
+     },
+     {
+      "x": 0.8025415444770283,
+      "y": 0.2417391304347826
+     },
+     {
+      "x": 0.7673509286412512,
+      "y": 0.22086956521739132
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#d467ff",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-altar-v1",
+    "kind": "altar",
+    "name": "Altar Area",
+    "points": [
+     {
+      "x": 0.405,
+      "y": 0.175
+     },
+     {
+      "x": 0.59,
+      "y": 0.175
+     },
+     {
+      "x": 0.585,
+      "y": 0.355
+     },
+     {
+      "x": 0.415,
+      "y": 0.355
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#ef5da8",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-podium-v1",
+    "kind": "podium",
+    "name": "Podium Zone",
+    "points": [
+     {
+      "x": 0.43304007820136853,
+      "y": 0.21217391304347827
+     },
+     {
+      "x": 0.5747800586510264,
+      "y": 0.21043478260869566
+     },
+     {
+      "x": 0.5747800586510264,
+      "y": 0.06608695652173913
+     },
+     {
+      "x": 0.5483870967741935,
+      "y": 0.034782608695652174
+     },
+     {
+      "x": 0.4506353861192571,
+      "y": 0.034782608695652174
+     },
+     {
+      "x": 0.42717497556207235,
+      "y": 0.06434782608695652
+     },
+     {
+      "x": 0.43206256109481916,
+      "y": 0.21217391304347827
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#f97316",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-center-steps-v1",
+    "kind": "front_stage",
+    "name": "Center Steps",
+    "points": [
+     {
+      "x": 0.4310850439882698,
+      "y": 0.1826086956521739
+     },
+     {
+      "x": 0.4359726295210166,
+      "y": 0.3652173913043478
+     },
+     {
+      "x": 0.555229716520039,
+      "y": 0.37217391304347824
+     },
+     {
+      "x": 0.5728250244379277,
+      "y": 0.17391304347826086
+     },
+     {
+      "x": 0.4310850439882698,
+      "y": 0.1791304347826087
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#5b8def",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-left-stage-v1",
+    "kind": "custom",
+    "name": "Left Stage",
+    "points": [
+     {
+      "x": 0.3098729227761486,
+      "y": 0.22782608695652173
+     },
+     {
+      "x": 0.4731182795698925,
+      "y": 0.21391304347826087
+     },
+     {
+      "x": 0.47996089931573804,
+      "y": 0.059130434782608696
+     },
+     {
+      "x": 0.4496578690127077,
+      "y": 0.02434782608695652
+     },
+     {
+      "x": 0.3734115347018573,
+      "y": 0.008695652173913044
+     },
+     {
+      "x": 0.34408602150537637,
+      "y": 0.06782608695652174
+     },
+     {
+      "x": 0.3098729227761486,
+      "y": 0.22434782608695653
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#8b5cf6",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-right-stage-v1",
+    "kind": "custom",
+    "name": "Right Stage",
+    "points": [
+     {
+      "x": 0.5757575757575758,
+      "y": 0.23130434782608697
+     },
+     {
+      "x": 0.5327468230694037,
+      "y": 0.19478260869565217
+     },
+     {
+      "x": 0.5249266862170088,
+      "y": 0.03130434782608696
+     },
+     {
+      "x": 0.541544477028348,
+      "y": 0.0052173913043478265
+     },
+     {
+      "x": 0.6217008797653959,
+      "y": 0.0034782608695652175
+     },
+     {
+      "x": 0.6471163245356794,
+      "y": 0.020869565217391306
+     },
+     {
+      "x": 0.7350928641251222,
+      "y": 0.10956521739130434
+     },
+     {
+      "x": 0.7761485826001955,
+      "y": 0.22608695652173913
+     },
+     {
+      "x": 0.5777126099706745,
+      "y": 0.22434782608695653
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#22c55e",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-rear-stage-v1",
+    "kind": "custom",
+    "name": "Rear Musicians",
+    "points": [
+     {
+      "x": 0.37438905180840665,
+      "y": 0.12869565217391304
+     },
+     {
+      "x": 0.6158357771260997,
+      "y": 0.1426086956521739
+     },
+     {
+      "x": 0.6226783968719453,
+      "y": 0.0034782608695652175
+     },
+     {
+      "x": 0.37438905180840665,
+      "y": 0.0
+     },
+     {
+      "x": 0.37145650048875856,
+      "y": 0.12869565217391304
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   },
+   {
+    "calibration_reference": "2026-08-09T16:39:48.124637+00:00",
+    "color": "#eab308",
+    "confidence": 0.0,
+    "coordinate_space": "calibration_reference",
+    "enabled": true,
+    "generated_at": "",
+    "generation_method": "",
+    "id": "suggested-stage-altar-v1",
+    "kind": "custom",
+    "name": "Stage + Altar",
+    "points": [
+     {
+      "x": 0.1906158357771261,
+      "y": 0.25217391304347825
+     },
+     {
+      "x": 0.43304007820136853,
+      "y": 0.2573913043478261
+     },
+     {
+      "x": 0.41837732160312807,
+      "y": 0.3269565217391304
+     },
+     {
+      "x": 0.5747800586510264,
+      "y": 0.3182608695652174
+     },
+     {
+      "x": 0.5532746823069403,
+      "y": 0.24695652173913044
+     },
+     {
+      "x": 0.7996089931573802,
+      "y": 0.24347826086956523
+     },
+     {
+      "x": 0.7771260997067448,
+      "y": 0.10956521739130434
+     },
+     {
+      "x": 0.7370478983382209,
+      "y": 0.07478260869565218
+     },
+     {
+      "x": 0.6480938416422287,
+      "y": 0.06608695652173913
+     },
+     {
+      "x": 0.6197458455522972,
+      "y": 0.0052173913043478265
+     },
+     {
+      "x": 0.37145650048875856,
+      "y": 0.0034782608695652175
+     },
+     {
+      "x": 0.34701857282502446,
+      "y": 0.043478260869565216
+     },
+     {
+      "x": 0.3088954056695992,
+      "y": 0.10956521739130434
+     },
+     {
+      "x": 0.19257086999022482,
+      "y": 0.24695652173913044
+     }
+    ],
+    "source": "audience",
+    "suggested": true,
+    "support_points": 0,
+    "supporting_poses": []
+   }
+  ],
+  "upper_body_only": true
+ },
+ "automation_config": {
+  "adaptive_subject_framing_enabled": true,
+  "audience_handoff_max_pan_units": 1600,
+  "audience_handoff_max_seconds": 8.0,
+  "audience_handoff_max_tilt_units": 900,
+  "audience_handoff_reversal_deadband_units": 120,
+  "click_target_height": 0.34,
+  "click_target_width": 0.12,
+  "continuous_command_refresh_seconds": 0.5,
+  "continuous_control_revision": 2,
+  "continuous_error_smoothing": 0.58,
+  "continuous_pan_max_speed": 26,
+  "continuous_prediction_seconds": 0.55,
+  "continuous_speed_slew_per_second": 18.0,
+  "continuous_tilt_max_speed": 14,
+  "continuous_velocity_smoothing": 0.45,
+  "continuous_zoom_dwell_seconds": 0.6,
+  "continuous_zoom_max_speed": 8,
+  "decision_fps": 4.0,
+  "group_frame_height": 0.76,
+  "group_maximum_occupancy": 0.86,
+  "group_minimum_occupancy": 0.7,
+  "manual_override_grace_seconds": 2.5,
+  "manual_override_pan_units": 420,
+  "manual_override_tilt_units": 320,
+  "manual_override_zoom_units": 140,
+  "maximum_pan_step_units": 320,
+  "maximum_tilt_step_units": 220,
+  "maximum_zoom_step_units": 100,
+  "minimum_command_interval_seconds": 0.65,
+  "minimum_subject_age_frames": 2,
+  "mode": "off",
+  "off_podium_subject_frame_height": 0.88,
+  "pan_deadband_units": 80,
+  "podium_region_horizontal_inset_ratio": 0.18,
+  "podium_subject_frame_height": 0.84,
+  "podium_zoom_enabled": true,
+  "raised_gesture_maximum_occupancy": 0.84,
+  "single_subject_frame_height": 0.72,
+  "subject_center_deadband_x": 0.06,
+  "subject_center_deadband_y": 0.09,
+  "subject_lock_maximum_match_distance": 0.3,
+  "subject_maximum_occupancy": 0.88,
+  "subject_minimum_occupancy": 0.74,
+  "subject_safety_padding_x": 0.05,
+  "subject_safety_padding_y": 0.05,
+  "subject_zoom_center_gate_x": 0.16,
+  "target_dwell_seconds": 0.35,
+  "target_loss_disarm_seconds": 12.0,
+  "target_loss_hold_seconds": 2.5,
+  "target_padding_x": 0.1,
+  "target_padding_y": 0.12,
+  "tilt_deadband_units": 60,
+  "zoom_deadband_units": 35
+ },
+ "motor": {
+  "source": "Production Hub logs: speed commands integrated between logged poses",
+  "pan": {
+   "gain_units_per_second": 1532.448,
+   "exponent": 0.005,
+   "segments": 125,
+   "rms_residual_units": 401.9
+  },
+  "tilt": {
+   "gain_units_per_second": 4.835,
+   "exponent": 0.295,
+   "segments": 80,
+   "rms_residual_units": 22.8
+  }
+ }
+}

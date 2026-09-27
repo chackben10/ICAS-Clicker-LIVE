@@ -76,7 +76,11 @@ from production_hub.tracking.models import (
     TrackingState,
 )
 from production_hub.tracking.framing import FramingState
-from production_hub.tracking.ptz_geometry import PtzGeometryModel, PtzMotorPose
+from production_hub.tracking.ptz_geometry import (
+    PtzGeometryModel,
+    PtzMotorPose,
+    transform_reference_rect_to_live,
+)
 from production_hub.tracking.scene_regions import suggested_church_scene_regions
 from production_hub.video.models import VideoSourceKey, VideoSourceSnapshot
 
@@ -108,21 +112,61 @@ def click_viewport_to_canvas_rect(
     )
 
 
-def crop_click_to_frame_image(image: QImage) -> QImage:
-    if image.isNull():
-        return QImage(image)
+def _click_viewport_pixels(width: int, height: int) -> tuple[int, int, int, int]:
     crop_x, crop_y, crop_width, crop_height = CLICK_TO_FRAME_VIEWPORT
-    left = max(0, min(image.width() - 1, round(image.width() * crop_x)))
-    top = max(0, min(image.height() - 1, round(image.height() * crop_y)))
+    left = max(0, min(width - 1, round(width * crop_x)))
+    top = max(0, min(height - 1, round(height * crop_y)))
     right = max(
         left + 1,
-        min(image.width(), round(image.width() * (crop_x + crop_width))),
+        min(width, round(width * (crop_x + crop_width))),
     )
     bottom = max(
         top + 1,
-        min(image.height(), round(image.height() * (crop_y + crop_height))),
+        min(height, round(height * (crop_y + crop_height))),
     )
+    return left, top, right, bottom
+
+
+def crop_click_to_frame_image(image: QImage) -> QImage:
+    if image.isNull():
+        return QImage(image)
+    left, top, right, bottom = _click_viewport_pixels(image.width(), image.height())
     return image.copy(left, top, right - left, bottom - top)
+
+
+def click_live_rect_to_viewport(
+    bounds: NormalizedRect,
+    map_x: np.ndarray,
+    map_y: np.ndarray,
+    alpha: np.ndarray,
+    live_size: tuple[int, int],
+) -> NormalizedRect | None:
+    """Locate a live detection using the exact remap of the displayed image.
+
+    Click-to-Frame warps Audience pixels into a panorama and then crops it.
+    Raw Audience coordinates and the motor calibration are both wrong for
+    that canvas. Inverting the visible remap also handles its non-linear mesh
+    and the cached visual alignment without a second approximate transform.
+    """
+
+    height, width = map_x.shape
+    left, top, right, bottom = _click_viewport_pixels(width, height)
+    x, y = map_x[top:bottom, left:right], map_y[top:bottom, left:right]
+    visible = (
+        (alpha[top:bottom, left:right] > 0)
+        & (x >= bounds.x * live_size[0])
+        & (x < (bounds.x + bounds.width) * live_size[0])
+        & (y >= bounds.y * live_size[1])
+        & (y < (bounds.y + bounds.height) * live_size[1])
+    )
+    ys, xs = np.nonzero(visible)
+    if not len(xs):
+        return None
+    return NormalizedRect(
+        float(xs.min()) / (right-left), float(ys.min()) / (bottom-top),
+        float(xs.max()-xs.min()+1) / (right-left),
+        float(ys.max()-ys.min()+1) / (bottom-top),
+    )
 
 
 class VideoPreview(QFrame):
@@ -176,6 +220,7 @@ class VideoPreview(QFrame):
         self._frame_target_bounds = None
         self._frame_drag_start: tuple[float, float] | None = None
         self._frame_drag_current: tuple[float, float] | None = None
+        self._tracked_highlights: tuple[NormalizedRect, ...] = ()
         self._frame_target_opacity = 1.0
         self._frame_target_fade_step = 0.05
         self._frame_target_fade_timer = QTimer(self)
@@ -249,10 +294,25 @@ class VideoPreview(QFrame):
         self.sequence = 0
         self._image = None
         self._subjects = ()
+        self._tracked_highlights = ()
         self._calibration_markers = ()
         self._selected_calibration_marker_id = 0
         self.image_label.setPixmap(QPixmap())
         self.image_label.setText(message)
+
+    def set_tracked_highlights(self, bounds: tuple[NormalizedRect, ...]) -> None:
+        """Mark the people Subject Tracking is following.
+
+        Deliberately unlabelled. This is a small always-on-top window whose job
+        is to answer "is it on the right people?" at a glance; identifiers and
+        confidences belong on the Camera page, where there is room to read them.
+        """
+
+        selected = tuple(bounds)
+        if selected == self._tracked_highlights:
+            return
+        self._tracked_highlights = selected
+        self._render()
 
     def set_subjects(self, subjects: tuple[TrackedSubject, ...]) -> None:
         if subjects == self._subjects:
@@ -489,6 +549,7 @@ class VideoPreview(QFrame):
             self._paint_regions(painter, pixmap)
             self._paint_calibration_markers(painter, pixmap)
             self._paint_frame_target(painter, pixmap)
+            self._paint_tracked_highlights(painter, pixmap)
             for subject in self._subjects:
                 color = QColor("#ffb020" if subject.selected else "#25d0c8")
                 fill = QColor(color)
@@ -518,12 +579,14 @@ class VideoPreview(QFrame):
             or self._calibration_markers
             or self._frame_target_point
             or self._frame_target_bounds is not None
+            or self._tracked_highlights
         ):
             painter = QPainter(pixmap)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             self._paint_regions(painter, pixmap)
             self._paint_calibration_markers(painter, pixmap)
             self._paint_frame_target(painter, pixmap)
+            self._paint_tracked_highlights(painter, pixmap)
             painter.end()
         self.image_label.setText("")
         self.image_label.setPixmap(pixmap)
@@ -600,6 +663,26 @@ class VideoPreview(QFrame):
                 label,
             )
 
+    def _paint_tracked_highlights(self, painter: QPainter, pixmap: QPixmap) -> None:
+        if not self._tracked_highlights:
+            return
+        color = QColor("#ffd400")
+        fill = QColor(color)
+        fill.setAlpha(10)
+        color.setAlpha(170)
+        for bounds in self._tracked_highlights:
+            rect = QRectF(
+                bounds.x * pixmap.width(),
+                bounds.y * pixmap.height(),
+                bounds.width * pixmap.width(),
+                bounds.height * pixmap.height(),
+            )
+            if rect.width() <= 0 or rect.height() <= 0:
+                continue
+            painter.fillRect(rect, fill)
+            painter.setPen(QPen(color, 1))
+            painter.drawRoundedRect(rect, 4, 4)
+
     def _paint_frame_target(self, painter: QPainter, pixmap: QPixmap) -> None:
         color = QColor("#ff496c")
         color.setAlpha(round(255 * self._frame_target_opacity))
@@ -651,6 +734,7 @@ class ClickToFrameWindow(QWidget):
         )
         self.context = context
         self.frame_provider = None
+        self.tracking_bounds_mapper = None
         self.tracking_state_provider = None
         self._geometry_restored = False
         self._persisted_geometry: tuple[int, int, int, int] | None = None
@@ -813,6 +897,7 @@ class ClickToFrameWindow(QWidget):
             if provided is not None:
                 image, sequence = provided
                 self.preview.set_frame(image, sequence)
+            self.refresh_tracked_highlights()
             self.refresh_tracking_button()
             return
         packet = self.context.video.frame(VideoSourceKey.AUDIENCE)
@@ -821,7 +906,35 @@ class ClickToFrameWindow(QWidget):
             self.preview.set_frame(packet.image, packet.sequence)
         elif self.preview.sequence:
             self.preview.clear(snapshot.message or "No Audience video frame")
+        self.refresh_tracked_highlights()
         self.refresh_tracking_button()
+
+    def refresh_tracked_highlights(self) -> None:
+        """Show who Subject Tracking is following, in the live Audience image.
+
+        Draw only fresh Audience observations matched to the supervisor's
+        locks. Its reference targets include motor-map error, parallax offsets,
+        and smoothing for control; projecting them back produces misplaced
+        boxes even when identity matching is correct.
+        """
+
+        automation = getattr(self.context, "ptz_automation", None)
+        if automation is None:
+            self.preview.set_tracked_highlights(())
+            return
+        snapshot = automation.snapshot()
+        if not snapshot.armed:
+            self.preview.set_tracked_highlights(())
+            return
+        now = time.monotonic()
+        highlights = tuple(
+            subject.bounds
+            for subject in snapshot.locked_audience_subjects
+            if 0.0 <= now - subject.last_seen_monotonic <= 2.0
+        )
+        if callable(self.tracking_bounds_mapper):
+            highlights = self.tracking_bounds_mapper(highlights)
+        self.preview.set_tracked_highlights(highlights)
 
     def refresh_tracking_button(self) -> None:
         if not callable(self.tracking_state_provider):
@@ -912,6 +1025,7 @@ class CameraControlPage(QWidget):
         self._click_composite_relocalization_sequence = -1
         self._click_render_sequence = 0
         self._click_composite_reference_aligned = False
+        self._click_composite_highlight_mapping = None
         self._click_blender = ClickToFrameBlender()
         self._click_current_pose: PtzMotorPose | None = None
         self._click_pose_sequence = 0
@@ -1985,6 +2099,15 @@ class CameraControlPage(QWidget):
         controls.addWidget(self.tracking_ptz)
         controls.addWidget(QLabel("Analysis rate"))
         controls.addWidget(self.tracking_rate)
+        self.improved_tracking = QCheckBox("Improved subject tracking")
+        self.improved_tracking.setObjectName("improved_subject_tracking")
+        self.improved_tracking.setToolTip(
+            "Smoother pursuit, controlled zoom-out for fast movers, steadier headroom, "
+            "a calm hold while the subject stands still, and stricter identity. "
+            "Turn off to return to the earlier tracking immediately."
+        )
+        self.improved_tracking.setChecked(config.automation.improved_tracking_enabled)
+        controls.addWidget(self.improved_tracking)
         controls.addStretch()
         layout.addLayout(controls)
 
@@ -2014,6 +2137,7 @@ class CameraControlPage(QWidget):
         self.tracking_audience.toggled.connect(self.update_tracking_config)
         self.tracking_ptz.toggled.connect(self.update_tracking_config)
         self.tracking_rate.currentIndexChanged.connect(self.update_tracking_config)
+        self.improved_tracking.toggled.connect(self.update_tracking_config)
         return group
 
     def ptz_automation_group(self) -> QGroupBox:
@@ -2211,6 +2335,7 @@ class CameraControlPage(QWidget):
         self.click_to_frame_window.frame_provider = (
             self._click_to_frame_composite_frame
         )
+        self.click_to_frame_window.tracking_bounds_mapper = self._click_to_frame_highlight_bounds
         self.click_to_frame_window.tracking_state_provider = lambda: (
             self.subject_tracking_enabled(),
             self.subject_tracking_requested(),
@@ -2381,7 +2506,21 @@ class CameraControlPage(QWidget):
         self._click_composite_relocalization_sequence = -1
         self._click_composite_last_render_monotonic = 0.0
         self._click_composite_reference_aligned = False
+        self._click_composite_highlight_mapping = None
         self._click_composite_image = None
+
+    def _click_to_frame_highlight_bounds(
+        self, bounds: tuple[NormalizedRect, ...],
+    ) -> tuple[NormalizedRect, ...]:
+        if self._click_mosaic is None:
+            return bounds
+        mapping = self._click_composite_highlight_mapping
+        if not self._click_composite_reference_aligned or mapping is None:
+            return ()
+        return tuple(
+            projected for item in bounds
+            if (projected := click_live_rect_to_viewport(item, *mapping)) is not None
+        )
 
     def _click_to_frame_composite_frame(self) -> tuple[QImage, int] | None:
         packet = self.context.video.frame(VideoSourceKey.AUDIENCE)
@@ -2594,6 +2733,10 @@ class CameraControlPage(QWidget):
         )
         self._click_composite_last_render_monotonic = now
         self._click_composite_reference_aligned = reference_aligned
+        self._click_composite_highlight_mapping = (
+            (live_x, live_y, alpha, (packet.image.width(), packet.image.height()))
+            if reference_aligned else None
+        )
         self._click_composite_image = composite
         self._click_render_sequence += 1
         return QImage(composite), self._click_render_sequence
@@ -3403,6 +3546,7 @@ class CameraControlPage(QWidget):
         config.analyze_audience = self.tracking_audience.isChecked()
         config.analyze_ptz = self.tracking_ptz.isChecked()
         config.analysis_fps = float(self.tracking_rate.currentData())
+        config.automation.improved_tracking_enabled = self.improved_tracking.isChecked()
         config.__post_init__()
         self._save_tracking_config(config)
         # Use the same owner that hideEvent releases.  The former default

@@ -5,11 +5,13 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any, Protocol, Sequence
 
 from PySide6.QtGui import QImage
 
 from production_hub.core.config.models import CameraSceneRegion, CameraTrackingConfig
+from production_hub.tracking import appearance
 from production_hub.tracking.apple_vision import AppleVisionPersonDetector, VisionUnavailableError
 from production_hub.tracking.association import SubjectAssociator
 from production_hub.tracking.models import (
@@ -61,6 +63,7 @@ class PersonTrackingService:
         self.config = config
         self.logger = logger
         self.detector_factory = detector_factory
+        self.validated_boxes_enabled = False
         self._region_provider = region_provider
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
@@ -283,6 +286,8 @@ class PersonTrackingService:
             self._log("warning", "tracking_frame_failed", str(exc), source=source.value)
             return
 
+        if source == VideoSourceKey.PTZ and candidates:
+            candidates = _with_appearance(image, candidates)
         completed = time.monotonic()
         with self._lock:
             subjects = self._associators[source].update(
@@ -381,6 +386,8 @@ class PersonTrackingService:
         detector: PersonDetector,
         regions: tuple[CameraSceneRegion, ...] | None,
     ) -> list[PersonCandidate]:
+        if isinstance(detector, AppleVisionPersonDetector):
+            detector.conservative_pose_merging = self.validated_boxes_enabled
         if (
             source == VideoSourceKey.AUDIENCE
             and self.config.automation.mode == "subject"
@@ -394,7 +401,12 @@ class PersonTrackingService:
             # into a second video pipeline, and only runs while Subject
             # Tracking is actively using the wide-camera safety net.
             candidates = list(detector.detect(image))
-            for window in _subject_handoff_detection_windows():
+            windows = (
+                _stage_detection_windows(self.config.scene_regions)
+                if self.validated_boxes_enabled
+                else ()
+            ) or _subject_handoff_detection_windows()
+            for window in windows:
                 crop = _crop_normalized(image, window)
                 if crop.isNull():
                     continue
@@ -530,6 +542,29 @@ class PersonTrackingService:
         return (len(times) - 1) / elapsed if elapsed > 0 else 0.0
 
 
+def _with_appearance(
+    image: QImage,
+    candidates: list[PersonCandidate],
+) -> list[PersonCandidate]:
+    """Attach a clothing-colour signature to each PTZ detection.
+
+    The identity lock uses it to keep a different person from inheriting a
+    lost subject (see tracking/appearance.py). Computed on a 480 px copy.
+    """
+
+    try:
+        small = image.scaledToWidth(min(480, image.width())) if image.width() > 480 else image
+        rgb = appearance.image_array(small)
+        if rgb is None:
+            return candidates
+        return [
+            replace(candidate, appearance=appearance.signature(rgb, candidate.bounds))
+            for candidate in candidates
+        ]
+    except Exception:
+        return candidates
+
+
 def _region_contains(region: CameraSceneRegion, x: float, y: float) -> bool:
     points = region.points
     inside = False
@@ -602,6 +637,46 @@ def _subject_handoff_detection_windows() -> tuple[NormalizedRect, ...]:
         NormalizedRect(0.00, 0.00, 0.40, 0.52),
         NormalizedRect(0.30, 0.00, 0.40, 0.52),
         NormalizedRect(0.60, 0.00, 0.40, 0.52),
+    )
+
+
+# Dev experiment: wide-camera windows fitted to the calibrated stage.
+#
+# The fixed windows above are 52% of the frame tall, mostly pews, so a person
+# on the ICAS stage is small inside each crop and Apple Vision misses many of
+# them (49 of 60 rendered speakers found in testing). Four tighter windows
+# over the drawn stage region, padded to the side exits and the floor in
+# front, found 59 of 60 at the same cost.
+STAGE_WINDOW_COUNT = 4
+STAGE_WINDOW_PAD_X = 0.06
+STAGE_WINDOW_PAD_BELOW = 0.02  # regions mark where feet stand; the head is above
+STAGE_WINDOW_OVERLAP = 0.25
+
+
+def _stage_detection_windows(regions) -> tuple[NormalizedRect, ...]:
+    points = [
+        (point.x, point.y)
+        for region in regions or ()
+        if getattr(region, "enabled", True)
+        and getattr(region, "source", "audience") == "audience"
+        and getattr(region, "kind", "") in ("stage", "front_stage", "podium", "altar")
+        for point in region.points
+    ]
+    if not points:
+        return ()
+    left = max(0.0, min(x for x, _ in points) - STAGE_WINDOW_PAD_X)
+    right = min(1.0, max(x for x, _ in points) + STAGE_WINDOW_PAD_X)
+    top = 0.0
+    bottom = min(1.0, max(y for _, y in points) + STAGE_WINDOW_PAD_BELOW)
+    span = right - left
+    if span <= 0.05 or bottom <= 0.05:
+        return ()
+    step = span / (STAGE_WINDOW_COUNT - STAGE_WINDOW_OVERLAP * (STAGE_WINDOW_COUNT - 1))
+    width = min(span, step)
+    stride = width * (1.0 - STAGE_WINDOW_OVERLAP)
+    return tuple(
+        NormalizedRect(min(left + index * stride, right - width), top, width, bottom - top)
+        for index in range(STAGE_WINDOW_COUNT)
     )
 
 

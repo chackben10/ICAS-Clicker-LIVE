@@ -496,6 +496,10 @@ class PtzAutomationConfig(JsonModel):
     podium_zoom_enabled: bool = True
     podium_region_horizontal_inset_ratio: float = 0.18
     decision_fps: float = 4.0
+    # The 2026-09 tracking (smooth pursuit, escape zoom, headroom, framed hold,
+    # stricter identity and person detection). Off falls back to the earlier
+    # behaviour immediately, mid-service if need be.
+    improved_tracking_enabled: bool = True
     minimum_subject_age_frames: int = 2
     target_padding_x: float = 0.10
     target_padding_y: float = 0.12
@@ -509,8 +513,11 @@ class PtzAutomationConfig(JsonModel):
     subject_center_deadband_y: float = 0.09
     subject_minimum_occupancy: float = 0.74
     subject_maximum_occupancy: float = 0.88
+    subject_maximum_width_occupancy: float = 0.92
     group_minimum_occupancy: float = 0.70
     group_maximum_occupancy: float = 0.86
+    group_minimum_width_occupancy: float = 0.72
+    group_maximum_width_occupancy: float = 0.92
     raised_gesture_maximum_occupancy: float = 0.84
     off_podium_subject_frame_height: float = 0.88
     subject_zoom_center_gate_x: float = 0.16
@@ -527,9 +534,15 @@ class PtzAutomationConfig(JsonModel):
     maximum_tilt_step_units: int = 220
     maximum_zoom_step_units: int = 100
     subject_lock_maximum_match_distance: float = 0.30
+    maximum_locked_subjects: int = 3
+    subject_lock_formation_grace_seconds: float = 1.5
+    subject_lock_retire_seconds: float = 8.0
+    subject_lock_hold_seconds: float = 1.0
+    recovery_frame_height: float = 0.70
     continuous_pan_max_speed: int = 26
     continuous_tilt_max_speed: int = 14
     continuous_zoom_max_speed: int = 8
+    group_zoom_out_max_speed: int = 20
     continuous_speed_slew_per_second: float = 18.0
     continuous_error_smoothing: float = 0.58
     continuous_velocity_smoothing: float = 0.45
@@ -553,6 +566,7 @@ class PtzAutomationConfig(JsonModel):
                 "ptz_automation.mode must be off, subject, stage, stage_altar, or click"
             )
         self.decision_fps = max(1.0, min(8.0, float(self.decision_fps)))
+        self.improved_tracking_enabled = bool(self.improved_tracking_enabled)
         self.minimum_subject_age_frames = max(1, min(30, int(self.minimum_subject_age_frames)))
         self.target_padding_x = max(0.0, min(0.40, float(self.target_padding_x)))
         self.target_padding_y = max(0.0, min(0.40, float(self.target_padding_y)))
@@ -591,12 +605,25 @@ class PtzAutomationConfig(JsonModel):
             self.subject_minimum_occupancy,
             min(0.98, float(self.subject_maximum_occupancy)),
         )
+        self.subject_maximum_width_occupancy = max(
+            0.50, min(0.98, float(self.subject_maximum_width_occupancy))
+        )
         self.group_minimum_occupancy = max(
             0.30, min(0.95, float(self.group_minimum_occupancy))
         )
         self.group_maximum_occupancy = max(
             self.group_minimum_occupancy,
             min(0.98, float(self.group_maximum_occupancy)),
+        )
+        # How much of the frame WIDTH a group envelope may occupy. A row of
+        # people is bounded horizontally long before it is bounded vertically,
+        # so group framing needs its own budget on that axis.
+        self.group_minimum_width_occupancy = max(
+            0.20, min(0.95, float(self.group_minimum_width_occupancy))
+        )
+        self.group_maximum_width_occupancy = max(
+            self.group_minimum_width_occupancy,
+            min(0.98, float(self.group_maximum_width_occupancy)),
         )
         self.raised_gesture_maximum_occupancy = max(
             0.50, min(0.95, float(self.raised_gesture_maximum_occupancy))
@@ -638,6 +665,32 @@ class PtzAutomationConfig(JsonModel):
             0.08,
             min(0.60, float(self.subject_lock_maximum_match_distance)),
         )
+        self.maximum_locked_subjects = max(1, min(5, int(self.maximum_locked_subjects)))
+        # People do not all become stable detections on the same frame. This
+        # window lets the roster finish forming after arming; it never lets a
+        # newcomer join a group that has already settled.
+        self.subject_lock_formation_grace_seconds = max(
+            0.0, min(6.0, float(self.subject_lock_formation_grace_seconds))
+        )
+        # A locked person who has been gone this long has left, and holding a
+        # place for them keeps the camera off the people who are still there.
+        self.subject_lock_retire_seconds = max(
+            2.0, min(60.0, float(self.subject_lock_retire_seconds))
+        )
+        # How long a group member missed by both detectors keeps their place in
+        # the composition. Apple Vision drops a stationary person for a frame
+        # or two regularly; without this the shot collapses onto whoever was
+        # still detected and lurches back when they reappear.
+        self.subject_lock_hold_seconds = max(
+            0.0, min(4.0, float(self.subject_lock_hold_seconds))
+        )
+        # How much of the frame the locked people's known wide-camera positions
+        # should fill while the PTZ is reacquiring them. This is what bounds
+        # the recovery widening: the camera opens up to this framing of the
+        # Audience estimate and no further.
+        self.recovery_frame_height = max(
+            0.30, min(0.95, float(self.recovery_frame_height))
+        )
         self.continuous_control_revision = max(
             1,
             int(self.continuous_control_revision),
@@ -659,6 +712,7 @@ class PtzAutomationConfig(JsonModel):
             ("continuous_pan_max_speed", 2, 30),
             ("continuous_tilt_max_speed", 2, 30),
             ("continuous_zoom_max_speed", 2, 15),
+            ("group_zoom_out_max_speed", 2, 30),
         ):
             setattr(self, field_name, max(low, min(high, int(getattr(self, field_name)))))
         self.continuous_speed_slew_per_second = max(

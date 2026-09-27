@@ -72,11 +72,23 @@ there first, on the production machine and against the real cameras,
 ProPresenter, and NDI sources, and only promoted into the installed
 `Production Hub.app` once it has been shown to behave.
 
-Run it with:
+Open **Production Hub Dev** from Applications. It runs this checkout's source
+in a Terminal window that shows the log; keep that
+window open while using Dev (closing it quits Dev). If the live app is open it
+offers to quit it first, because the two cannot run at the same time. They also
+share settings: a change made in Dev is a change to the live app's settings.
+
+The Applications entry is only a launcher; source edits need no reinstall.
+(Re)install it after moving the checkout or changing Python:
 
 ```bash
-python3 Production_Hub_App/main.py
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 Production_Hub_App/scripts/install_dev_app.py
 ```
+
+From a terminal, the same thing is
+`/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 Production_Hub_App/main.py`.
+Use the python.org 3.12 framework Python: it has the app's requirements, and a
+plain `python3` may resolve to another install that does not.
 
 On macOS that relaunches the GUI through `.build/dev/Production Hub Dev.app`, a
 small stable wrapper that loads the **live source tree** while supplying its own
@@ -93,8 +105,8 @@ Why it exists, and why it is kept:
   release its Camera access.
 - **No rebuild between edits.** It loads source directly, so the
   edit-run-observe loop costs seconds rather than a full PyInstaller build.
-- **The two can run side by side**, though not on the same API port — stop one
-  before starting the other, or pass `--port` to the staging instance.
+- **Close the installed desktop app before opening Dev.** The desktop apps
+  share a single-instance lock; changing the API port does not bypass it.
 
 Do **not** rebuild and reinstall `Production Hub.app` to try a change. That is
 what the staging app is for. Promote to the installed release only when the

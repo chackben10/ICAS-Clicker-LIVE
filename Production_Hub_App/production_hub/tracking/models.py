@@ -64,6 +64,8 @@ class NormalizedRect:
 class PersonCandidate:
     bounds: NormalizedRect
     confidence: float
+    # Clothing-colour signature (see tracking/appearance.py); () when unknown.
+    appearance: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,7 @@ class TrackedSubject:
     selected: bool
     age_frames: int
     last_seen_monotonic: float
+    appearance: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +87,18 @@ class SubjectReferenceTarget:
     bounds: NormalizedRect
     confidence: float
     source: str
+    # Walking speed across the reference image (reference widths/s), measured
+    # from raw observations; 0 when unknown.
+    velocity_x: float = 0.0
+    # The latest raw (unsmoothed) observation behind this target: its centre x
+    # and when it was seen. Lets motion control react to a walker without the
+    # lag of the identity lock's smoothing.
+    observed_x: float | None = None
+    observed_at: float = 0.0
+    # Top edge (head) of that observation: a box that changes shape with a
+    # gesture moves its centre, not the head.
+    observed_top: float | None = None
+    observed_bottom: float | None = None
 
 
 @dataclass(slots=True)
