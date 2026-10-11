@@ -178,6 +178,54 @@ class VideoPhaseOneTests(unittest.TestCase):
             page.close()
             context.video.shutdown()
 
+    def test_recording_controls_enable_once_video_services_start(self) -> None:
+        # The diagnostics group is built before the lazy video start, when the
+        # recorder does not exist yet. The buttons must not stay disabled.
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            page = CameraControlPage(context)
+            self.assertFalse(context.video.qt_initialized)
+            self.assertFalse(page.record_button.isEnabled())
+            self.assertTrue(page.recording_unavailable_label.isHidden())
+
+            page._ensure_video_initialized()
+
+            self.assertTrue(context.video.recording_available)
+            self.assertTrue(page.record_button.isEnabled())
+            self.assertTrue(page.replay_button.isEnabled())
+            self.assertTrue(page.recording_unavailable_label.isHidden())
+            page.close()
+            context.video.shutdown()
+
+    def test_diagnostic_recorder_is_shown_only_in_production_hub_dev(self) -> None:
+        for dev_build in (False, True):
+            with self.subTest(dev_build=dev_build), TemporaryDirectory() as directory:
+                context = build_context(Path(directory))
+                context.config.integrations.video.audience_auto_connect = False
+                context.config.integrations.video.ptz_auto_connect = False
+                context.ptz_automation.tracking_refinements_enabled = dev_build
+                page = CameraControlPage(context)
+                placed = page._advanced_diagnostics_group.parent() is not None
+                self.assertEqual(placed, dev_build)
+                page.close()
+                context.video.shutdown()
+
+    def test_recording_unavailable_notice_appears_only_after_a_failed_start(self) -> None:
+        with TemporaryDirectory() as directory:
+            context = build_context(Path(directory))
+            context.config.integrations.video.audience_auto_connect = False
+            context.config.integrations.video.ptz_auto_connect = False
+            page = CameraControlPage(context)
+            with patch.object(context.video.recorder, "initialize_qt"):
+                page._ensure_video_initialized()
+            self.assertFalse(context.video.recording_available)
+            self.assertFalse(page.record_button.isEnabled())
+            self.assertFalse(page.recording_unavailable_label.isHidden())
+            page.close()
+            context.video.shutdown()
+
     def test_broker_retains_only_latest_frame_and_copies_snapshots(self) -> None:
         broker = LatestFrameBroker()
         first = broker.publish(VideoSourceKey.AUDIENCE, image("#101010"), frame_rate=30)

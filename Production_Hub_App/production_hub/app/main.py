@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from production_hub.app.bootstrap import build_context
+from production_hub.app.dev_launcher import DEV_CHILD_ARGUMENT
 from production_hub.app.lifecycle import start_api_server, start_background_services, startup_checks
 from production_hub.app.single_instance import SingleInstanceLock
 
@@ -50,6 +51,10 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run(args: argparse.Namespace) -> int:
     context = build_context(args.data_dir)
+    context.ptz_automation.motion_easing_enabled = (
+        DEV_CHILD_ARGUMENT in sys.argv and not getattr(sys, "frozen", False)
+    )
+    context.ptz_automation.tracking_refinements_enabled = context.ptz_automation.motion_easing_enabled
     if args.host:
         context.config.api.bind_host = args.host
     if args.port:

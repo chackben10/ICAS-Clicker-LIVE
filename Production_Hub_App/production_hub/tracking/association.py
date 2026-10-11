@@ -34,6 +34,7 @@ class SubjectAssociator:
         self.retain_missed_with_active = bool(retain_missed_with_active)
         self._tracks: dict[int, _Track] = {}
         self._selected_ids: set[int] = set()
+        self._dormant: dict[int, _Track] = {}
         self._next_id = 1
 
     @property
@@ -46,7 +47,9 @@ class SubjectAssociator:
         *,
         observed_monotonic: float | None = None,
     ) -> tuple[TrackedSubject, ...]:
-        observed_at = float(observed_monotonic or monotonic())
+        observed_at = float(monotonic() if observed_monotonic is None else observed_monotonic)
+        self._dormant = {key: track for key, track in self._dormant.items()
+                         if 0 <= observed_at - track.last_seen_monotonic <= 2.0}
         normalized = [
             PersonCandidate(item.bounds.clamped(), max(0.0, min(1.0, item.confidence)))
             for item in candidates
@@ -87,14 +90,31 @@ class SubjectAssociator:
             if track_id not in matched_tracks:
                 track.missed_frames += 1
                 if track.missed_frames > self.maximum_missed_frames:
+                    if 0 <= observed_at - track.last_seen_monotonic <= 2.0:
+                        self._dormant[track_id] = track
                     self._tracks.pop(track_id, None)
                     self._selected_ids.discard(track_id)
 
         for candidate_index, candidate in enumerate(normalized):
             if candidate_index in matched_candidates:
                 continue
-            track_id = self._next_id
-            self._next_id += 1
+            # Hidden identity memory is not a visible/coasted subject and is
+            # never selected for steering. Reuse an ID only for an unambiguous,
+            # nearby return with compatible size; active matches take priority.
+            possible = []
+            for dormant_id, old in self._dormant.items():
+                ratio = candidate.bounds.area / max(old.bounds.area, 1e-9)
+                overlap = old.bounds.intersection_over_union(candidate.bounds)
+                if (1/3 <= ratio <= 3 and overlap >= .35
+                        and old.bounds.center_distance(candidate.bounds) <= .08):
+                    possible.append((overlap, dormant_id))
+            possible.sort(reverse=True)
+            if possible and (len(possible) == 1 or possible[0][0] - possible[1][0] >= .15):
+                track_id = possible[0][1]
+                self._dormant.pop(track_id)
+            else:
+                track_id = self._next_id
+                self._next_id += 1
             self._tracks[track_id] = _Track(
                 track_id=track_id,
                 bounds=candidate.bounds,
@@ -161,6 +181,7 @@ class SubjectAssociator:
 
     def reset(self) -> None:
         self._tracks.clear()
+        self._dormant.clear()
         self._selected_ids.clear()
         self._next_id = 1
 

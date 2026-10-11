@@ -251,30 +251,38 @@ def merge_pose_envelopes(
     tracking service remains the second, conservative false-positive filter.
     """
 
-    merged = list(candidates)
-    for envelope in envelopes:
-        if not merged:
-            merged.append(PersonCandidate(envelope, 0.50))
+    # Match against the original rectangles, globally, before expanding any
+    # bounds. Expanding during nearest-neighbour assignment made the first
+    # rectangle absorb neighbouring poses and progressively grow across people.
+    pairs = []
+    for candidate_index, candidate in enumerate(candidates):
+        for pose_index, envelope in enumerate(envelopes):
+            overlap = candidate.bounds.intersection_over_union(envelope)
+            if overlap >= 0.10:
+                pairs.append((overlap, candidate_index, pose_index))
+    matches = {}
+    used_poses = set()
+    for _score, candidate_index, pose_index in sorted(pairs, reverse=True):
+        if candidate_index not in matches and pose_index not in used_poses:
+            matches[candidate_index] = pose_index
+            used_poses.add(pose_index)
+    merged = []
+    for index, candidate in enumerate(candidates):
+        if index not in matches:
+            merged.append(candidate)
             continue
-        distances = [item.bounds.center_distance(envelope) for item in merged]
-        index = min(range(len(merged)), key=distances.__getitem__)
-        candidate = merged[index]
-        diagonal = (candidate.bounds.width**2 + candidate.bounds.height**2) ** 0.5
-        if distances[index] > max(0.12, diagonal * 0.9):
-            merged.append(PersonCandidate(envelope, 0.50))
-            continue
+        envelope = envelopes[matches[index]]
         left = min(candidate.bounds.x, envelope.x)
         top = min(candidate.bounds.y, envelope.y)
-        right = max(
-            candidate.bounds.x + candidate.bounds.width,
-            envelope.x + envelope.width,
-        )
-        bottom = max(
-            candidate.bounds.y + candidate.bounds.height,
-            envelope.y + envelope.height,
-        )
-        merged[index] = PersonCandidate(
-            NormalizedRect(left, top, right - left, bottom - top).clamped(),
+        right = max(candidate.bounds.x + candidate.bounds.width,
+                    envelope.x + envelope.width)
+        bottom = max(candidate.bounds.y + candidate.bounds.height,
+                     envelope.y + envelope.height)
+        merged.append(PersonCandidate(
+            NormalizedRect(left, top, right-left, bottom-top).clamped(),
             candidate.confidence,
-        )
+        ))
+    merged.extend(PersonCandidate(envelope, 0.50)
+                  for index, envelope in enumerate(envelopes)
+                  if index not in used_poses)
     return sorted(merged, key=lambda item: (item.bounds.x, item.bounds.y))

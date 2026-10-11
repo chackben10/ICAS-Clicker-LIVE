@@ -211,6 +211,8 @@ def _automation_payload(snapshot) -> dict:
         "lastCommandMonotonic": snapshot.last_command_monotonic,
         "lastError": snapshot.last_error,
         "trackingSource": snapshot.tracking_source,
+        "lockedSubjectCount": snapshot.locked_subject_count,
+        "matchedSubjectCount": snapshot.matched_subject_count,
         "actualPose": _pose_payload(snapshot.actual_pose),
         "commandedPose": _pose_payload(snapshot.commanded_pose),
         "decision": None

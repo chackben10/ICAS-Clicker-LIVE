@@ -91,3 +91,20 @@ Preflight captures a current Audience NDI frame and verifies usable light,
 visible detail, and a lock against the approved calibration reference before
 any application is stopped or production state is captured. A dark or changed
 room fails safely before mutation rather than skipping camera coverage.
+
+## Stage-specific tracking acceptance
+
+The [ICAS stage suite](fixtures/tracking/stage/README.md) adds checksummed video
+excerpts and independent one-, two-, and three-subject labels, normal/accelerated
+video replays, and closed-loop pursuit scenarios with separate video/motor delay,
+dropouts and oversized detections. Its installed-release backend exercises only
+solo tracking and never launches the app or controls hardware.
+
+Run `testing/run_stage_tracking.py --backend installed --counts 1 --lane all
+--report testing/benchmarks/outputs/stage-corpus/installed.json` in the configured
+test environment for production's solo acceptance report. Use `--backend source`
+with `--counts 1,2,3` for the worktree's Dev implementation. See the linked guide
+for media setup, dependencies and model limitations. Behavioral failures exit 1;
+missing prerequisites exit 2. These gates are separate from `fast`, whose green
+result validates harness mechanics but does not mean tracking passes stage
+acceptance. Physical staging checks remain required before a tracking release.

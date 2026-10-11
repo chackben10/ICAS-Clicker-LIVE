@@ -101,6 +101,7 @@ class TrackingSnapshot:
     suppressed_candidates: int = 0
     active_region_names: tuple[str, ...] = ()
     last_analysis_monotonic: float = 0.0
+    frame_captured_monotonic: float = 0.0
     last_error: str = ""
 
     @property

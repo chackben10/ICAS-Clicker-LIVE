@@ -78,6 +78,12 @@ Run it with:
 python3 Production_Hub_App/main.py
 ```
 
+Or double-click `Launch Production Hub Dev.command` in the repository root.
+It opens Terminal and runs the same source entry point. Keep that Terminal
+window open while using Dev. Opening the generated `.build/dev/Production Hub
+Dev.app` directly only launches its Python runtime without the source entry
+point, so use the command file instead.
+
 On macOS that relaunches the GUI through `.build/dev/Production Hub Dev.app`, a
 small stable wrapper that loads the **live source tree** while supplying its own
 bundle identity (`org.icas.productionhub.dev`). Source edits change what it
@@ -93,8 +99,8 @@ Why it exists, and why it is kept:
   release its Camera access.
 - **No rebuild between edits.** It loads source directly, so the
   edit-run-observe loop costs seconds rather than a full PyInstaller build.
-- **The two can run side by side**, though not on the same API port — stop one
-  before starting the other, or pass `--port` to the staging instance.
+- **Close the installed desktop app before opening Dev.** The desktop apps
+  share a single-instance lock; changing the API port does not bypass it.
 
 Do **not** rebuild and reinstall `Production Hub.app` to try a change. That is
 what the staging app is for. Promote to the installed release only when the

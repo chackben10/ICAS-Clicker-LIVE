@@ -240,7 +240,8 @@ class PersonTrackingService:
                     )
                     self._set_waiting_if_needed(source, fresh)
                     continue
-                self._analyze(source, packet.sequence, packet.image, detector)
+                self._analyze(source, packet.sequence, packet.image, detector,
+                              captured_monotonic=packet.captured_monotonic)
                 analyzed = True
                 break
             if not analyzed:
@@ -252,6 +253,8 @@ class PersonTrackingService:
         sequence: int,
         image: QImage,
         detector: PersonDetector,
+        *,
+        captured_monotonic: float | None = None,
     ) -> None:
         started = time.monotonic()
         with self._lock:
@@ -303,6 +306,7 @@ class PersonTrackingService:
             snapshot.raw_candidates = len(detected)
             snapshot.suppressed_candidates = len(detected) - len(candidates)
             snapshot.active_region_names = tuple(region.name for region in active_regions)
+            snapshot.frame_captured_monotonic = captured_monotonic if captured_monotonic is not None else started
             snapshot.last_analysis_monotonic = completed
             snapshot.last_error = ""
             self._last_sequences[source] = sequence

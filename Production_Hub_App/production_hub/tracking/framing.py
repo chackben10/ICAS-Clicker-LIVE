@@ -22,6 +22,12 @@ from production_hub.tracking.ptz_geometry import (
 )
 
 
+# Locked people the PTZ is not currently observing. They still belong in the
+# composition: one is off the edge with a known wide-camera position, the other
+# was in shot a moment ago and was missed by the detector.
+_UNOBSERVED_SOURCES = frozenset({"audience", "hold"})
+
+
 class FramingState(StrEnum):
     OFF = "off"
     WAITING = "waiting"
@@ -39,6 +45,17 @@ class FramingDecision:
     target_confidence: float = 0.0
     desired_pose: PtzMotorPose | None = None
     podium_framing: bool = False
+    two_person_portrait: bool = False
+    # Union of the locked people in PTZ image space, including any projected
+    # from the wide camera because they are off the edge. The velocity
+    # controller steers on this; it is deliberately unpadded, because padding
+    # would bias the image error the controller measures.
+    live_subject_bounds: NormalizedRect | None = None
+    subjects_outside_frame: int = 0
+    # True while the shot is too tight to contain everyone locked. Chasing the
+    # aim point across the group before the field of view can hold it pushes
+    # the people already in shot out of the other side of the frame.
+    widen_before_recentering: bool = False
 
 
 class FramingEngine:
@@ -57,6 +74,7 @@ class FramingEngine:
         click_target: tuple[float, float] | None = None,
         subject_targets_locked: bool = False,
         locked_reference_targets: Sequence[SubjectReferenceTarget] | None = None,
+        two_person_portrait_enabled: bool = False,
     ) -> FramingDecision:
         mode = config.mode
         if mode == "off":
@@ -92,10 +110,26 @@ class FramingEngine:
             # frame. This makes the operator workflow a simple move-then-toggle
             # action and avoids a second subject-selection UI.
             if current_pose is not None:
-                ptz_selected = self._stable_ptz_subjects(
-                    ptz,
-                    config.minimum_subject_age_frames,
+                # `minimum_subject_age_frames` guards subject *selection*
+                # against a flickering false positive. Once the supervisor's
+                # cross-camera lock owns the identity, the snapshot holds only
+                # matched locks and re-imposing the detector's age would throw
+                # away a valid observation -- which is exactly what dropped a
+                # group member for the frame after a missed detection.
+                #
+                # Single-subject tracking deliberately keeps the original gate:
+                # its dropout-and-return path is separately tuned, and the same
+                # relaxation there is worth evaluating on its own.
+                stable_age = (
+                    1
+                    if (
+                        subject_targets_locked
+                        and locked_reference_targets is not None
+                        and len(locked_reference_targets) > 1
+                    )
+                    else config.minimum_subject_age_frames
                 )
+                ptz_selected = self._stable_ptz_subjects(ptz, stable_age)
                 selected = self._project_ptz_subjects(
                     ptz_selected,
                     geometry,
@@ -126,7 +160,7 @@ class FramingEngine:
                         )
                         for item in locked_reference_targets
                         if str(item.lock_id) not in ptz_lock_ids
-                        and item.source == "audience"
+                        and item.source in _UNOBSERVED_SOURCES
                     )
             elif not selected:
                 allowed = {"stage", "front_stage", "altar", "podium"}
@@ -223,17 +257,54 @@ class FramingEngine:
                 for region in usable_regions
             )
         )
+        outside_frame: list[tuple[str, NormalizedRect, float]] = []
+        if (
+            mode == "subject"
+            and subject_targets_locked
+            and locked_reference_targets is not None
+            and current_pose is not None
+            and ptz_selected
+        ):
+            # A locked person the PTZ cannot see is not a lost subject while
+            # the rest of the group is still in shot -- they are a framing
+            # problem. Project them back into image space so the composition
+            # can see how far outside they are and widen to include them.
+            ptz_lock_ids = {_logical_subject_id(item[0]) for item in ptz_selected}
+            for item in locked_reference_targets:
+                if (
+                    item.source not in _UNOBSERVED_SOURCES
+                    or str(item.lock_id) in ptz_lock_ids
+                ):
+                    continue
+                try:
+                    projected = geometry.reference_rect_to_ptz_image(
+                        item.bounds,
+                        current_pose,
+                    )
+                except ValueError:
+                    continue
+                outside_frame.append(
+                    (f"locked:{item.lock_id}", projected, item.confidence)
+                )
+        composed = list(ptz_selected) + outside_frame
         if (
             mode == "subject"
             and config.adaptive_subject_framing_enabled
             and ptz_selected
-            and len(ptz_selected) == len(selected)
+            and len(composed) == len(selected)
             and current_pose is not None
         ):
-            target, desired_height = _adaptive_ptz_composition(
+            portrait = two_person_portrait_enabled and len(composed) == 2
+            composition_bounds = [
+                _portrait_subject_bounds(item[1]) if portrait else item[1]
+                for item in composed
+            ]
+            target, desired_height, desired_width = _adaptive_ptz_composition(
                 config,
-                [item[1] for item in ptz_selected],
+                composition_bounds,
                 podium=podium,
+                allow_outside_frame=bool(outside_frame),
+                two_person_portrait=portrait,
             )
             try:
                 reference_target = geometry.ptz_rect_to_reference(
@@ -245,22 +316,23 @@ class FramingEngine:
                     FramingState.BLOCKED,
                     mode,
                     str(exc),
-                    target_ids=tuple(item[0] for item in ptz_selected),
-                    target_confidence=min(item[2] for item in ptz_selected),
+                    target_ids=tuple(item[0] for item in composed),
+                    target_confidence=min(item[2] for item in composed),
                     podium_framing=podium,
                 )
             decision = self._pose_decision(
                 config,
                 geometry,
                 reference_target,
-                tuple(item[0] for item in ptz_selected),
-                min(item[2] for item in ptz_selected),
+                tuple(item[0] for item in composed),
+                min(item[2] for item in composed),
                 podium=podium,
                 desired_frame_height=desired_height,
+                desired_frame_width=desired_width,
             )
             if decision.desired_pose is None:
                 return decision
-            live_subject_bounds = [item[1] for item in ptz_selected]
+            live_subject_bounds = [item[1] for item in composed]
             if len(live_subject_bounds) == 1 and not podium:
                 # The old upper-body expansion had an unintended equilibrium:
                 # once an off-lectern person reached roughly 55% image height,
@@ -273,18 +345,36 @@ class FramingEngine:
                     config.subject_safety_padding_y,
                 )
                 optical_height = config.off_podium_subject_frame_height
+                # The width term is a ceiling, not a target: it can only widen
+                # the shot. Without it a wider-than-tall posture (arms spread,
+                # a wide gesture, leaning across a lectern) reads as too small,
+                # tightens until it touches the frame edge, is pushed back by
+                # the edge rule, and tightens again -- a permanent zoom hunt.
+                # Podium framing deliberately still uses the older formula; a
+                # wide gesture at the lectern has the same problem and is worth
+                # revisiting separately against its own tuned composition.
                 relative_footprint = max(
                     optical_target.height / max(0.10, optical_height),
                     optical_target.width
-                    / max(0.10, optical_height * 16.0 / 9.0),
+                    / max(0.10, config.subject_maximum_width_occupancy),
+                )
+            elif desired_width is not None:
+                relative_footprint = max(
+                    target.height / max(0.10, desired_height),
+                    target.width / max(0.10, desired_width),
                 )
             else:
                 relative_footprint = max(
                     target.height / max(0.10, desired_height),
                     target.width / max(0.10, desired_height * 16.0 / 9.0),
                 )
+            # Only rectangles the PTZ actually observed can report an edge
+            # touch. A lock projected from the wide camera is outside the frame
+            # by construction, and would otherwise pin the widen factor on for
+            # as long as it stayed away.
             touches_edge = any(
-                _touches_ptz_edge(bounds) for bounds in live_subject_bounds
+                _touches_ptz_edge(_portrait_subject_bounds(bounds) if portrait else bounds)
+                for _identifier, bounds, _confidence in ptz_selected
             )
             if touches_edge:
                 # A detector rectangle touching any image edge is incomplete.
@@ -304,6 +394,16 @@ class FramingEngine:
                 current_pose.zoom,
                 relative_footprint,
             )
+            # Widen before recentering. Pan is roughly three times faster than
+            # zoom on this camera, so aiming at a group envelope the frame
+            # cannot yet hold walks the far side of the group out of shot long
+            # before the widening catches up. Once the view can contain them --
+            # or the lens has no wide left to give -- normal centering resumes.
+            widen_first = bool(
+                outside_frame
+                and relative_footprint > 1.10
+                and relative_zoom < current_pose.zoom
+            )
             target_center_x, target_center_y = target.center
             # The composition helper deliberately snaps an acceptable live
             # subject to image center. Make that hold decision authoritative:
@@ -319,6 +419,14 @@ class FramingEngine:
                     tilt=(current_pose.tilt if hold_tilt else decision.desired_pose.tilt),
                     zoom=relative_zoom,
                 ),
+                live_subject_bounds=(
+                    _unclamped_union(composition_bounds if portrait else live_subject_bounds)
+                    if outside_frame
+                    else _union(composition_bounds if portrait else live_subject_bounds)
+                ),
+                two_person_portrait=portrait,
+                subjects_outside_frame=len(outside_frame),
+                widen_before_recentering=widen_first,
             )
         prepared = [
             bounds if podium else _expand_upper_body_to_stage_frame(bounds)
@@ -341,6 +449,11 @@ class FramingEngine:
             min(item[2] for item in selected),
             podium=podium,
             desired_frame_height=desired_height,
+            desired_frame_width=(
+                None
+                if podium or len(selected) == 1
+                else config.group_maximum_width_occupancy
+            ),
         )
 
     @staticmethod
@@ -417,6 +530,7 @@ class FramingEngine:
         *,
         podium: bool,
         desired_frame_height: float | None = None,
+        desired_frame_width: float | None = None,
     ) -> FramingDecision:
         try:
             pose = geometry.pose_for_target(
@@ -426,6 +540,7 @@ class FramingEngine:
                     if desired_frame_height is not None
                     else config.single_subject_frame_height
                 ),
+                desired_frame_width=desired_frame_width,
             )
         except ValueError as exc:
             return FramingDecision(
@@ -487,12 +602,22 @@ def _expand_upper_body_to_stage_frame(bounds: NormalizedRect) -> NormalizedRect:
     return NormalizedRect(center_x - width / 2.0, top, width, bottom - top).clamped()
 
 
+def _portrait_subject_bounds(bounds: NormalizedRect) -> NormalizedRect:
+    # Estimate head-to-waist height from body width, in normalized 16:9
+    # coordinates. Using a fraction of observed height would shrink again
+    # whenever the legs leave the shot, causing an endless zoom-in loop.
+    # Short torso detections are already portrait-sized; never extend them.
+    return NormalizedRect(bounds.x, bounds.y, bounds.width, min(bounds.height, bounds.width * 1.9))
+
+
 def _adaptive_ptz_composition(
     config: PtzAutomationConfig,
     subjects: Sequence[NormalizedRect],
     *,
     podium: bool,
-) -> tuple[NormalizedRect, float]:
+    allow_outside_frame: bool = False,
+    two_person_portrait: bool = False,
+) -> tuple[NormalizedRect, float, float | None]:
     """Compose PTZ observations while preserving an already-good manual zoom.
 
     The operator establishes the shot before enabling tracking. Within a
@@ -506,9 +631,17 @@ def _adaptive_ptz_composition(
     prepared = list(subjects)
     if len(prepared) == 1 and not podium:
         prepared[0] = _expand_upper_body_to_stage_frame(prepared[0])
-    content = _union(prepared)
-    raised_gesture_at_top = content.y <= 0.015
-    target = _pad(
+    # Clamping here would throw away the only measurement that matters when a
+    # locked person is off the edge: how far off they are. Every other caller
+    # keeps the historical in-frame clamp.
+    content = (
+        _unclamped_union(prepared) if allow_outside_frame else _union(prepared)
+    )
+    # The single-person raised-hand crop must never replace a group's
+    # envelope: doing so clips away an offscreen member's horizontal extent
+    # and makes a too-tight shot look as though it already contains everyone.
+    raised_gesture_at_top = len(subjects) == 1 and content.y <= 0.015
+    target = (_unclamped_pad if allow_outside_frame else _pad)(
         content,
         config.subject_safety_padding_x,
         config.subject_safety_padding_y,
@@ -524,21 +657,48 @@ def _adaptive_ptz_composition(
         else config.subject_center_deadband_x,
         config.subject_center_deadband_y,
         preserve_vertical=raised_gesture_at_top,
-    )
-    effective_occupancy = max(
-        target.height,
-        target.width / (16.0 / 9.0),
+        allow_outside_frame=allow_outside_frame,
     )
     if len(subjects) > 1:
-        minimum = config.group_minimum_occupancy
         maximum = config.group_maximum_occupancy
+        # After separating, the group must tighten back to its configured
+        # framing size. The old lower occupancy limit accepted a loose recovery
+        # shot indefinitely even after the horizontal envelope shrank.
+        minimum = max(
+            config.group_minimum_occupancy,
+            min(maximum, config.group_frame_height),
+        )
+        # A row of people runs out of frame sideways long before it runs out
+        # vertically, so the group envelope carries a real horizontal budget
+        # instead of folding width into the height figure. Both axes are
+        # normalized to the unit square: a target 0.9 wide occupies 90% of the
+        # frame width, with no aspect conversion to do.
+        desired_width: float | None = max(
+            config.group_minimum_width_occupancy,
+            min(config.group_maximum_width_occupancy, target.width),
+        )
+        effective_occupancy = target.height
+        if two_person_portrait:
+            # Width is a ceiling, not a reason to hold a loose shot forever.
+            # Separated people remain width-limited; when they regroup the
+            # upper-body envelope can tighten to the podium-style height.
+            desired_width = config.group_maximum_width_occupancy
+            minimum = min(maximum, config.podium_subject_frame_height)
     else:
         minimum = config.subject_minimum_occupancy
         maximum = config.subject_maximum_occupancy
+        desired_width = None
+        # A lone body is bounded by its height in every posture the tuning was
+        # built on, so the vertical figure keeps the historical formula. The
+        # horizontal limit for one subject is a ceiling applied in the optical
+        # branch of `decide` instead, because it exists only to stop the shot
+        # tightening onto someone whose arms already fill the frame -- it must
+        # never make a height-bounded shot tighter.
+        effective_occupancy = max(target.height, target.width / (16.0 / 9.0))
     if raised_gesture_at_top:
         maximum = min(maximum, config.raised_gesture_maximum_occupancy)
     desired_height = max(minimum, min(maximum, effective_occupancy))
-    return target, desired_height
+    return target, desired_height, desired_width
 
 
 def _apply_center_deadband(
@@ -547,17 +707,52 @@ def _apply_center_deadband(
     vertical: float,
     *,
     preserve_vertical: bool,
+    allow_outside_frame: bool = False,
 ) -> NormalizedRect:
     center_x, center_y = bounds.center
     if abs(center_x - 0.5) <= horizontal:
         center_x = 0.5
     if not preserve_vertical and abs(center_y - 0.5) <= vertical:
         center_y = 0.5
+    if allow_outside_frame:
+        # An envelope larger than the frame cannot be nudged inside it, and
+        # forcing it there would put the aim point on the frame edge instead
+        # of on the group.
+        return NormalizedRect(
+            center_x - bounds.width / 2.0,
+            center_y - bounds.height / 2.0,
+            bounds.width,
+            bounds.height,
+        )
     width = min(1.0, bounds.width)
     height = min(1.0, bounds.height)
     left = max(0.0, min(1.0 - width, center_x - width / 2.0))
     top = max(0.0, min(1.0 - height, center_y - height / 2.0))
     return NormalizedRect(left, top, width, height)
+
+
+def _unclamped_union(rectangles: Iterable[NormalizedRect]) -> NormalizedRect:
+    values = tuple(rectangles)
+    if not values:
+        return NormalizedRect(0, 0, 0, 0)
+    left = min(item.x for item in values)
+    top = min(item.y for item in values)
+    right = max(item.x + item.width for item in values)
+    bottom = max(item.y + item.height for item in values)
+    return NormalizedRect(left, top, right - left, bottom - top)
+
+
+def _unclamped_pad(
+    bounds: NormalizedRect,
+    padding_x: float,
+    padding_y: float,
+) -> NormalizedRect:
+    return NormalizedRect(
+        bounds.x - padding_x / 2.0,
+        bounds.y - padding_y / 2.0,
+        bounds.width + padding_x,
+        bounds.height + padding_y,
+    )
 
 
 def _union(rectangles: Iterable[NormalizedRect]) -> NormalizedRect:

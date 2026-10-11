@@ -1,0 +1,1799 @@
+{
+  "schema": 1,
+  "channel": "https://www.youtube.com/@icaseattlevideos",
+  "window": {
+    "from": "2026-03-20",
+    "through": "2026-09-20"
+  },
+  "annotation_method": "Agent visual inspection of decoded frames, independent of detector output. Approximate visible-body envelopes and head anchors; not pixel-perfect masks. Identities are anonymous and clip-local. Only annotated instants have ground truth.",
+  "thresholds": {
+    "minimum_recall": 0.95,
+    "maximum_merged_boxes": 0,
+    "maximum_identity_switches": 0,
+    "minimum_iou": 0.12,
+    "head_margin": 0.025,
+    "maximum_width_ratio": 2.0
+  },
+  "clips": [
+    {
+      "id": "march-single",
+      "video_id": "Imk30InrO14",
+      "url": "https://www.youtube.com/watch?v=Imk30InrO14",
+      "title": "ICAS Sunday Service & Youth Meeting 03/22/2026",
+      "published": "20260322",
+      "start_seconds": 440,
+      "duration_seconds": 20,
+      "media_sha256": "e716f65df4e52b6c4618e7300062ec7152d206232a98728d90e2c6dbfe74d101",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/march-single-0.jpg",
+          "sha256": "74e22cc84bd4b09ad96fe56003e717ae3c067a729ad3aa053e25fe51886076a4",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/march-single-4.jpg",
+          "sha256": "02c71493c8021bf654c6e637a91417bfa0d0bb6e7d1158f6df4f37170305888e",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/march-single-8.jpg",
+          "sha256": "07943ccf983d51dcf309d4a52c3e4717880c1e647e1820d079425e3536c82790",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/march-single-12.jpg",
+          "sha256": "5f1dd712d8787e7cd5ff22caca33163d10f0a7eb7a9cad8f23c6d4b92fd6534e",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/march-single-16.jpg",
+          "sha256": "cca0ce3570a6cc072d416f11de9d32b2bc5d62ce640b276d6d6cb7a2067f77c5",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        },
+        {
+          "t": 19,
+          "image": "frames/march-single-19.jpg",
+          "sha256": "d212b710dd637e61c9b78f2374ffe23cb7e7afa175dcb02d627f40b7d6cdce06",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.18,
+                0.1,
+                0.57,
+                0.89
+              ],
+              "head": [
+                0.39,
+                0.1,
+                0.22,
+                0.41
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 1,
+      "tags": [
+        "solo",
+        "lectern",
+        "small-movement"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "march-triple",
+      "video_id": "Imk30InrO14",
+      "url": "https://www.youtube.com/watch?v=Imk30InrO14",
+      "title": "ICAS Sunday Service & Youth Meeting 03/22/2026",
+      "published": "20260322",
+      "start_seconds": 800,
+      "duration_seconds": 20,
+      "media_sha256": "088abebf164632f99b61a941365b4eb6bf9cfeff2dd09f06720fdd1a56ad0ba1",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/march-triple-0.jpg",
+          "sha256": "80008ee54f36a90d907eaac0b9365104aac3c091c4107bf33b22ec0247924747",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.39
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.48
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/march-triple-4.jpg",
+          "sha256": "5c34b7a5bd3e4d52d19f21812dae5b45655c51b2b8490e6de5ef0be20e7261fa",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.39
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.48
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/march-triple-8.jpg",
+          "sha256": "095c4ab298d6ba5c1af1d2c58366a626e371048b34f35fae2a368eb3053fdbd1",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.39
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.48
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/march-triple-12.jpg",
+          "sha256": "60e8dcadb9a51d21524d30aee74936d5873877cb51e960f9c0d8b6bae2f95b3a",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.44
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.53
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/march-triple-16.jpg",
+          "sha256": "4006ad15eb70cdc95713d7bab5f73dc58e29d33ac13f747af98bb7e2521da6d6",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.44
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.53
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        },
+        {
+          "t": 19,
+          "image": "frames/march-triple-19.jpg",
+          "sha256": "39c5809ff5e3ab40d6f012aa86f924ec23b02a3f26cf23f882e1074be1878190",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.18,
+                0.14,
+                0.13,
+                0.44
+              ],
+              "head": [
+                0.22,
+                0.15,
+                0.06,
+                0.16
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.28,
+                0.13,
+                0.16,
+                0.53
+              ],
+              "head": [
+                0.32,
+                0.14,
+                0.06,
+                0.17
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.51,
+                0.14,
+                0.18,
+                0.85
+              ],
+              "head": [
+                0.57,
+                0.14,
+                0.06,
+                0.16
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 3,
+      "tags": [
+        "triple",
+        "music-stands",
+        "background-musician",
+        "overlap"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "june-dual",
+      "video_id": "ZnWoQFmCkVc",
+      "url": "https://www.youtube.com/watch?v=ZnWoQFmCkVc",
+      "title": "SURRENDER to God's PLAN! |  PR. JOY M. THOMAS Malayalam & English Sermon",
+      "published": "20260607",
+      "start_seconds": 1065,
+      "duration_seconds": 20,
+      "media_sha256": "69407c7daa88b3b060b0f622373fd1b382a669fc291bda6bd8ed76935a860311",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/june-dual-0.jpg",
+          "sha256": "35fa0b408a81c3ff4ac2df9c04b63d3b49699da6c411cc6871711b1cf1459bf6",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/june-dual-4.jpg",
+          "sha256": "40394b39f65ea88290f5f571f4b9c19a3bf8565e63f722c7325ac84ee2a9fc30",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/june-dual-8.jpg",
+          "sha256": "90a7ff02e2aecdebf0adad3b8110966ad003850901ff659922d319a4e71f5ecb",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/june-dual-12.jpg",
+          "sha256": "0db3834375af7d9b3ad36cce4a17bf4c5bd92e5617e63b967f4cc31558447b92",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/june-dual-16.jpg",
+          "sha256": "76700dcc65c09b4b7cceec72edb995ae2e06b3644333b79a84801518b3b285a8",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        },
+        {
+          "t": 19,
+          "image": "frames/june-dual-19.jpg",
+          "sha256": "271377a1b36bfacc9bda409467f79d5bcb16021a0a0b761e6f19f05eeb8fe434",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.04,
+                0.29,
+                0.63
+              ],
+              "head": [
+                0.33,
+                0.04,
+                0.11,
+                0.22
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.62,
+                0.09,
+                0.28,
+                0.9
+              ],
+              "head": [
+                0.71,
+                0.1,
+                0.12,
+                0.21
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 2,
+      "tags": [
+        "dual",
+        "lectern",
+        "gestures"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "august-dual-walk",
+      "video_id": "ORtkVnGtEyg",
+      "url": "https://www.youtube.com/watch?v=ORtkVnGtEyg",
+      "title": "GOD is with YOU! | PR. CT ABRAHAM ICAS Malayalam & English Sermon 08/30/26",
+      "published": "20260831",
+      "start_seconds": 1405,
+      "duration_seconds": 30,
+      "media_sha256": "d58acb2a6e2439318360701d485ecee79b5b4a277824c7aabbceb8c188029184",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/august-dual-walk-0.jpg",
+          "sha256": "c102750ef1549b7b4d899142110b1b2630339dcc8bca6b5137126f0ef8f303e2",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.13,
+                0.18,
+                0.24,
+                0.57
+              ],
+              "head": [
+                0.197,
+                0.18,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/august-dual-walk-4.jpg",
+          "sha256": "195af84515ce343e3427e10be1c4cc65b72d6c835179c5c08cfcd8148b841237",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.319,
+                0.18,
+                0.24,
+                0.47
+              ],
+              "head": [
+                0.386,
+                0.18,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/august-dual-walk-8.jpg",
+          "sha256": "fd8af425b7a8e050708828628b85f91c80ba4366a42d218b29c81c1f67728ac8",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.265,
+                0.18,
+                0.24,
+                0.47
+              ],
+              "head": [
+                0.332,
+                0.18,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/august-dual-walk-12.jpg",
+          "sha256": "63cc4ebccceff43c46144f77796b90e4f07e32ba94a91c8dda4b9c58f3b2bf80",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.214,
+                0.19,
+                0.24,
+                0.46
+              ],
+              "head": [
+                0.281,
+                0.19,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/august-dual-walk-16.jpg",
+          "sha256": "5596b34a59a196fe661531e3d63014341f73afb9a651506f1797bd6ba5b0822b",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.24,
+                0.19,
+                0.24,
+                0.46
+              ],
+              "head": [
+                0.307,
+                0.19,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        },
+        {
+          "t": 29,
+          "image": "frames/august-dual-walk-29.jpg",
+          "sha256": "3ec396876e323b04e56c2954fafce893c107a93e69550d3dbf104c254cedef92",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "lectern",
+              "body": [
+                0.242,
+                0.19,
+                0.24,
+                0.46
+              ],
+              "head": [
+                0.309,
+                0.19,
+                0.1,
+                0.21
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.66,
+                0.16,
+                0.25,
+                0.83
+              ],
+              "head": [
+                0.74,
+                0.16,
+                0.1,
+                0.2
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 2,
+      "tags": [
+        "dual",
+        "side-step",
+        "raised-arm",
+        "operator-reframe"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "september-single",
+      "video_id": "bvuQFg7ESPM",
+      "url": "https://www.youtube.com/watch?v=bvuQFg7ESPM",
+      "title": "ICAS Sunday Service 09/13/2026",
+      "published": "20260913",
+      "start_seconds": 5830,
+      "duration_seconds": 30,
+      "media_sha256": "98a866389a5ac9585b6b846486fb1fb0a40e7ec935cab53854c529c238d7215c",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/september-single-0.jpg",
+          "sha256": "20117efa84d3668d612bac7b4a2eda006b41c9071da7b1b8d3d5cb9043a7d203",
+          "shot": "composite",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.215,
+                0.07,
+                0.215,
+                0.51
+              ],
+              "head": [
+                0.3,
+                0.065,
+                0.07,
+                0.165
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/september-single-4.jpg",
+          "sha256": "680c219cc1cf0290b2c517a3daebf37134d69e93d56f978dfd3a25f7371e7349",
+          "shot": "composite",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.215,
+                0.07,
+                0.215,
+                0.51
+              ],
+              "head": [
+                0.3,
+                0.065,
+                0.07,
+                0.165
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/september-single-8.jpg",
+          "sha256": "88bc3de9c8534833fd237269c49655e7de101243b597d97eff6e0b49446a54f2",
+          "shot": "composite",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.215,
+                0.07,
+                0.215,
+                0.51
+              ],
+              "head": [
+                0.3,
+                0.065,
+                0.07,
+                0.165
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/september-single-12.jpg",
+          "sha256": "4ce82db744dd9b4052c37534d32fdf1f5bbd85ef23cd4f038b21269950dfadc7",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.368,
+                0.11,
+                0.36,
+                0.88
+              ],
+              "head": [
+                0.5,
+                0.11,
+                0.143,
+                0.3
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/september-single-16.jpg",
+          "sha256": "cdb631329ae2d206368b555637d23e8841f86ebce3d79c3ce8eb9ea37b13917e",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.389,
+                0.11,
+                0.36,
+                0.88
+              ],
+              "head": [
+                0.521,
+                0.11,
+                0.143,
+                0.3
+              ]
+            }
+          ]
+        },
+        {
+          "t": 29,
+          "image": "frames/september-single-29.jpg",
+          "sha256": "9872711a0a33c08c4c7a08e5dc67615b7f90dacc2e5df61eed6b840a68b3b4d0",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "speaker",
+              "body": [
+                0.218,
+                0.11,
+                0.36,
+                0.88
+              ],
+              "head": [
+                0.35,
+                0.11,
+                0.143,
+                0.3
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 1,
+      "tags": [
+        "solo",
+        "walk",
+        "broadcast-cut",
+        "picture-in-picture"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "july-overlap",
+      "video_id": "SmaUPOqVrVw",
+      "url": "https://www.youtube.com/watch?v=SmaUPOqVrVw",
+      "title": "ICAS Sunday Service & Youth Meeting 07/26/2026",
+      "published": "20260726",
+      "start_seconds": 345,
+      "duration_seconds": 20,
+      "media_sha256": "34f742379e3025ffbe57df5d9e221275fb86c8b603db14d6ec32b7838a75acc7",
+      "annotations": [
+        {
+          "t": 0,
+          "image": "frames/july-overlap-0.jpg",
+          "sha256": "51aad3155681f5f8d9da4c7f1035d65997c1435ba30e85e74a5eab30aedfd847",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.15,
+                0.1,
+                0.58,
+                0.73
+              ],
+              "head": [
+                0.385,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.26
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.24
+              ]
+            }
+          ]
+        },
+        {
+          "t": 4,
+          "image": "frames/july-overlap-4.jpg",
+          "sha256": "f60010ac9e96156afc8aa154c30778756a9238de9013f7ed25a67dad57b247d0",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.26,
+                0.1,
+                0.47,
+                0.73
+              ],
+              "head": [
+                0.385,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.26
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.24
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/july-overlap-8.jpg",
+          "sha256": "40e5b6de812c38ded858734a214fa0e61b13932cf04530c3f463ce35b1b441a6",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.26,
+                0.1,
+                0.47,
+                0.73
+              ],
+              "head": [
+                0.385,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.26
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.24
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/july-overlap-12.jpg",
+          "sha256": "49fc7736578b2a07ef06427393ffff5d26bb613bc788807024de447d199d36cf",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.26,
+                0.1,
+                0.47,
+                0.73
+              ],
+              "head": [
+                0.38,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.15
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/july-overlap-16.jpg",
+          "sha256": "512365080cd59665017caaf731e5f34464bd6a0a1d91077f1ff172072752897e",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.26,
+                0.1,
+                0.47,
+                0.73
+              ],
+              "head": [
+                0.38,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.15
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 19,
+          "image": "frames/july-overlap-19.jpg",
+          "sha256": "2e4e993443f13fb36de7ec682a8c22e7eb0b04a35d0ea3983092dd098661c031",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "front",
+              "body": [
+                0.26,
+                0.1,
+                0.47,
+                0.73
+              ],
+              "head": [
+                0.38,
+                0.1,
+                0.175,
+                0.29
+              ]
+            },
+            {
+              "id": "back-left",
+              "body": [
+                0.18,
+                0,
+                0.25,
+                0.78
+              ],
+              "head": [
+                0.29,
+                0,
+                0.11,
+                0.15
+              ]
+            },
+            {
+              "id": "back-right",
+              "body": [
+                0.56,
+                0,
+                0.39,
+                0.99
+              ],
+              "head": [
+                0.7,
+                0,
+                0.13,
+                0.13
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 3,
+      "tags": [
+        "triple",
+        "occlusion",
+        "merged-box",
+        "cropped-head"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    },
+    {
+      "id": "may-triple",
+      "video_id": "_kv4L9wop4Y",
+      "url": "https://www.youtube.com/watch?v=_kv4L9wop4Y",
+      "title": "The LIFE of JOSEPH Children\u2019s Skit | ICAS Church Anniversary 2026",
+      "published": "20260517",
+      "start_seconds": 425,
+      "duration_seconds": 25,
+      "media_sha256": "2a29f026db03ea2d50eca470f8383d6f34965a8f62a6a7c8ef0cced18e3baf61",
+      "annotations": [
+        {
+          "t": 4,
+          "image": "frames/may-triple-4.jpg",
+          "sha256": "c1f5a6b5178e73bcc6be037496f0e527c8aa0f4c7a5253a20b320f53f78cd1e1",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.095,
+                0.36,
+                0.16,
+                0.54
+              ],
+              "head": [
+                0.166,
+                0.37,
+                0.06,
+                0.13
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.32,
+                0.45,
+                0.17,
+                0.39
+              ],
+              "head": [
+                0.38,
+                0.46,
+                0.06,
+                0.11
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.7,
+                0.59,
+                0.17,
+                0.35
+              ],
+              "head": [
+                0.78,
+                0.59,
+                0.055,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 8,
+          "image": "frames/may-triple-8.jpg",
+          "sha256": "b8ef89d17fe957d492e9ccba0b9543357fe71a58ce7521ee209a715ce97547cc",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.095,
+                0.47,
+                0.16,
+                0.43
+              ],
+              "head": [
+                0.125,
+                0.48,
+                0.06,
+                0.13
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.32,
+                0.45,
+                0.17,
+                0.39
+              ],
+              "head": [
+                0.38,
+                0.46,
+                0.06,
+                0.11
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.7,
+                0.59,
+                0.17,
+                0.35
+              ],
+              "head": [
+                0.78,
+                0.59,
+                0.055,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 12,
+          "image": "frames/may-triple-12.jpg",
+          "sha256": "2446dbb2bb379590cf1301cd7c784697e1242d37657b6bd8cc079110e34c6dad",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.095,
+                0.47,
+                0.16,
+                0.43
+              ],
+              "head": [
+                0.125,
+                0.48,
+                0.06,
+                0.13
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.32,
+                0.45,
+                0.17,
+                0.39
+              ],
+              "head": [
+                0.38,
+                0.46,
+                0.06,
+                0.11
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.7,
+                0.59,
+                0.17,
+                0.35
+              ],
+              "head": [
+                0.78,
+                0.59,
+                0.055,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 16,
+          "image": "frames/may-triple-16.jpg",
+          "sha256": "22d70f712c67dbaac46b049436b698eed00fd051aa53f75648f83362f006011d",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.095,
+                0.47,
+                0.16,
+                0.43
+              ],
+              "head": [
+                0.125,
+                0.48,
+                0.06,
+                0.13
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.32,
+                0.45,
+                0.17,
+                0.39
+              ],
+              "head": [
+                0.38,
+                0.46,
+                0.06,
+                0.11
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.7,
+                0.59,
+                0.17,
+                0.35
+              ],
+              "head": [
+                0.78,
+                0.59,
+                0.055,
+                0.13
+              ]
+            }
+          ]
+        },
+        {
+          "t": 24,
+          "image": "frames/may-triple-24.jpg",
+          "sha256": "4bf7ef6e6e24037983a3ac9fd1815396c479df7eaff811180554c5539d76d104",
+          "shot": "stage",
+          "subjects": [
+            {
+              "id": "left",
+              "body": [
+                0.095,
+                0.47,
+                0.16,
+                0.43
+              ],
+              "head": [
+                0.19,
+                0.5,
+                0.06,
+                0.13
+              ]
+            },
+            {
+              "id": "middle",
+              "body": [
+                0.32,
+                0.45,
+                0.17,
+                0.39
+              ],
+              "head": [
+                0.38,
+                0.46,
+                0.06,
+                0.11
+              ]
+            },
+            {
+              "id": "right",
+              "body": [
+                0.7,
+                0.59,
+                0.17,
+                0.35
+              ],
+              "head": [
+                0.78,
+                0.59,
+                0.055,
+                0.13
+              ]
+            }
+          ]
+        }
+      ],
+      "target_count": 3,
+      "tags": [
+        "triple",
+        "kneel",
+        "entry",
+        "costume",
+        "low-light",
+        "operator-pan"
+      ],
+      "background_policy": "Unannotated people are distractors, not extra required targets; detections matching them are not penalized in detector recall.",
+      "camera_motion": "Broadcast footage: operator pan/zoom and graphics are not subject motion; no direct world-space inference."
+    }
+  ]
+}

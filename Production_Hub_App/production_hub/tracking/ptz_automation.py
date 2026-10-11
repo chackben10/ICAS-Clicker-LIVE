@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from production_hub.core.config.models import CameraTrackingConfig
+from production_hub.tracking.frame_alignment import PtzFrameAlignment
 from production_hub.tracking.framing import (
     FramingDecision,
     FramingEngine,
@@ -18,6 +19,7 @@ from production_hub.tracking.framing import (
 from production_hub.tracking.models import (
     NormalizedRect,
     SubjectReferenceTarget,
+    TrackedSubject,
     TrackingSnapshot,
 )
 from production_hub.tracking.ptz_geometry import (
@@ -58,9 +60,22 @@ class PtzAutomationSnapshot:
     commands_sent: int = 0
     last_error: str = ""
     tracking_source: str = ""
+    locked_subject_count: int = 0
+    matched_subject_count: int = 0
+    # Where the supervisor believes each locked person is, in calibrated
+    # reference coordinates. Surfaced so an operator can see who the camera is
+    # actually following before it goes to air.
+    locked_targets: tuple[SubjectReferenceTarget, ...] = ()
+    # Actual matched Audience detections, in live image coordinates. The motor
+    # map and its learned parallax offsets are unsuitable for a visual overlay.
+    locked_audience_subjects: tuple[TrackedSubject, ...] = ()
 
     def copy(self) -> PtzAutomationSnapshot:
-        return replace(self)
+        return replace(
+            self,
+            locked_targets=tuple(self.locked_targets),
+            locked_audience_subjects=tuple(self.locked_audience_subjects),
+        )
 
 
 class PtzAutomationService:
@@ -108,10 +123,20 @@ class PtzAutomationService:
         self._last_target_seen = 0.0
         self._last_command = 0.0
         self._last_recommended: PtzMotorPose | None = None
+        self._group_zoom_in_since: float | None = None
         self._subject_lock = SubjectTargetLock(
-            maximum_match_distance=config.automation.subject_lock_maximum_match_distance
+            maximum_match_distance=config.automation.subject_lock_maximum_match_distance,
+            maximum_locked_subjects=config.automation.maximum_locked_subjects,
+            formation_grace_seconds=config.automation.subject_lock_formation_grace_seconds,
+            retire_seconds=config.automation.subject_lock_retire_seconds,
+            hold_seconds=config.automation.subject_lock_hold_seconds,
         )
         self._velocity = SmoothPtzVelocityController()
+        self._frame_alignment = PtzFrameAlignment()
+        # Runtime experiment, enabled by the source Dev launcher only. Never
+        # persist it into the profile shared with the installed application.
+        self.motion_easing_enabled = False
+        self.tracking_refinements_enabled = False
         self._last_velocity_command = PtzVelocityCommand()
         self._last_velocity_sent = 0.0
         self._consecutive_cycle_errors = 0
@@ -178,10 +203,23 @@ class PtzAutomationService:
             self._subject_lock.maximum_match_distance = (
                 config.automation.subject_lock_maximum_match_distance
             )
+            self._subject_lock.maximum_locked_subjects = (
+                config.automation.maximum_locked_subjects
+            )
+            self._subject_lock.formation_grace_seconds = (
+                config.automation.subject_lock_formation_grace_seconds
+            )
+            self._subject_lock.retire_seconds = (
+                config.automation.subject_lock_retire_seconds
+            )
+            self._subject_lock.hold_seconds = (
+                config.automation.subject_lock_hold_seconds
+            )
             if previous_mode != config.automation.mode:
                 self._target_key = ()
                 self._target_since = 0.0
                 self._subject_lock.reset()
+                self._group_zoom_in_since = None
                 self._velocity.reset()
                 self._handoff_motor_pose = None
                 self._handoff_mapped_pose = None
@@ -438,7 +476,9 @@ class PtzAutomationService:
             self._last_command = 0.0
             self._last_recommended = None
             self._subject_lock.reset()
+            self._group_zoom_in_since = None
             self._velocity.reset()
+            self._frame_alignment.reset()
             self._last_velocity_command = PtzVelocityCommand()
             self._last_velocity_sent = 0.0
             self._last_tracking_source = ""
@@ -472,6 +512,7 @@ class PtzAutomationService:
             self._target_since = 0.0
             self._last_recommended = None
             self._subject_lock.reset()
+            self._group_zoom_in_since = None
             self._handoff_motor_pose = None
             self._handoff_mapped_pose = None
             self._reset_handoff_guard()
@@ -642,6 +683,8 @@ class PtzAutomationService:
             return
         audience_snapshot = self.video.tracking.snapshot(VideoSourceKey.AUDIENCE)
         ptz_snapshot = self.video.tracking.snapshot(VideoSourceKey.PTZ)
+        if armed and actual is not None and self.tracking_refinements_enabled:
+            ptz_snapshot = self._frame_alignment.align(ptz_snapshot, geometry, actual, now)
         relocalization = self.video.relocalization.snapshot()
         subject_targets_locked = False
         all_locked_targets_in_ptz = False
@@ -650,6 +693,7 @@ class PtzAutomationService:
         locked_ptz_matches = 0
         locked_audience_matches = 0
         locked_audience_coasts = 0
+        locked_held = 0
         if armed and config.automation.mode == "subject" and actual is not None:
             with self._lock:
                 if (
@@ -674,6 +718,7 @@ class PtzAutomationService:
             locked_ptz_matches = locked.ptz_matches
             locked_audience_matches = locked.audience_matches
             locked_audience_coasts = locked.audience_coasts
+            locked_held = locked.held_locks
             all_locked_targets_in_ptz = bool(
                 locked.initialized and locked.ptz_matches == locked.lock_count
             )
@@ -688,9 +733,11 @@ class PtzAutomationService:
             click_target=click_target,
             subject_targets_locked=subject_targets_locked,
             locked_reference_targets=locked_reference_targets,
+            two_person_portrait_enabled=self.tracking_refinements_enabled,
         )
         handoff_guard_reason = ""
         handoff_bounds = _reference_target_union(locked_reference_targets)
+        mapped_handoff: PtzMotorPose | None = None
         if (
             armed
             and config.automation.mode == "subject"
@@ -700,11 +747,15 @@ class PtzAutomationService:
             try:
                 mapped_handoff = geometry.pose_for_target(
                     handoff_bounds,
-                    desired_frame_height=0.70,
+                    desired_frame_height=config.automation.recovery_frame_height,
+                    desired_frame_width=config.automation.group_maximum_width_occupancy,
                 )
             except ValueError:
                 mapped_handoff = None
-            if all_locked_targets_in_ptz:
+            if locked_ptz_matches > 0:
+                # Any locked person in the PTZ image still gives the guard a
+                # verified direction to remember. For a single subject this is
+                # the same condition as before.
                 self._prepare_handoff_guard(actual)
             if all_locked_targets_in_ptz and mapped_handoff is not None:
                 # Refresh the local wide-camera origin whenever the PTZ has a
@@ -714,7 +765,14 @@ class PtzAutomationService:
                 self._handoff_motor_pose = actual
                 self._handoff_mapped_pose = mapped_handoff
             elif (
-                (locked_audience_matches > 0 or locked_audience_coasts > 0)
+                # Audience handoff is recovery for a PTZ image with nobody
+                # locked in it. While part of the group is still in shot the
+                # camera keeps image-space authority, and routing through the
+                # guard here would replace the composed pose -- zoom included
+                # -- with a motor-space estimate, which is exactly what stopped
+                # the shot widening to hold the people at the edge.
+                locked_ptz_matches == 0
+                and (locked_audience_matches > 0 or locked_audience_coasts > 0)
                 and mapped_handoff is not None
                 and self._handoff_motor_pose is not None
                 and self._handoff_mapped_pose is not None
@@ -741,6 +799,11 @@ class PtzAutomationService:
                     reason=handoff_guard_reason or decision.reason,
                     desired_pose=guarded_pose,
                 )
+        partial_group_visible = bool(
+            locked_ptz_matches > 0
+            and locked_subject_count > locked_ptz_matches
+            and decision.subjects_outside_frame > 0
+        )
         if (
             armed
             and config.automation.mode == "subject"
@@ -748,13 +811,43 @@ class PtzAutomationService:
             and decision.desired_pose is not None
             and not all_locked_targets_in_ptz
         ):
-            # The wide camera is an aiming backup, not an optical composition
-            # source. Hold the operator's zoom until the locked person is back
-            # in the PTZ image, where scale can be measured directly.
-            decision = replace(
-                decision,
-                desired_pose=replace(decision.desired_pose, zoom=actual.zoom),
-            )
+            if partial_group_visible:
+                # Part of the group is still in shot and the rest has a known
+                # position, so the composition measured how far outside they
+                # are. Widening is the one move that recovers them; tightening
+                # on an estimate is still forbidden, so this is bounded to a
+                # single direction. Panasonic zoom counts up toward telephoto.
+                decision = replace(
+                    decision,
+                    desired_pose=replace(
+                        decision.desired_pose,
+                        zoom=min(decision.desired_pose.zoom, actual.zoom),
+                    ),
+                )
+            elif mapped_handoff is not None:
+                # Nobody locked is in the PTZ image, so there is no optical
+                # scale to measure -- but the wide camera still knows roughly
+                # where these people are, and `mapped_handoff` is the
+                # calibrated zoom that frames those positions. Widening toward
+                # it opens the shot by exactly enough to find them again and
+                # not one step further: the bound comes from the Audience
+                # observation, not from a guess, and it does not move as the
+                # camera widens, so the widening stops on its own. Tightening
+                # on an estimate stays forbidden.
+                decision = replace(
+                    decision,
+                    desired_pose=replace(
+                        decision.desired_pose,
+                        zoom=min(mapped_handoff.zoom, actual.zoom),
+                    ),
+                )
+            else:
+                # No wide-camera position for anybody locked. With nothing to
+                # widen toward, hold the operator's zoom.
+                decision = replace(
+                    decision,
+                    desired_pose=replace(decision.desired_pose, zoom=actual.zoom),
+                )
         if armed and config.automation.mode == "subject":
             handoff_searching = bool(
                 handoff_guard_reason and decision.desired_pose is not None
@@ -766,8 +859,12 @@ class PtzAutomationService:
                 if handoff_searching
                 else "ptz"
                 if all_locked_targets_in_ptz
+                else "ptz_group_partial"
+                if partial_group_visible
                 else "audience_handoff"
                 if locked_audience_matches > 0
+                else "ptz_group_hold"
+                if locked_held > 0
                 else "audience_coast"
                 if locked_audience_coasts > 0
                 else "holding"
@@ -792,6 +889,17 @@ class PtzAutomationService:
                 or authority_generation != self._authority_generation
             ):
                 return
+            if armed and locked_subject_count > 1 and actual is not None:
+                if locked_subject_count < self._snapshot.locked_subject_count:
+                    # Retirement already required a sustained absence. Do not
+                    # add another size-stability wait before framing survivors.
+                    self._group_zoom_in_since = now - 2.0
+                if decision.desired_pose is not None:
+                    decision = replace(decision, desired_pose=self._guard_group_zoom_in(
+                        actual, decision.desired_pose, now,
+                    ))
+            else:
+                self._group_zoom_in_since = None
             self._snapshot.decision = decision
             self._snapshot.last_decision_monotonic = now
             self._snapshot.actual_pose = actual
@@ -799,6 +907,10 @@ class PtzAutomationService:
             self._snapshot.last_error = ""
             if armed and config.automation.mode == "subject":
                 self._snapshot.tracking_source = tracking_source
+                self._snapshot.locked_subject_count = locked_subject_count
+                self._snapshot.matched_subject_count = locked.matched_lock_count
+                self._snapshot.locked_targets = tuple(locked_reference_targets or ())
+                self._snapshot.locked_audience_subjects = tuple(audience_snapshot.subjects)
             if not armed:
                 self._snapshot.state = (
                     AutomationState.SHADOW
@@ -845,11 +957,25 @@ class PtzAutomationService:
                     decision.desired_pose,
                     now,
                     live_bounds=(
+                        decision.live_subject_bounds
+                        if all_locked_targets_in_ptz and decision.two_person_portrait
+                        else
                         _subject_union(ptz_snapshot)
                         if all_locked_targets_in_ptz
+                        # Losing one of three is a framing problem, not a lost
+                        # subject: steer on the union that includes the people
+                        # who are off the edge rather than dropping to
+                        # motor-space recovery. While the frame is still too
+                        # tight to hold them all, steer on the people actually
+                        # in shot so widening -- not panning -- does the work.
+                        else _subject_union(ptz_snapshot)
+                        if partial_group_visible and decision.widen_before_recentering
+                        else decision.live_subject_bounds
+                        if partial_group_visible
                         else None
                     ),
                     authority_generation=authority_generation,
+                    group_tracking=locked_subject_count > 1,
                 )
             else:
                 self._send_bounded_command(
@@ -858,6 +984,27 @@ class PtzAutomationService:
                     now,
                     authority_generation=authority_generation,
                 )
+
+    def _guard_group_zoom_in(
+        self, actual: PtzMotorPose, desired: PtzMotorPose, now: float,
+    ) -> PtzMotorPose:
+        """Require a consistently smaller group before narrowing the view.
+
+        Full-body detections briefly becoming torso-only, or two walkers
+        crossing, can collapse the measured envelope for several frames.
+        Wait for two seconds of consistent tightening requests, then follow
+        the live target without repeatedly delaying each motor increment.
+        Widening requests always pass through immediately.
+        """
+
+        if desired.zoom <= actual.zoom + self.config.automation.zoom_deadband_units:
+            self._group_zoom_in_since = None
+            return desired
+        if self._group_zoom_in_since is None:
+            self._group_zoom_in_since = now
+        if now - self._group_zoom_in_since < 2.0:
+            return replace(desired, zoom=actual.zoom)
+        return desired
 
     def _prepare_handoff_guard(self, actual: PtzMotorPose) -> None:
         """Remember the last PTZ-authoritative motion before an edge loss."""
@@ -1091,6 +1238,7 @@ class PtzAutomationService:
         *,
         live_bounds: NormalizedRect | None,
         authority_generation: int,
+        group_tracking: bool = False,
     ) -> None:
         with self._lock:
             if (
@@ -1098,12 +1246,24 @@ class PtzAutomationService:
                 or authority_generation != self._authority_generation
             ):
                 return
+            image_motion_scale = None
+            if self.tracking_refinements_enabled and not group_tracking and self._geometry is not None:
+                try:
+                    pan_span, tilt_span = self._geometry.image_axis_motor_units(actual)
+                    image_motion_scale = (min(1.0, max(.10, pan_span/1600.0)),
+                                          min(1.0, max(.10, tilt_span/900.0)))
+                except (ValueError, AttributeError):
+                    pass
             command = self._velocity.update(
                 actual=actual,
                 desired=desired,
                 config=self.config.automation,
                 now=now,
                 live_bounds=live_bounds,
+                group_tracking=group_tracking,
+                ease_motion=self.motion_easing_enabled,
+                responsive_tracking=self.tracking_refinements_enabled,
+                image_motion_scale=image_motion_scale,
             )
             previous = self._last_velocity_command
             refresh = self.config.automation.continuous_command_refresh_seconds
