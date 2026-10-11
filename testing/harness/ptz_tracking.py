@@ -23,6 +23,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Iterable, Sequence
 
+from production_hub.integrations.panasonic_awp import speed_model
 from production_hub.calibration.relocalization import (
     RelocalizationSnapshot,
     RelocalizationState,
@@ -175,6 +176,16 @@ def build_geometry() -> PtzGeometryModel:
     return PtzGeometryModel(Path("/approved/harness_sweep.json"), "harness", anchors)
 
 
+_GEOMETRY: PtzGeometryModel | None = None
+
+
+def _harness_geometry() -> PtzGeometryModel:
+    global _GEOMETRY
+    if _GEOMETRY is None:
+        _GEOMETRY = build_geometry()
+    return _GEOMETRY
+
+
 def locked_relocalization() -> RelocalizationSnapshot:
     return RelocalizationSnapshot(
         state=RelocalizationState.LOCKED,
@@ -214,6 +225,9 @@ def stage_regions() -> list[CameraSceneRegion]:
 # --- simulated camera -------------------------------------------------------
 
 # Full-scale AW speed (an offset of 49 from neutral) in motor units per second.
+# This linear motor is what the characterization tests (the single-subject
+# golden recording among them) were captured against. Stage simulation opts
+# into the measured AW-HE120 rates instead; see SimulatedPanasonic.
 _PAN_UNITS_PER_SECOND = 2600.0
 _TILT_UNITS_PER_SECOND = 1200.0
 _ZOOM_UNITS_PER_SECOND = 900.0
@@ -237,9 +251,12 @@ class SimulatedPanasonic:
     recording as continued motion rather than as a silent no-op.
     """
 
-    def __init__(self, pose: PtzMotorPose) -> None:
+    def __init__(self, pose: PtzMotorPose, *, measured_rates: bool = False) -> None:
         self.config = SimpleNamespace(enabled=True)
         self._state = _MotorState(pose.pan, pose.tilt, pose.zoom)
+        # The measured model includes the camera's own pan/tilt slowdown as it
+        # zooms in; the linear one runs ~3.5x too fast at sermon zoom.
+        self.measured_rates = measured_rates
         self.pan_tilt_speed_commands: list[tuple[int, int]] = []
         self.zoom_speed_commands: list[int] = []
         self.absolute_commands: list[tuple[int, int, int]] = []
@@ -256,8 +273,18 @@ class SimulatedPanasonic:
         state = self._state
         # An AW speed above 50 drives the absolute pan and tilt coordinates
         # downward; zoom is not inverted. See velocity_controller.update.
-        state.pan -= (state.pan_speed - 50) / 49.0 * _PAN_UNITS_PER_SECOND * seconds
-        state.tilt -= (state.tilt_speed - 50) / 49.0 * _TILT_UNITS_PER_SECOND * seconds
+        pan_offset = state.pan_speed - 50
+        tilt_offset = state.tilt_speed - 50
+        if self.measured_rates:
+            # The harness sweep's frame is narrower (in motor units) than the
+            # real camera's, so reproduce the measured *picture* speed: frames
+            # per second for this command and zoom, in this geometry's units.
+            pan_span, tilt_span = _harness_geometry().image_axis_motor_units(self.pose)
+            state.pan -= speed_model.picture_speed("pan", pan_offset, state.zoom) * pan_span * seconds
+            state.tilt -= speed_model.picture_speed("tilt", tilt_offset, state.zoom) * tilt_span * seconds
+        else:
+            state.pan -= pan_offset / 49.0 * _PAN_UNITS_PER_SECOND * seconds
+            state.tilt -= tilt_offset / 49.0 * _TILT_UNITS_PER_SECOND * seconds
         state.zoom += (state.zoom_speed - 50) / 49.0 * _ZOOM_UNITS_PER_SECOND * seconds
         state.pan = max(0, min(0xFFFF, state.pan))
         state.tilt = max(0, min(0xFFFF, state.tilt))

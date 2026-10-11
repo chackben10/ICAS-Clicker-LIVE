@@ -35,7 +35,9 @@ class StagePerson:
 
 class DelayedPanasonic(SimulatedPanasonic):
     def __init__(self, pose, *, delay=.15, response=.12, motor_scale=1.0):
-        super().__init__(pose)
+        # Stage cases are judged against the real camera's reach, so they use
+        # the measured AW-HE120 pan/tilt rates (zoom slowdown included).
+        super().__init__(pose, measured_rates=True)
         self.elapsed=0.;self.delay=delay;self.response=response;self.motor_scale=motor_scale
         self.pending=[];self.requested=[50.,50.,50.]
     async def pan_tilt(self,pan,tilt):

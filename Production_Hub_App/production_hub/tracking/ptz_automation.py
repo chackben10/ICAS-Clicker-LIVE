@@ -762,7 +762,11 @@ class PtzAutomationService:
                 # trusted live observation. Relative motor deltas cancel the
                 # fixed inverse-map bias that otherwise reverses direction at
                 # the exact moment a subject crosses the PTZ image edge.
-                self._handoff_motor_pose = actual
+                self._handoff_motor_pose = (
+                    _centred_motor_pose(actual, ptz_snapshot, geometry)
+                    if self.tracking_refinements_enabled
+                    else actual
+                )
                 self._handoff_mapped_pose = mapped_handoff
             elif (
                 # Audience handoff is recovery for a PTZ image with nobody
@@ -788,6 +792,10 @@ class PtzAutomationService:
                     relative_pose,
                     actual=actual,
                     now=now,
+                    audience_fresh=bool(
+                        self.tracking_refinements_enabled
+                        and locked_audience_matches > 0
+                    ),
                 )
                 decision = replace(
                     decision,
@@ -834,11 +842,27 @@ class PtzAutomationService:
                 # observation, not from a guess, and it does not move as the
                 # camera widens, so the widening stops on its own. Tightening
                 # on an estimate stays forbidden.
+                recovery_zoom = mapped_handoff.zoom
+                if self.tracking_refinements_enabled and self._handoff_motor_pose is not None:
+                    # The person left a tight shot faster than it could follow.
+                    # Searching at that same tight zoom is what kept the live
+                    # camera blind for 10 s at a time; open to ~1.6x the field
+                    # of view it last saw them in, which also shows the feet
+                    # of someone who stepped down off the platform.
+                    try:
+                        recovery_zoom = min(
+                            recovery_zoom,
+                            geometry.zoom_for_relative_footprint(
+                                self._handoff_motor_pose.zoom, _HANDOFF_WIDENING,
+                            ),
+                        )
+                    except (AttributeError, ValueError):
+                        pass
                 decision = replace(
                     decision,
                     desired_pose=replace(
                         decision.desired_pose,
-                        zoom=min(mapped_handoff.zoom, actual.zoom),
+                        zoom=min(recovery_zoom, actual.zoom),
                     ),
                 )
             else:
@@ -1034,6 +1058,7 @@ class PtzAutomationService:
         *,
         actual: PtzMotorPose,
         now: float,
+        audience_fresh: bool = False,
     ) -> tuple[PtzMotorPose | None, str]:
         """Bound wide-camera recovery and reject unverified reversals.
 
@@ -1051,6 +1076,21 @@ class PtzAutomationService:
             self._handoff_origin_pose = origin
         if self._handoff_started_at <= 0.0:
             self._handoff_started_at = now
+        if audience_fresh:
+            # The wide camera is matching the locked person right now, not
+            # coasting on an old estimate. Follow them -- including when they
+            # turn back or walk further than the first edge search allowed --
+            # and let the safety limits count from the last fresh match. A
+            # stale or coasting estimate still meets every limit below.
+            self._handoff_started_at = now
+            self._handoff_origin_pose = actual
+            pan_direction = _direction(desired.pan - actual.pan, limits.audience_handoff_reversal_deadband_units)
+            tilt_direction = _direction(desired.tilt - actual.tilt, limits.audience_handoff_reversal_deadband_units)
+            if pan_direction:
+                self._handoff_pan_direction = pan_direction
+            if tilt_direction:
+                self._handoff_tilt_direction = tilt_direction
+            return PtzMotorPose(desired.pan, desired.tilt, actual.zoom), ""
         if now - self._handoff_started_at > limits.audience_handoff_max_seconds:
             return None, "Holding camera; Audience handoff reached its safe time limit"
 
@@ -1247,11 +1287,14 @@ class PtzAutomationService:
             ):
                 return
             image_motion_scale = None
-            if self.tracking_refinements_enabled and not group_tracking and self._geometry is not None:
+            frame_spans = None
+            if self.tracking_refinements_enabled and self._geometry is not None:
                 try:
                     pan_span, tilt_span = self._geometry.image_axis_motor_units(actual)
-                    image_motion_scale = (min(1.0, max(.10, pan_span/1600.0)),
-                                          min(1.0, max(.10, tilt_span/900.0)))
+                    frame_spans = (pan_span, tilt_span)
+                    if not group_tracking:
+                        image_motion_scale = (min(1.0, max(.10, pan_span/1600.0)),
+                                              min(1.0, max(.10, tilt_span/900.0)))
                 except (ValueError, AttributeError):
                     pass
             command = self._velocity.update(
@@ -1264,6 +1307,7 @@ class PtzAutomationService:
                 ease_motion=self.motion_easing_enabled,
                 responsive_tracking=self.tracking_refinements_enabled,
                 image_motion_scale=image_motion_scale,
+                frame_spans=frame_spans,
             )
             previous = self._last_velocity_command
             refresh = self.config.automation.continuous_command_refresh_seconds
@@ -1551,6 +1595,40 @@ def _target_is_continuous(
         previous.intersection_over_union(current) >= 0.08
         or previous.center_distance(current) <= 0.12
     )
+
+
+def _centred_motor_pose(
+    actual: PtzMotorPose,
+    ptz_snapshot: TrackingSnapshot,
+    geometry: PtzGeometryModel,
+) -> PtzMotorPose:
+    """The motor pose that would put the locked people at image centre.
+
+    The handoff anchor pairs this pose with the Audience-mapped pose for the
+    same people, and recovery moves by the difference. The live anchor is
+    refreshed until the last frame the PTZ sees them -- typically with them
+    at the very edge -- so using the raw pose biased recovery by up to half a
+    frame, short of a walker in one direction.
+    """
+
+    bounds = _subject_union(ptz_snapshot)
+    if bounds is None:
+        return actual
+    try:
+        pan_span, tilt_span = geometry.image_axis_motor_units(actual)
+    except (AttributeError, ValueError):
+        return actual
+    center_x, center_y = bounds.center
+    # Aiming left raises Panasonic pan; aiming down raises tilt.
+    return PtzMotorPose(
+        round(actual.pan - (center_x - 0.5) * pan_span),
+        round(actual.tilt + (center_y - 0.48) * tilt_span),
+        actual.zoom,
+    )
+
+
+# Field-of-view multiple the PTZ opens to when a locked person leaves the shot.
+_HANDOFF_WIDENING = 1.6
 
 
 def _subject_union(snapshot: TrackingSnapshot) -> NormalizedRect | None:
