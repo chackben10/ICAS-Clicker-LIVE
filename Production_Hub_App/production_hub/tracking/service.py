@@ -22,6 +22,10 @@ from production_hub.video.frame_broker import LatestFrameBroker
 from production_hub.video.models import VideoSourceKey
 
 
+
+# Upper bound for any analysis rate, configured or requested.
+MAXIMUM_ANALYSIS_FPS = 12.0
+
 class PersonDetector(Protocol):
     backend_name: str
 
@@ -77,6 +81,11 @@ class PersonTrackingService:
         self._last_sequences = {source: 0 for source in self.SOURCES}
         self._last_analysis_times = {source: 0.0 for source in self.SOURCES}
         self._rate_times = {source: deque(maxlen=60) for source in self.SOURCES}
+        # Per-source analysis rate requested by PTZ automation (Dev's
+        # variable rate); None keeps the configured analysis_fps.
+        self._rate_overrides: dict[VideoSourceKey, float | None] = {
+            source: None for source in self.SOURCES
+        }
 
     @property
     def running(self) -> bool:
@@ -164,6 +173,19 @@ class PersonTrackingService:
                 self._last_analysis_times[source] = 0.0
                 self._snapshots[source] = TrackingSnapshot(source=source)
 
+    def analysis_rate(self, source: VideoSourceKey) -> float:
+        """Analyses per second for this source right now."""
+
+        override = self._rate_overrides.get(source)
+        rate = self.config.analysis_fps if override is None else override
+        return max(0.5, min(MAXIMUM_ANALYSIS_FPS, float(rate)))
+
+    def set_analysis_rate(self, source: VideoSourceKey, fps: float | None) -> None:
+        """Temporarily analyse a source faster or slower; None restores config."""
+
+        if source in self._rate_overrides:
+            self._rate_overrides[source] = fps
+
     def reconfigure(self, config: CameraTrackingConfig) -> None:
         if self._runtime_signature(self.config) == self._runtime_signature(config):
             with self._lock:
@@ -220,7 +242,6 @@ class PersonTrackingService:
             self._set_all_unavailable(f"Person detector could not start: {exc}")
             return
 
-        interval = 1.0 / self.config.analysis_fps
         while not self._stop_event.is_set():
             if not self.active:
                 self._activity_event.wait(timeout=1.0)
@@ -230,6 +251,7 @@ class PersonTrackingService:
             for source in self.SOURCES:
                 if not self._source_enabled(source):
                     continue
+                interval = 1.0 / self.analysis_rate(source)
                 if now - self._last_analysis_times[source] < interval:
                     continue
                 packet = self.broker.frame(source)
@@ -528,10 +550,13 @@ class PersonTrackingService:
 
     @staticmethod
     def _calculate_rate(times: deque[float]) -> float:
-        if len(times) < 2:
+        # Only the last few seconds: the rate varies, and older entries made
+        # the readout show ~0.9/s for a while after tracking was armed.
+        recent = [stamp for stamp in times if stamp >= times[-1] - 3.0] if times else []
+        if len(recent) < 2:
             return 0.0
-        elapsed = times[-1] - times[0]
-        return (len(times) - 1) / elapsed if elapsed > 0 else 0.0
+        elapsed = recent[-1] - recent[0]
+        return (len(recent) - 1) / elapsed if elapsed > 0 else 0.0
 
 
 def _region_contains(region: CameraSceneRegion, x: float, y: float) -> bool:

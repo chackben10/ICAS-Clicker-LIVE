@@ -38,7 +38,10 @@ def test_brisk_walk_keeps_people_visible_and_stops_afterward(count, axis, rate):
 
 @pytest.mark.parametrize('group', [False, True])
 @pytest.mark.parametrize('direction', [-1, 1])
-def test_edge_pursuit_reaches_higher_speeds_without_changing_zoom(group, direction):
+def test_edge_pursuit_reaches_higher_speeds_and_only_widens(group, direction):
+    # Dev pursuit (picture speed, measured AW model) must out-run the release
+    # path toward a subject at the frame corner, and may only *widen* there:
+    # tightening on someone leaving the shot is what lost them live.
     controllers = [SmoothPtzVelocityController(), SmoothPtzVelocityController()]
     records = []
     for refined, controller in zip([False, True], controllers):
@@ -51,25 +54,26 @@ def test_edge_pursuit_reaches_higher_speeds_without_changing_zoom(group, directi
         records.append(commands)
     old, new = records
     assert max(abs(c.pan-50) for c in new[:4]) > max(abs(c.pan-50) for c in old[:4])
-    assert abs(new[-1].pan-50) == 44
-    assert abs(new[-1].tilt-50) == 32
-    assert [c.zoom for c in old] == [c.zoom for c in new]
+    # Aim follows the subject: right of centre -> pan above 50; low -> tilt below 50.
+    assert all((c.pan-50)*direction > 0 for c in new)
+    assert all((c.tilt-50)*direction < 0 for c in new)
+    assert all(c.zoom <= 50 for c in new) and any(c.zoom < 50 for c in new)
     assert not controllers[1].halt().moving
 
 
-def test_small_corrections_keep_the_existing_gentle_response():
-    records = []
-    for refined in (False, True):
-        controller = SmoothPtzVelocityController()
-        commands = [controller.update(
-            actual=PtzMotorPose(43000,34000,2400), desired=PtzMotorPose(43000,34000,2400),
-            config=PtzAutomationConfig(), now=i*.25,
-            live_bounds=NormalizedRect(x-.06,.20,.12,.56),
-            ease_motion=True, responsive_tracking=refined,
-        ) for i,x in enumerate([.50]*8+[.60]*8+[.50]*12)]
-        records.append(commands)
-    assert records[0] == records[1]
-    assert not records[1][-1].moving
+def test_small_corrections_stay_gentle_and_stop():
+    # A tenth-of-a-frame re-frame is centred at a crawl, not with a lunge,
+    # and a centred, still subject never moves the camera.
+    controller = SmoothPtzVelocityController()
+    commands = [controller.update(
+        actual=PtzMotorPose(43000,34000,2400), desired=PtzMotorPose(43000,34000,2400),
+        config=PtzAutomationConfig(), now=i*.25,
+        live_bounds=NormalizedRect(x-.06,.20,.12,.56),
+        ease_motion=True, responsive_tracking=True,
+    ) for i,x in enumerate([.50]*8+[.60]*8+[.50]*12)]
+    assert all(c.pan == 50 for c in commands[:8])
+    assert all(0 < c.pan-50 <= 22 for c in commands[8:16])
+    assert not commands[-1].moving
 
 
 def pair(separation, suffix=0):
@@ -139,23 +143,31 @@ def test_portrait_projection_preserves_a_missing_person_outside_the_frame():
 
 @pytest.mark.parametrize('group', [False, True])
 @pytest.mark.parametrize('bounds', [True, False])
-def test_recorded_telephoto_range_uses_established_motion_envelope(group, bounds):
-    # The live failure at zoom 3452-3663 repeatedly hit AW pan 6/94 and lost
-    # the person. Both image tracking and Audience recovery must suppress the
-    # additional gain at these focal lengths, including direction reversals.
-    records = []
-    for refined in (False, True):
-        controller = SmoothPtzVelocityController()
-        commands = []
-        for i,x in enumerate([.5]*4+[.8]*4+[.2]*4+[.85]*4+[.5]*20):
-            commands.append(controller.update(
-                actual=PtzMotorPose(43800,33300,3452),
-                desired=PtzMotorPose(43800+round((x-.5)*6000),33300,3452),
-                config=PtzAutomationConfig(),now=i*.25,
-                live_bounds=NormalizedRect(x-.06,.2,.12,.56) if bounds else None,
-                group_tracking=group,ease_motion=True,responsive_tracking=refined,
-            ))
-        records.append(commands)
-    assert records[0] == records[1]
-    assert max(abs(c.pan-50) for c in records[1]) <= 26
-    assert not records[1][-1].moving
+def test_recorded_telephoto_range_stays_within_a_followable_picture_speed(group, bounds):
+    # The live failure at zoom 3452-3663 hit AW pan 6/94 and lost the person;
+    # the release cap of 26 then could not keep up with a walker at all
+    # (~0.23 frames/s there). Dev bounds *picture* speed instead: enough to
+    # follow, never a whip -- including Audience recovery and reversals.
+    from production_hub.integrations.panasonic_awp import speed_model
+    controller = SmoothPtzVelocityController()
+    xs = [.5]*4+[.8]*4+[.2]*4+[.85]*4+[.5]*20
+    commands = []
+    for i,x in enumerate(xs):
+        commands.append(controller.update(
+            actual=PtzMotorPose(43800,33300,3452),
+            desired=PtzMotorPose(43800+round((x-.5)*6000),33300,3452),
+            config=PtzAutomationConfig(),now=i*.25,
+            live_bounds=NormalizedRect(x-.06,.2,.12,.56) if bounds else None,
+            group_tracking=group,ease_motion=True,responsive_tracking=True,
+        ))
+    cap = .60 if not bounds else 1.0
+    assert max(abs(speed_model.picture_speed('pan', c.pan-50, 3452)) for c in commands) <= cap+.02
+    assert all(abs(c.pan-50) < 45 for c in commands)
+    # Each held offset is followed in its own direction once the ramp settles.
+    # Image tracking: subject right -> AW pan above 50. Recovery: target pan
+    # above the current one -> Panasonic pan must rise -> AW pan below 50.
+    for start, x in ((7, .8), (11, .2), (15, .85)):
+        side = 1 if x > .5 else -1
+        expected = side if bounds else -side
+        assert (commands[start].pan-50)*expected > 0
+    assert not commands[-1].moving

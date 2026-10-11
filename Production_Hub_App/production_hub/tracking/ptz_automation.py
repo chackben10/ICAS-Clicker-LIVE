@@ -141,6 +141,9 @@ class PtzAutomationService:
         self._last_velocity_sent = 0.0
         self._consecutive_cycle_errors = 0
         self._last_tracking_source = ""
+        # Dev's variable PTZ analysis rate: fast while anything is moving.
+        self._analysis_rate: float | None = None
+        self._fast_analysis_until = 0.0
         self._handoff_motor_pose: PtzMotorPose | None = None
         self._handoff_mapped_pose: PtzMotorPose | None = None
         self._handoff_origin_pose: PtzMotorPose | None = None
@@ -526,6 +529,7 @@ class PtzAutomationService:
             self._snapshot.message = str(reason)
         if was_armed:
             self._stop_continuous_motion()
+        self._set_ptz_analysis_rate(None)
         self.video.set_tracking_activity(False, owner=self.ACTIVITY_OWNER)
         self.video.set_calibration_activity(False, owner=self.ACTIVITY_OWNER)
         if was_armed:
@@ -633,7 +637,10 @@ class PtzAutomationService:
         while not self._stop.is_set():
             with self._lock:
                 active = self._armed or bool(self._shadow_owners)
-                rate = self.config.automation.decision_fps
+                rate = max(
+                    float(self.config.automation.decision_fps),
+                    self._analysis_rate or 0.0,
+                )
             if not active:
                 self._wake.wait(timeout=1.0)
                 self._wake.clear()
@@ -990,16 +997,26 @@ class PtzAutomationService:
                         # subject: steer on the union that includes the people
                         # who are off the edge rather than dropping to
                         # motor-space recovery. While the frame is still too
-                        # tight to hold them all, steer on the people actually
-                        # in shot so widening -- not panning -- does the work.
+                        # tight to hold them all, the release path steers on
+                        # the people actually in shot. In Dev that chased
+                        # whoever was visible: two people splitting to
+                        # opposite walls whipped the camera 3,000 units each
+                        # way. Dev steers on the whole group and widens.
                         else _subject_union(ptz_snapshot)
-                        if partial_group_visible and decision.widen_before_recentering
+                        if partial_group_visible
+                        and decision.widen_before_recentering
+                        and not self.tracking_refinements_enabled
                         else decision.live_subject_bounds
                         if partial_group_visible
                         else None
                     ),
                     authority_generation=authority_generation,
                     group_tracking=locked_subject_count > 1,
+                    observed_at=(
+                        ptz_snapshot.frame_captured_monotonic
+                        or ptz_snapshot.last_analysis_monotonic
+                        or None
+                    ),
                 )
             else:
                 self._send_bounded_command(
@@ -1279,6 +1296,7 @@ class PtzAutomationService:
         live_bounds: NormalizedRect | None,
         authority_generation: int,
         group_tracking: bool = False,
+        observed_at: float | None = None,
     ) -> None:
         with self._lock:
             if (
@@ -1308,11 +1326,14 @@ class PtzAutomationService:
                 responsive_tracking=self.tracking_refinements_enabled,
                 image_motion_scale=image_motion_scale,
                 frame_spans=frame_spans,
+                observed_at=observed_at,
             )
+            motion_active = self._velocity.motion_active
             previous = self._last_velocity_command
             refresh = self.config.automation.continuous_command_refresh_seconds
             refresh_due = command.moving and now - self._last_velocity_sent >= refresh
             should_send = command != previous or refresh_due
+        self._update_analysis_rate(now, motion_active)
         if not should_send:
             return
 
@@ -1363,7 +1384,41 @@ class PtzAutomationService:
             zoom_speed=command.zoom,
         )
 
+    def _update_analysis_rate(self, now: float, active: bool) -> None:
+        """Dev: analyse the PTZ at 12/s while anything moves, else as configured.
+
+        ProPresenter shares this Mac and has priority, so the fast rate is
+        held only while it buys something: the subject or camera moving, the
+        subject off centre, a widening escape or a reacquisition. 1.5 s of
+        calm returns to the configured rate (4/s by default).
+        """
+
+        if not (self.tracking_refinements_enabled and self._armed):
+            return
+        if active:
+            self._fast_analysis_until = now + _FAST_ANALYSIS_HOLD_SECONDS
+        rate = (
+            _FAST_ANALYSIS_FPS
+            if now < self._fast_analysis_until
+            else float(self.config.analysis_fps)
+        )
+        self._set_ptz_analysis_rate(rate)
+
+    def _set_ptz_analysis_rate(self, rate: float | None) -> None:
+        if rate == self._analysis_rate:
+            return
+        self._analysis_rate = rate
+        setter = getattr(self.video.tracking, "set_analysis_rate", None)
+        if setter is not None:
+            setter(VideoSourceKey.PTZ, rate)
+        if rate is not None:
+            # Wake the decision loop so it adopts the new rate immediately.
+            self._wake.set()
+
     def _stop_continuous_motion(self) -> None:
+        # Holding still while armed means waiting to (re)acquire someone:
+        # keep looking at the fast rate.
+        self._update_analysis_rate(time.monotonic(), True)
         with self._lock:
             previous = self._last_velocity_command
             self._velocity.halt()
@@ -1626,6 +1681,10 @@ def _centred_motor_pose(
         actual.zoom,
     )
 
+
+# Dev's variable analysis rate (see _update_analysis_rate).
+_FAST_ANALYSIS_FPS = 12.0
+_FAST_ANALYSIS_HOLD_SECONDS = 1.5
 
 # Field-of-view multiple the PTZ opens to when a locked person leaves the shot.
 _HANDOFF_WIDENING = 1.6

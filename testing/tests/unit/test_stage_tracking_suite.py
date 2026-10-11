@@ -100,16 +100,21 @@ def test_motor_latency_applies_no_motion_before_command_arrives():
     camera.advance(.2)
     assert camera.pose==pose
     camera.advance(.1)
-    assert camera.pose.pan==pose.pan-260
-    assert camera.pose.tilt==pose.tilt+120
+    expected=SimulatedPanasonic(pose,measured_rates=True)
+    asyncio.run(expected.pan_tilt(99,1));expected.advance(.1)
+    assert camera.pose==expected.pose
+    assert camera.pose.pan<pose.pan and camera.pose.tilt>pose.tilt
 
 
 def test_zero_delay_motor_matches_existing_integrator():
     pose=PtzMotorPose(43000,34000,3000)
-    cameras=[DelayedPanasonic(pose,delay=0,response=0),SimulatedPanasonic(pose)]
+    cameras=[DelayedPanasonic(pose,delay=0,response=0),SimulatedPanasonic(pose,measured_rates=True)]
     for camera in cameras:
         asyncio.run(camera.pan_tilt(70,35));asyncio.run(camera.zoom(45));camera.advance(.25)
-    assert cameras[0].pose==cameras[1].pose
+    # Pan/tilt rates depend on zoom, which changes during the move; the
+    # delayed camera integrates in 10 ms steps, so allow rounding-level drift.
+    a,b=cameras[0].pose,cameras[1].pose
+    assert abs(a.pan-b.pan)<=2 and abs(a.tilt-b.tilt)<=2 and a.zoom==b.zoom
 
 
 def test_stop_command_stops_latched_motion_after_latency():
@@ -213,3 +218,18 @@ def test_footage_acceleration_changes_time_not_path():
     fast,_=recorded_case('fast',count=1,playback=16)
     assert fast.steps[-1][0].x==pytest.approx(slow.steps[-1][0].x)
     assert len(fast.steps)<len(slow.steps)
+
+
+def test_stage_camera_moves_the_picture_at_the_measured_aw_he120_speed():
+    # Stage cases judge reach against the real camera, which slows pan as it
+    # zooms in: the same command must move the *picture* at the measured rate.
+    from production_hub.integrations.panasonic_awp import speed_model
+    from testing.harness.ptz_tracking import build_geometry
+    geometry=build_geometry()
+    for zoom in (2238,3500):
+        pose=PtzMotorPose(43000,34000,zoom)
+        camera=DelayedPanasonic(pose,delay=0,response=0)
+        asyncio.run(camera.pan_tilt(76,50));camera.advance(.5)
+        span,_=geometry.image_axis_motor_units(pose)
+        frames_per_second=(pose.pan-camera.pose.pan)/span/.5
+        assert abs(frames_per_second-speed_model.picture_speed('pan',26,zoom))<.02
