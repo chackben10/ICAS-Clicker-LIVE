@@ -15,9 +15,12 @@ Last updated 2026-10-11 (evening) by Claude. Read this before touching PTZ track
   (`git merge-tree main dev`) shows 10 conflicts: tracking modules, README,
   feature matrix, `testing/harness/ptz_tracking.py`,
   `test_single_subject_easing.py`. Resolving that merge is the user's call.
-- The new controller work is on branch **`dev-pursuit-wip`**, not on
-  `dev`. It passes every test, but it hasn't been tried on the real camera
-  yet. See "Work in progress" below.
+- **`dev` is the only experimental branch** (user rule). Don't create
+  side branches such as WIP branches; commit unfinished PTZ work to `dev`
+  and say in the commit and here what isn't verified yet.
+- `dev` now carries the new pursuit controller and variable rate. It passes
+  every test but hasn't been tried on the real camera yet. See "Current
+  work" below.
 
 ## Running Production Hub Dev from `dev`
 
@@ -82,19 +85,19 @@ analysis.
 
 | # | Symptom (live) | Root cause found |
 |---|---|---|
-| 1 | Two people split to opposite sides; the camera whip-pans 3,000 units to one side wall, then the other (run E, 21:10:57) | `ptz_automation.py`, partial-group branch of `_send_continuous_command`: with `widen_before_recentering` the speed command steers on `_subject_union(ptz_snapshot)`, i.e. **only the visible person**, against the correct composed `desired_pose` (the midpoint). **Fixed on WIP:** Dev steers on `decision.live_subject_bounds` (whole group); a clipped group member no longer forces a hard pan (groups widen instead). |
+| 1 | Two people split to opposite sides; the camera whip-pans 3,000 units to one side wall, then the other (run E, 21:10:57) | `ptz_automation.py`, partial-group branch of `_send_continuous_command`: with `widen_before_recentering` the speed command steers on `_subject_union(ptz_snapshot)`, i.e. **only the visible person**, against the correct composed `desired_pose` (the midpoint). **Fixed on dev:** Dev steers on `decision.live_subject_bounds` (whole group); a clipped group member no longer forces a hard pan (groups widen instead). |
 | 2 | Walker reaches the frame edge every 10-15 s; camera crawls 6-60 units/0.1 s | At sermon zoom the AW-HE120 already slows pan (measured: speed 26 ≈ 390 units/s at zoom 3500 vs 2,800 at 2238). Dev's `continuous_pan_max_speed=26` plus `image_motion_scale` slowed it a **second** time, to ≈0.23 frame/s or less. A walker needs ~0.5-1 frame/s. |
 | 3 | Camera keeps panning the wrong way ~1 s after the subject turns | Speed slew limit (18/s) also limits **braking**; `_predicted_error` zeroes the target rather than reversing. |
 | 4 | Lost speaker for 10-12 s after walking off the edge (run D, 21:05:48) | The handoff followed the right person, but: (a) speed as in #2; (b) never widened (zoom held ~3516); (c) hit `audience_handoff_max_seconds=8` and held; (d) the guard rejects any Audience-reported reversal. |
 | 5 | Speaker stepped down off the platform; only the top of the head visible at the bottom for 10 s (run D, 21:06:54) | Tilt barely moves (speed ~3 for 150-unit errors). The detector can't see a person from a head sliver. Widening on loss would have recovered it. |
-| 6 | Two-person zoom hunt: 7 reversals / 1,470 units in 40 s; one person clipped at the edge (first recording, 20:49:34) | Portrait group composition fills `group_maximum_width_occupancy=0.92` with only a 0.015 edge margin. Box jitter flips between "zoom in" and "touches edge → widen". **WIP:** Dev never tightens while anyone is within 8% of a side edge. |
-| 7 | "PTZ analysis 0.9/s" right after arming | Display only: the rate estimate warms up. The real rate was 4/s. **Fixed on WIP:** the readout averages only the last 3 s. |
+| 6 | Two-person zoom hunt: 7 reversals / 1,470 units in 40 s; one person clipped at the edge (first recording, 20:49:34) | Portrait group composition fills `group_maximum_width_occupancy=0.92` with only a 0.015 edge margin. Box jitter flips between "zoom in" and "touches edge → widen". **On dev:** Dev never tightens while anyone is within 8% of a side edge. |
+| 7 | "PTZ analysis 0.9/s" right after arming | Display only: the rate estimate warms up. The real rate was 4/s. **Fixed on dev:** the readout averages only the last 3 s. |
 
 ## Rate (user decisions)
 
 - The user allows more than 4 analyses/s if it makes tracking fluid.
   **ProPresenter on the same Mac has priority.**
-- **Variable rate, implemented on WIP (Dev only, while armed).**
+- **Variable rate, implemented on dev (Dev app only, while armed).**
   - PTZ analysis runs at 12/s while anything moves, or the subject is more
     than 25% off centre, or an escape or a reacquisition is running. It
     returns to the configured `analysis_fps` (4) after 1.5 s of calm.
@@ -112,7 +115,7 @@ analysis.
   main's twin scenarios. dev has no twin scenarios. Add one before shipping
   a higher rate.
 
-## Work in progress: branch `dev-pursuit-wip` (not finished)
+## Current work on `dev` (not yet live-tested)
 
 1. **Measured AW-HE120 speed model** copied unchanged from main:
    `Production_Hub_App/production_hub/integrations/panasonic_awp/speed_model.py`.
@@ -166,8 +169,8 @@ Stage motion matrix, 228 cases, realistic camera, `--counts 1,2,3`:
 
 | Build | 4/s | 8/s | adaptive 4↔12 |
 |---|---|---|---|
-| `dev` as committed | 26 | 26 | – |
-| WIP now | 60 | 100 | 100 |
+| `dev` at 1b66138 (Codex version) | 26 | 26 | – |
+| `dev` now | 60 | 100 | 100 |
 
 - Remaining failures:
   - Fast walks (3-5 body widths/s) leaving the harness's calibrated sweep
@@ -202,9 +205,10 @@ Next steps:
 3. Add a look-alike crossing scenario before trusting 12/s identity.
 4. Widen the harness calibrated sweep (or make it configurable) so fast
    walks are scored fairly.
-5. Merge `dev-pursuit-wip` into `dev` once live testing is good.
+5. If live testing goes badly, revert on `dev`. The Codex version the user
+   live-tested is commit `1b66138`.
 
-## Debugging tools (on `dev-pursuit-wip`, `testing/tools/ptz_debug/`)
+## Debugging tools (`testing/tools/ptz_debug/`)
 
 - `ptz_telemetry_logger.py OUT.jsonl`: 10 Hz poll of the Dev API.
   Read-only; never touches ProPresenter.
