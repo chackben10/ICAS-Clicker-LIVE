@@ -85,3 +85,21 @@ def test_live_playlist_without_slide_number_is_not_labelled_inactive(page, safe_
     page.goto(safe_web_base_url+'/index.html')
     expect(page.locator('#presentationName')).to_have_text('sermon')
     expect(page.locator('#statusText')).to_have_text('Live · Slide position unavailable')
+
+
+@pytest.mark.browser
+def test_estimated_position_is_highlighted_and_labelled(page, safe_web_base_url):
+    slides = [{'enabled': True, 'text': '', 'notes': f'Note {n}'} for n in range(6)]
+    state = {'presentation': {'id': {'uuid': 'sermon', 'name': 'sermon'}, 'groups': [{'slides': slides}]},
+             'slide_index': {'presentation_index': {'presentation_id': {'uuid': 'sermon'}, 'index': 4, 'estimated': True}},
+             'presentation_mode': 'live', 'position_estimated': True}
+    page.route('**/active-presentation', lambda route: route.fulfill(json=state))
+    page.route('**/thumbnail?*', lambda route: route.fulfill(body=image_bytes(), content_type='image/png'))
+    page.goto(safe_web_base_url+'/index.html')
+    expect(page.locator('#statusText')).to_have_text('Slide 5* of 6')
+    expect(page.locator('.slide-item.current.estimated')).to_have_count(1)
+    state['slide_index']['presentation_index'].pop('estimated')
+    state['position_estimated'] = False
+    page.evaluate('fetchStatus()')
+    expect(page.locator('#statusText')).to_have_text('Slide 5 of 6')
+    expect(page.locator('.slide-item.current.estimated')).to_have_count(0)

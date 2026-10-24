@@ -7,6 +7,7 @@
         "testing/tests/contracts/test_endpoint_contracts.py::test_every_default_endpoint_has_a_valid_contract",
         "testing/tests/contracts/test_endpoint_contracts.py::test_endpoint_validation_rejects_bad_inputs",
         "testing/tests/unit/test_clicker_presentation_reliability.py::PresentationReliabilityTests",
+        "testing/tests/unit/test_clicker_presentation_reliability.py::MissingPositionTests",
         "testing/tests/unit/test_clicker_presentation_reliability.py::ThumbnailReliabilityTests"
       ],
       "features": [
@@ -216,7 +217,8 @@
         "testing/tests/browser/test_clicker_reliability.py::test_clicker_keeps_notes_when_snapshot_identity_disagrees",
         "testing/tests/browser/test_clicker_reliability.py::test_clicker_retries_initial_thumbnail_failure_and_invalid_image",
         "testing/tests/browser/test_clicker_reliability.py::test_slow_status_requests_do_not_starve_rendering_or_overlap",
-        "testing/tests/browser/test_clicker_reliability.py::test_live_playlist_without_slide_number_is_not_labelled_inactive"
+        "testing/tests/browser/test_clicker_reliability.py::test_live_playlist_without_slide_number_is_not_labelled_inactive",
+        "testing/tests/browser/test_clicker_reliability.py::test_estimated_position_is_highlighted_and_labelled"
       ],
       "features": [
         "index.html",

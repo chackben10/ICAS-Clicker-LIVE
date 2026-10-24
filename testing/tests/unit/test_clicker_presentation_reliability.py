@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from PIL import Image
@@ -141,6 +142,88 @@ class PresentationReliabilityTests(unittest.IsolatedAsyncioTestCase):
         result = await self.service.full_presentation()
         self.assertIsNone(result['presentation'])
         self.service.client.trigger.assert_not_awaited()
+
+
+class MissingPositionTests(unittest.IsolatedAsyncioTestCase):
+    """ProPresenter 22 leaves out positions; the hub fills only what it can justify."""
+
+    def setUp(self):
+        self.service = ProPresenterService(ProPresenterConfig())
+        self.service._status_stream = SimpleNamespace(connected=True)
+        self.service.slide_index = AsyncMock(return_value={'presentation_index': None})
+        self.service.monitored_slide_index = AsyncMock(return_value={'presentation_index': None})
+        self.service._active_playlist_uuid = AsyncMock(return_value='sermon')
+        self.sermon = document('sermon', slides=6)
+        self.service.active_presentation = AsyncMock(return_value=self.sermon)
+        self.service.client.trigger = AsyncMock(return_value=True)
+
+    def push(self, uuid=None, index=None):
+        self.service._note_position(position(uuid, index) if uuid else {'presentation_index': None}, pushed=True)
+
+    async def position(self):
+        result = await self.service.full_presentation()
+        index = result['slide_index']['presentation_index']
+        return (index['index'], result['position_estimated']) if index else None
+
+    async def test_idle_decay_keeps_the_last_reported_position(self):
+        self.push('sermon', 3)
+        self.assertEqual((3, False), await self.position())
+
+    async def test_unreported_clicker_press_is_estimated_from_last_position(self):
+        self.push('sermon', 3)
+        await self.service.next_slide()
+        self.push()
+        self.assertEqual((4, True), await self.position())
+        await self.service.previous_slide()
+        await self.service.previous_slide()
+        self.assertEqual((2, True), await self.position())
+
+    async def test_estimate_skips_disabled_slides_and_stops_at_the_ends(self):
+        self.sermon['presentation']['groups'][0]['slides'][4]['enabled'] = False
+        self.push('sermon', 3)
+        await self.service.next_slide()
+        self.push()
+        self.assertEqual((5, True), await self.position())
+        await self.service.next_slide()
+        self.assertEqual((5, True), await self.position())
+
+    async def test_report_from_propresenter_replaces_the_estimate(self):
+        self.push('sermon', 3)
+        await self.service.next_slide()
+        self.push()
+        self.push('sermon', 4)
+        self.assertEqual((4, False), await self.position())
+
+    async def test_unreported_cue_not_sent_by_the_hub_is_not_guessed(self):
+        self.push('sermon', 3)
+        self.push()
+        self.assertIsNone(await self.position())
+
+    async def test_press_reported_while_trigger_was_in_flight_is_not_double_counted(self):
+        self.push('sermon', 3)
+        async def trigger(path):
+            self.push('sermon', 4)
+            return True
+        self.service.client.trigger = trigger
+        await self.service.next_slide()
+        self.assertEqual((4, False), await self.position())
+
+    async def test_position_from_another_document_is_never_applied(self):
+        self.push('song', 3)
+        await self.service.next_slide()
+        self.assertIsNone(await self.position())
+
+    async def test_without_the_status_stream_idle_decay_is_not_bridged(self):
+        self.push('sermon', 3)
+        self.service._status_stream = None
+        self.assertIsNone(await self.position())
+
+    async def test_focused_jump_is_estimated_at_the_requested_slide(self):
+        self.push('sermon', 1)
+        self.service.slide_index = AsyncMock(return_value={'presentation_index': None})
+        await self.service.focus_slide(5)
+        self.push()
+        self.assertEqual((5, True), await self.position())
 
 
 class ThumbnailReliabilityTests(unittest.IsolatedAsyncioTestCase):

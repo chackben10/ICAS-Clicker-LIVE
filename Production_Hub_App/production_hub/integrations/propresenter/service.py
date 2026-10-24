@@ -32,6 +32,12 @@ class ProPresenterService:
         self._status_ingest = None
         # Set by the application so the stream can stop the press-to-cue clock.
         self.press_to_cue: Any | None = None
+        # The last slide position ProPresenter actually reported, how many
+        # slide_index pushes the stream had seen then, and the clicker presses
+        # sent since. See _fill_missing_position.
+        self._position_events = 0
+        self._known_position: dict[str, Any] | None = None
+        self._pending_press: dict[str, Any] | None = None
 
     @staticmethod
     def _cue_signature(path: str, data: Any) -> str:
@@ -93,6 +99,8 @@ class ProPresenterService:
             cache_key = cache_keys.get(path)
             if cache_key is not None:
                 self._cache_monitor_value(cache_key, data if data is not None else {})
+            if path == "presentation/slide_index":
+                self._note_position(data, pushed=True)
             if path == "look/current" and isinstance(data, dict):
                 self._cache_monitor_value(
                     "current_look",
@@ -305,6 +313,91 @@ class ProPresenterService:
         except (TypeError, ValueError):
             return False
 
+    def _note_position(self, data: Any, *, pushed: bool) -> None:
+        if pushed:
+            self._position_events += 1
+        position = data.get("presentation_index") if isinstance(data, dict) else None
+        if not isinstance(position, dict) or position.get("index") is None:
+            return
+        try:
+            index = int(position["index"])
+        except (TypeError, ValueError):
+            return
+        uuid = str((position.get("presentation_id") or {}).get("uuid") or "")
+        known = self._known_position
+        if (known and known["uuid"] == uuid and known["index"] == index
+                and known["events"] == self._position_events):
+            return
+        self._known_position = {"uuid": uuid, "index": index, "events": self._position_events}
+
+    def _record_press(self, step: int, known_before: dict[str, Any] | None) -> None:
+        known = self._known_position
+        pending = self._pending_press
+        if known is None or known is not known_before:
+            # ProPresenter reported a position while the trigger was in
+            # flight: this press was reported, so there is nothing to infer.
+            self._pending_press = None
+        elif pending is not None and pending["known"] is known:
+            self._pending_press = {**pending, "step": pending["step"] + step}
+        else:
+            self._pending_press = {"known": known, "index": known["index"], "step": step}
+
+    def _record_jump(self, index: int, known_before: dict[str, Any] | None) -> None:
+        known = self._known_position
+        self._pending_press = (
+            {"known": known, "index": index, "step": 0} if known and known is known_before else None
+        )
+
+    def _fill_missing_position(self, after: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        """Supply a live position ProPresenter 22 left out.
+
+        Two different gaps. A GET of slide_index decays to null about 12 s
+        after a cue while the stream pushes nothing: the last reported
+        position is still the real one. And after an idle pause a cue can be
+        pushed with no position at all: if a clicker press caused it, step
+        from the last reported position and mark the result as estimated.
+        Any later report from ProPresenter replaces both.
+        """
+
+        uuid = self._active_uuid(payload)
+        known = self._known_position
+        if not uuid or not known or known["uuid"].casefold() != uuid.casefold():
+            return after
+        pending = self._pending_press
+        if pending is not None and pending["known"] is known:
+            index = self._step_enabled(payload, pending["index"], pending["step"])
+            estimated = True
+        elif self.status_stream_connected and self._position_events == known["events"]:
+            index, estimated = known["index"], False
+        else:
+            return after
+        if index is None:
+            return after
+        position: dict[str, Any] = {"index": index, "presentation_id": {"uuid": uuid}}
+        if estimated:
+            position["estimated"] = True
+        return {**after, "presentation_index": position}
+
+    @staticmethod
+    def _step_enabled(payload: dict[str, Any], start: int, step: int) -> int | None:
+        presentation = payload.get("presentation")
+        if not isinstance(presentation, dict):
+            return None
+        slides = [slide for group in presentation.get("groups") or [] for slide in group.get("slides") or []]
+        if not 0 <= start < len(slides):
+            return None
+        index = start
+        direction = 1 if step > 0 else -1
+        for _ in range(abs(step)):
+            candidate = index + direction
+            # ProPresenter's next/previous skip disabled slides.
+            while 0 <= candidate < len(slides) and (slides[candidate] or {}).get("enabled") is False:
+                candidate += direction
+            if not 0 <= candidate < len(slides):
+                break
+            index = candidate
+        return index
+
     def _blank_presentation(self, reason: str) -> dict[str, Any]:
         return {"presentation": None, "reason": reason}
 
@@ -376,7 +469,16 @@ class ProPresenterService:
                 # Right after a playlist switch ProPresenter 22 can label the
                 # previous document's position with the new document's UUID.
                 after = {**after, "presentation_index": None}
-            return {**payload, "slide_index": after, "presentation_mode": "live" if live else "focused"}
+            if self._has_slide_index(after):
+                self._note_position(after, pushed=False)
+            elif live:
+                after = self._fill_missing_position(after, payload)
+            return {
+                **payload,
+                "slide_index": after,
+                "presentation_mode": "live" if live else "focused",
+                "position_estimated": bool((after.get("presentation_index") or {}).get("estimated")),
+            }
         raise RuntimeError("ProPresenter changed presentations while reading; retry the snapshot")
 
     def _base_from_slide_index(self, data: dict[str, Any], *, playlist_uuid: str = "") -> str:
@@ -405,8 +507,9 @@ class ProPresenterService:
         """
 
         base = await self._fast_presentation_base()
+        known_before = self._known_position
         try:
-            return await self.client.trigger(f"{base}/{verb}/trigger")
+            result = await self.client.trigger(f"{base}/{verb}/trigger")
         except ProPresenterHttpError:
             # ProPresenter rejected the cached base. Re-read it authoritatively
             # and retry once. A transport failure is not retried here: the
@@ -414,7 +517,9 @@ class ProPresenterService:
             corrected = await self.refresh_presentation_base()
             if corrected == base:
                 raise
-            return await self.client.trigger(f"{corrected}/{verb}/trigger")
+            result = await self.client.trigger(f"{corrected}/{verb}/trigger")
+        self._record_press(1 if verb == "next" else -1, known_before)
+        return result
 
     async def next_slide(self) -> bool:
         return await self._advance("next")
@@ -424,7 +529,10 @@ class ProPresenterService:
 
     async def focus_slide(self, index: int) -> bool:
         await self.refresh_presentation_base()
-        return await self.client.trigger(f"{self._current_base}/{int(index)}/trigger")
+        known_before = self._known_position
+        result = await self.client.trigger(f"{self._current_base}/{int(index)}/trigger")
+        self._record_jump(int(index), known_before)
+        return result
 
     async def trigger_presentation_slide(self, uuid: str, index: int) -> bool:
         uuid = str(uuid or "").strip()

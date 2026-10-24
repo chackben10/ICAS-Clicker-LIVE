@@ -172,6 +172,13 @@
       cursor: default;
     }
 
+    /* ProPresenter skipped reporting this cue; the hub stepped from the last
+       reported slide. Replaced as soon as ProPresenter reports again. */
+    .slide-item.current.estimated {
+      outline: 2px dashed var(--slide-text-current);
+      outline-offset: -6px;
+    }
+
     .slide-item.selected {
       outline: var(--selected-outline);
       outline-offset: 3px;
@@ -1773,6 +1780,7 @@
 
       if (isCurrent) {
         item.classList.add("current");
+        if (state.estimated) item.classList.add("estimated");
         item.disabled = true;
       } else if (isPending) {
         item.classList.add("selected");
@@ -1848,7 +1856,7 @@
       return slides;
     }
 
-    function updateStatusText(currentIndex, totalSlides, focused) {
+    function updateStatusText(currentIndex, totalSlides, focused, estimated = false) {
       dom.statusText.replaceChildren();
 
       if (!focused && currentIndex === null) {
@@ -1872,7 +1880,9 @@
       const current = document.createElement("span");
       current.id = "slideCurrent";
       current.className = "status-current";
-      current.textContent = currentIndex + 1;
+      // An asterisk marks a slide the hub estimated because ProPresenter
+      // skipped reporting the cue.
+      current.textContent = `${currentIndex + 1}${estimated ? "*" : ""}`;
 
       const total = document.createElement("span");
       total.id = "slideTotal";
@@ -1881,6 +1891,7 @@
       dom.statusText.appendChild(current);
       dom.statusText.append(" of ");
       dom.statusText.appendChild(total);
+
     }
 
     function renderSlides(slides, state, settings) {
@@ -2694,6 +2705,7 @@
         const slides = getSlidesFromPresentation(presentation);
         const totalSlides = slides.length;
         const indexValue = indexResponse.presentation_index?.index ?? null;
+        const estimated = indexValue !== null && indexResponse.presentation_index?.estimated === true;
         const focused = presentationResponse.presentation_mode
           ? presentationResponse.presentation_mode !== "live"
           : indexValue === null;
@@ -2701,7 +2713,7 @@
         clearThumbnailStateForNewPresentation(uuid);
 
         dom.presentationName.textContent = name;
-        updateStatusText(indexValue, totalSlides, focused);
+        updateStatusText(indexValue, totalSlides, focused, estimated);
 
         if (!focused && pendingSelectedIndex === indexValue) {
           pendingSelectedIndex = null;
@@ -2711,7 +2723,7 @@
 
         const currentSlideEl = renderSlides(
           slides,
-          { uuid, currentIndex: indexValue, focused, mode: "live", interactionLocked: false },
+          { uuid, currentIndex: indexValue, focused, estimated, mode: "live", interactionLocked: false },
           settings
         );
 
