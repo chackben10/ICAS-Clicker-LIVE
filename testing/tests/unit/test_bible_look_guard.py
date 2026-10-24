@@ -288,7 +288,7 @@ def test_presentation_current_is_subscribed_but_never_cached_as_active() -> None
 def test_bible_endpoint_triggers_the_configured_macro() -> None:
     """The manual override remains available, but nothing depends on it."""
 
-    import os
+    from pathlib import Path
     from tempfile import TemporaryDirectory
     from unittest.mock import AsyncMock
 
@@ -298,8 +298,7 @@ def test_bible_endpoint_triggers_the_configured_macro() -> None:
     from production_hub.app.bootstrap import build_context
 
     with TemporaryDirectory() as directory:
-        os.environ["PRODUCTION_HUB_DATA_ROOT"] = directory
-        context = build_context()
+        context = build_context(Path(directory))
         context.propresenter.client.trigger_macro = AsyncMock(return_value=True)
         client = TestClient(create_app(context))
 

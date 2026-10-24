@@ -194,7 +194,20 @@ class ProPresenterService:
         if not uuid:
             raise ValueError("Presentation UUID is required")
         uuid_q = self.client.quote_segment(uuid)
-        return await self.client.get_json(f"/presentation/{uuid_q}")
+        try:
+            payload = await self.client.get_json(f"/presentation/{uuid_q}")
+        except ProPresenterHttpError as exc:
+            if exc.code != 404:
+                raise
+            # Some migrated ProPresenter 22 documents are readable as current
+            # but are missing from the UUID index. Never substitute an unrelated
+            # current document (in particular, its sermon notes).
+            payload = await self.client.get_json("/presentation/current")
+            if self._active_uuid(payload).casefold() != uuid.casefold():
+                raise exc
+        if self._active_uuid(payload).casefold() != uuid.casefold():
+            raise ValueError("ProPresenter returned a different presentation than requested")
+        return payload
 
     async def focused_playlist(self) -> dict[str, Any]:
         return await self.client.get_json("/playlist/focused")
@@ -234,10 +247,31 @@ class ProPresenterService:
 
     async def refresh_presentation_base(self) -> str:
         try:
-            return self._base_from_slide_index(await self.slide_index())
+            data = await self.slide_index()
+            playlist_uuid = await self._active_playlist_uuid() if not self._has_slide_index(data) else ""
+            return self._base_from_slide_index(data, playlist_uuid=playlist_uuid)
         except Exception:
-            self._current_base = "/presentation/focused"
+            # A timeout does not mean the selected preview became live.
+            pass
         return self._current_base
+
+    @staticmethod
+    def _has_slide_index(data: dict[str, Any]) -> bool:
+        return isinstance(data, dict) and (data.get("presentation_index") or {}).get("index") is not None
+
+    async def _active_playlist_uuid(self, *, cached: bool = False) -> str:
+        if cached:
+            value = self._cached_monitor_value("active_playlist_uuid", max_age=self._monitor_cache_seconds)
+            if isinstance(value, str):
+                return value
+        data = await self.client.get_json("/playlist/active")
+        active = data.get("presentation") or {}
+        item = active.get("playlist_item") or {}
+        uuid = self._playlist_presentation_uuid(item)
+        self._cache_monitor_value("active_playlist_identity", {
+            "uuid": uuid, "name": str((item.get("id") or {}).get("name") or ""),
+        })
+        return self._cache_monitor_value("active_playlist_uuid", uuid)
 
     def _active_uuid(self, active_obj: dict[str, Any]) -> str:
         presentation = active_obj.get("presentation")
@@ -258,6 +292,19 @@ class ProPresenterService:
         blank_uuid = self.config.presentation_behavior.avoid_blank_preview_uuid
         return bool(uuid and blank_uuid and uuid == blank_uuid)
 
+    @staticmethod
+    def _position_fits(data: dict[str, Any], payload: dict[str, Any]) -> bool:
+        position = (data.get("presentation_index") or {}) if isinstance(data, dict) else {}
+        presentation = payload.get("presentation")
+        if position.get("index") is None or not isinstance(presentation, dict):
+            return True
+        slides = sum(len(group.get("slides") or []) for group in presentation.get("groups") or [])
+        total = position.get("total_cues")
+        try:
+            return int(position["index"]) < slides and (total is None or int(total) <= slides)
+        except (TypeError, ValueError):
+            return False
+
     def _blank_presentation(self, reason: str) -> dict[str, Any]:
         return {"presentation": None, "reason": reason}
 
@@ -273,49 +320,77 @@ class ProPresenterService:
         return ""
 
     async def full_presentation(self) -> dict[str, Any]:
-        await self.refresh_presentation_base()
+        # A failed live-state read is not evidence that the operator's focused
+        # document is live. Let the browser retain its last confirmed content.
+        # Bracket the document read so a cue change cannot mix one document's
+        # notes with another document's slide number.
+        for _ in range(2):
+            before = await self.slide_index()
+            position = before.get("presentation_index") or {}
+            playlist_uuid = await self._active_playlist_uuid() if not self._has_slide_index(before) else ""
+            live = position.get("index") is not None or bool(playlist_uuid)
+            focused_uuid = ""
+            if live:
+                expected = str((position.get("presentation_id") or {}).get("uuid") or playlist_uuid)
+                payload = await self.active_presentation()
+                if expected and self._active_uuid(payload).casefold() != expected.casefold():
+                    payload = await self.presentation_by_uuid(expected)
+            else:
+                focused_uuid = await self._focused_uuid()
+                if not focused_uuid or self._is_blank_preview(focused_uuid):
+                    payload = self._blank_presentation("no_focused" if not focused_uuid else "blank_preview")
+                else:
+                    payload = await self.presentation_by_uuid(focused_uuid)
+                    if (self._presentation_destination(payload) == "announcements"
+                            and self.config.presentation_behavior.ignore_announcements_focused):
+                        # Reading the clicker must not change ProPresenter's focus.
+                        payload = self._blank_presentation("focused_is_announcements")
+            after = await self.slide_index()
+            if before.get("presentation_index") != after.get("presentation_index"):
+                continue
+            if not self._has_slide_index(before) and playlist_uuid != await self._active_playlist_uuid():
+                continue
+            if not live and focused_uuid != await self._focused_uuid():
+                continue
+            if self._is_blank_preview(self._active_uuid(payload)):
+                payload = self._blank_presentation("blank_preview")
+            presentation = payload.get("presentation")
+            if isinstance(presentation, dict):
+                identity = presentation.get("id") or {}
+                playlist_identity = self._cached_monitor_value("active_playlist_identity") or {}
+                if not identity.get("name") and live and not playlist_uuid:
+                    # ProPresenter 22 can report a live document with a blank
+                    # name; its playlist entry still carries the real name.
+                    try:
+                        await self._active_playlist_uuid()
+                        playlist_identity = self._cached_monitor_value("active_playlist_identity") or {}
+                    except Exception:
+                        pass
+                if (not identity.get("name") and self._active_uuid(payload)
+                        and str(playlist_identity.get("uuid", "")).casefold() == self._active_uuid(payload).casefold()):
+                    payload = {**payload, "presentation": {**presentation, "id": {
+                        **identity, "name": playlist_identity.get("name", ""),
+                    }}}
+            self._base_from_slide_index(after, playlist_uuid=playlist_uuid)
+            if not self._position_fits(after, payload):
+                # Right after a playlist switch ProPresenter 22 can label the
+                # previous document's position with the new document's UUID.
+                after = {**after, "presentation_index": None}
+            return {**payload, "slide_index": after, "presentation_mode": "live" if live else "focused"}
+        raise RuntimeError("ProPresenter changed presentations while reading; retry the snapshot")
 
-        if self._current_base == "/presentation/active":
-            active_obj = await self.active_presentation()
-            active_uuid = self._active_uuid(active_obj)
-            if not self._is_blank_preview(active_uuid):
-                return active_obj
-
-        focused_uuid = await self._focused_uuid()
-        if not focused_uuid:
-            return self._blank_presentation("no_focused")
-        if self._is_blank_preview(focused_uuid):
-            return self._blank_presentation("blank_preview")
-
-        focused_full = await self.presentation_by_uuid(focused_uuid)
-        destination = self._presentation_destination(focused_full)
-
-        if destination == "announcements" and self.config.presentation_behavior.ignore_announcements_focused:
-            try:
-                await self.client.trigger("/presentation/active/focus")
-            except Exception:
-                pass
-            await asyncio.sleep(self.config.presentation_behavior.refocus_delay_seconds)
-            refocused_uuid = await self._focused_uuid()
-            if not refocused_uuid or self._is_blank_preview(refocused_uuid):
-                return self._blank_presentation("focused_is_announcements")
-            refocused_full = await self.presentation_by_uuid(refocused_uuid)
-            if self._presentation_destination(refocused_full) == "presentation":
-                return refocused_full
-            return self._blank_presentation("focused_is_announcements")
-
-        return focused_full
-
-    def _base_from_slide_index(self, data: dict[str, Any]) -> str:
+    def _base_from_slide_index(self, data: dict[str, Any], *, playlist_uuid: str = "") -> str:
         index = (data.get("presentation_index") or {}).get("index") if isinstance(data, dict) else None
-        self._current_base = "/presentation/active" if index is not None else "/presentation/focused"
+        self._current_base = "/presentation/active" if index is not None or playlist_uuid else "/presentation/focused"
         return self._current_base
 
     async def _fast_presentation_base(self) -> str:
         """Decide active-vs-focused from the stream cache, without a blocking GET."""
 
         try:
-            return self._base_from_slide_index(await self.monitored_slide_index())
+            data = await self.monitored_slide_index()
+            playlist_uuid = await self._active_playlist_uuid(cached=True) if not self._has_slide_index(data) else ""
+            return self._base_from_slide_index(data, playlist_uuid=playlist_uuid)
         except Exception:
             # A cold or failed cache is not worth delaying a keypress for; the
             # last known base is retried and corrected below if it was wrong.

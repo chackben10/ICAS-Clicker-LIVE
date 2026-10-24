@@ -1191,6 +1191,7 @@
 
     const PLACEHOLDER_SIZE_BYTES_MAX = 100;
     const THUMBNAIL_POLL_MS = 650;
+    const THUMBNAIL_REFRESH_MS = 20000;
     const STATUS_REFRESH_MS = 1000;
     const ACTIVATION_PERMISSION_REFRESH_MS = 1000;
     const FOCUS_REFRESH_DELAY_MS = 350;
@@ -1207,6 +1208,7 @@
     let liveStatusRequestSequence = 0;
     let presentationRequestController = null;
     let presentationRequestSequence = 0;
+    let liveStatusInFlight = false;
     let previewTriggerInFlight = false;
     let clickerPresentationActivationEnabled = null;
     let activationPermissionRefreshPromise = null;
@@ -1515,16 +1517,19 @@
         `${BASE_URL}/thumbnail?uuid=${encodeURIComponent(uuid)}&index=${encodeURIComponent(index)}` +
         (bust ? `&t=${Date.now()}` : "");
 
-      thumbInflight[key] = fetch(requestUrl, { cache: "no-store" })
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const request = fetch(requestUrl, { cache: "no-store", signal: controller.signal })
         .then(async res => {
           if (!res.ok) throw new Error(`Thumbnail request failed: ${res.status}`);
           return res.blob();
         })
         .finally(() => {
-          delete thumbInflight[key];
+          clearTimeout(timeout);
+          if (thumbInflight[key] === request) delete thumbInflight[key];
         });
-
-      return thumbInflight[key];
+      thumbInflight[key] = request;
+      return request;
     }
 
     async function loadThumbnail(uuid, index, options = {}) {
@@ -1536,8 +1541,25 @@
 
       try {
         const blob = await fetchThumbnailBlob(uuid, index, { bust: options.bust === true });
+        if (currentPresentationUuid !== uuid) return null;
         const url = URL.createObjectURL(blob);
         const oldCached = thumbCache[key];
+        if (isPlaceholderBlob(blob) && oldCached && !oldCached.isPlaceholder) {
+          URL.revokeObjectURL(url);
+          return { ...oldCached, retry: true };
+        }
+        if (!isPlaceholderBlob(blob)) {
+          const probe = new Image();
+          probe.src = url;
+          try { await probe.decode(); } catch (error) {
+            URL.revokeObjectURL(url);
+            throw error;
+          }
+        }
+        if (currentPresentationUuid !== uuid) {
+          URL.revokeObjectURL(url);
+          return null;
+        }
 
         thumbCache[key] = {
           url,
@@ -1584,9 +1606,10 @@
       }));
     }
 
-    function pollUntilThumbnailReady(uuid, index) {
+    function pollUntilThumbnailReady(uuid, index, delay = THUMBNAIL_POLL_MS) {
       const key = thumbnailKey(uuid, index);
       clearThumbPoll(key);
+      let retryDelay = THUMBNAIL_POLL_MS;
 
       const run = async () => {
         const targets = thumbTargets[key];
@@ -1597,9 +1620,11 @@
         }
 
         const result = await loadThumbnail(uuid, index, { force: true, bust: true });
+        if (currentPresentationUuid !== uuid || thumbTargets[key] !== targets) return;
 
         if (!result) {
-          thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+          retryDelay = Math.min(retryDelay * 2, 8000);
+          thumbPollTimers[key] = setTimeout(run, retryDelay);
           return;
         }
 
@@ -1612,14 +1637,16 @@
           emitThumbnailState(img, result);
         });
 
-        if (result.isPlaceholder) {
-          thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+        if (result.isPlaceholder || result.retry) {
+          retryDelay = Math.min(retryDelay * 2, 8000);
+          thumbPollTimers[key] = setTimeout(run, retryDelay);
         } else {
-          clearThumbPoll(key);
+          retryDelay = THUMBNAIL_POLL_MS;
+          thumbPollTimers[key] = setTimeout(run, THUMBNAIL_REFRESH_MS);
         }
       };
 
-      thumbPollTimers[key] = setTimeout(run, THUMBNAIL_POLL_MS);
+      thumbPollTimers[key] = setTimeout(run, delay);
     }
 
     async function attachThumbnailToImage(img, uuid, index) {
@@ -1633,15 +1660,13 @@
       }
 
       if (!result) {
-        img.classList.remove("loading");
+        pollUntilThumbnailReady(uuid, index);
         return;
       }
 
       emitThumbnailState(img, result);
 
-      if (result.isPlaceholder) {
-        pollUntilThumbnailReady(uuid, index);
-      }
+      pollUntilThumbnailReady(uuid, index, result.isPlaceholder ? THUMBNAIL_POLL_MS : THUMBNAIL_REFRESH_MS);
     }
 
     function makeTextElement(className, text, textScale) {
@@ -1825,6 +1850,11 @@
 
     function updateStatusText(currentIndex, totalSlides, focused) {
       dom.statusText.replaceChildren();
+
+      if (!focused && currentIndex === null) {
+        dom.statusText.textContent = "Live · Slide position unavailable";
+        return;
+      }
 
       if (focused) {
         dom.statusText.append("Status: ");
@@ -2271,9 +2301,13 @@
     }
 
     async function fetchJson(url, options = {}) {
-      const response = await fetch(url, { cache: "no-cache", ...options });
-      if (!response.ok) throw new Error(`Request failed: ${response.status} ${url}`);
-      return response.json();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const response = await fetch(url, { cache: "no-store", ...options, signal: options.signal || controller.signal });
+        if (!response.ok) throw new Error(`Request failed: ${response.status} ${url}`);
+        return await response.json();
+      } finally { clearTimeout(timeout); }
     }
 
     function songResultsFromPayload(payload) {
@@ -2636,15 +2670,14 @@
     }
 
     async function fetchStatus() {
-      if (presentationViewMode === "library-preview") return;
+      if (presentationViewMode === "library-preview" || liveStatusInFlight) return;
+      liveStatusInFlight = true;
 
       const sequence = ++liveStatusRequestSequence;
       const revision = presentationViewRevision;
       try {
-        const [presentationResponse, indexResponse] = await Promise.all([
-          fetchJson(`${BASE_URL}/active-presentation`),
-          fetchJson(`${BASE_URL}/slide-index`)
-        ]);
+        const presentationResponse = await fetchJson(`${BASE_URL}/active-presentation`);
+        const indexResponse = presentationResponse.slide_index || await fetchJson(`${BASE_URL}/slide-index`);
 
         if (
           sequence !== liveStatusRequestSequence ||
@@ -2654,12 +2687,16 @@
 
         const presentation = presentationFromPayload(presentationResponse);
         const uuid = presentation?.id?.uuid || null;
+        const indexUuid = indexResponse.presentation_index?.presentation_id?.uuid;
+        if (indexUuid && String(indexUuid).toLowerCase() !== String(uuid).toLowerCase()) return;
         livePresentationUuid = uuid;
-        const name = presentation?.id?.name || "No active presentation";
+        const name = presentation?.id?.name || (uuid ? "Untitled presentation" : "No active presentation");
         const slides = getSlidesFromPresentation(presentation);
         const totalSlides = slides.length;
         const indexValue = indexResponse.presentation_index?.index ?? null;
-        const focused = indexValue === null;
+        const focused = presentationResponse.presentation_mode
+          ? presentationResponse.presentation_mode !== "live"
+          : indexValue === null;
 
         clearThumbnailStateForNewPresentation(uuid);
 
@@ -2698,6 +2735,8 @@
         if (revision === presentationViewRevision && presentationViewMode === "live") {
           console.error(error);
         }
+      } finally {
+        liveStatusInFlight = false;
       }
     }
 

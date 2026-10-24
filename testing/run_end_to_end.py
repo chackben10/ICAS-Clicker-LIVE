@@ -198,7 +198,7 @@ def run_quick(report: RunReport, *, skip_browser: bool = False, skip_swift: bool
                 ),
                 environment={
                     "PRODUCTION_HUB_LIVE": "0",
-                    "PRODUCTION_HUB_DEPLOYED_SMOKE": "1",
+                    "PRODUCTION_HUB_DEPLOYED_SMOKE": "0",
                     "PRODUCTION_HUB_BROWSER_OUTPUT": str(report.output_dir / "screenshots" / engine),
                     "PRODUCTION_HUB_BROWSER_METRICS": str(report.output_dir / f"browser-{engine}-metrics.json"),
                 },

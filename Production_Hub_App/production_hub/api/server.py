@@ -206,6 +206,9 @@ def create_app(context):
             if request.url.path in {
                 "/clicker-presentation-activation",
                 "/presentation-focus-time",
+                "/active-presentation",
+                "/slide-index",
+                "/thumbnail",
             }:
                 response.headers["Cache-Control"] = "no-store"
             return response
